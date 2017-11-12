@@ -4,14 +4,17 @@ PEPDIR=pep
 CDSDIR=cds
 PEPEXT=fasta
 CDSEXT=fasta
+LOG_FOLDER=logs
 if [ ! -f config.txt ]; then
  echo "Need a config.txt file"
  exit
 fi
 
 source ./config.txt
+# make sure log folder is created
+mkdir -p $LOG_FOLDER
 
-if [ ! -d HMM/$HMM  ]; then 
+if [ ! -d HMM/${HMM}  ]; then 
  echo "need a HMM defined in config.txt and this needs to be a folder in HMM/"
  echo "usually you checkout / download https://github.com/1KFG/Phylogenomics_HMMs/releases/latest and then "
  echo "symlink/move Phylogenomics_HMMs/HMM ./HMM"
