@@ -2,8 +2,8 @@
 
 PEPDIR=pep
 CDSDIR=cds
-PEPEXT=fasta
-CDSEXT=fasta
+PEPEXT=aa.fasta
+CDSEXT=cds.fasta
 LOG_FOLDER=logs
 if [ ! -f config.txt ]; then
  echo "Need a config.txt file"
@@ -26,10 +26,10 @@ head -q -n1 $PEPDIR/*.$PEPEXT | awk -F\| '{print $1}' | awk '{print $1}' > expec
 
 if [ ! -f prefix.tab ]; then
     echo "making prefix.tab"
-    for file in $PEPDIR/*.$PEPEXT
+    for file in $PEPDIR/*.${PEPEXT}
     do
-	name=$(basename $file .$PEPEXT | perl -p -e 's/\.(aa|TFASTX|pep)//; s/\.\w+\.v\d+//;')
-	pref=$(head -n1 $file | awk -F\| '{print $1}' | awk '{print $1}' | perl -p -e 's/^>//')
+	name=$(basename $file .${PEPEXT} | perl -p -e 's/\.\w+\.v\d+//;')
+	pref=$(head -n1 $file | perl -p -e 's/^>([^\|\s]+).+/$1/')
 	echo -e "$pref\t$name"
     done > prefix.tab
 else
