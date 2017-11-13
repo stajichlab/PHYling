@@ -30,16 +30,16 @@ if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr $TOTALCPU / $JOBCPU)
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
-    echo "ls $ALN_OUTDIR/$HMM/$PEPEXT | parallel -j $JOBPARALLEL $SUBJOB_SCRIPT"
+    echo "ls $ALN_OUTDIR/$HMM/*.$PEPEXT | parallel -j $JOBPARALLEL $SUBJOB_SCRIPT"
 elif [ $QUEUEING == "slurm" ]; then
     echo "Run srun job hmmsearch"
-    for INPUTFILE in $(ls $ALN_OUTDIR/$HMM/$PEPEXT)
+    for INPUTFILE in $(ls $ALN_OUTDIR/$HMM/*.$PEPEXT)
     do
 	sbatch --ntasks $JOBCPU --nodes 1 --export=IN=$INPUTFILE $SUBJOB_SCRIPT
     done
 else
  echo "Run in serial"
- for file in $(ls $ALN_OUTDIR/$HMM/$PEPEXT)
+ for file in $(ls $ALN_OUTDIR/$HMM/*.$PEPEXT)
  do
    $SUBJOB_SCRIPT $file
  done
