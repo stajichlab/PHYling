@@ -51,3 +51,9 @@ if [[ ! -f "$OUT/$NM.domtbl" || $PEPDIR/$IN -nt $OUT/$NM.domtbl ]]; then
 else
  echo "skipping $NM - has already run"
 fi
+
+if [ ! -f $OUT/$NM.best ]; then
+    base=$(dirname $0)
+#    echo "    $base/../util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF --input $OUT/$NM.domtbl > $OUT/$NM.best"
+    $base/../util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF --input $OUT/$NM.domtbl > $OUT/$NM.best
+fi
