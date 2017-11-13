@@ -23,16 +23,16 @@ if [ ! $HMM ]; then
  echo "need to a config file to set the HMM folder name"
 fi
 
-if [ ! $INPUTFILE ]; then
-    INPUTFILE=$1
-    if [ ! $INPUTFILE ]; then
+if [ ! $IN ]; then
+    IN=$1
+    if [ ! $IN ]; then
 	echo "NO INPUT GENOME FILE"
 	exit
     fi
 fi
-INPUTFILE=$(basename $INPUTFILE)
-NM=$(basename $INPUTFILE .$PEPEXT)
-echo "g=$INPUTFILE NM=$NM"
+IN=$(basename $IN)
+NM=$(basename $IN .$PEPEXT)
+echo "g=$IN NM=$NM"
 
 MARKERS=${HMM_FOLDER}/$HMM/markers_3.hmmb
 OUT=$HMMSEARCH_OUT/$HMM
@@ -45,8 +45,8 @@ fi
 # convention is they all end in .aa.fasta - change this if not or make a variable
 
 if [[ ! -f "$OUT/$NM.domtbl" ||
-      $PEPDIR/$INPUTFILE -nt $OUT/$NM.domtbl ]]; then
- hmmsearch --cpu $CPU -E $HMMSEARCH_CUTOFF --domtblout $OUT/$NM.domtbl $MARKERS $PEPDIR/$INPUTFILE >& $OUT/$NM.log
+      $PEPDIR/$IN -nt $OUT/$NM.domtbl ]]; then
+ hmmsearch --cpu $CPU -E $HMMSEARCH_CUTOFF --domtblout $OUT/$NM.domtbl $MARKERS $PEPDIR/$IN >& $OUT/$NM.log
 else
  echo "skipping $NM - has already run"
 fi

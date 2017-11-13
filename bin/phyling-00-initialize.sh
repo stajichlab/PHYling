@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+#SBATCH --time 2:00:00 --out=logs/init.log -J init
 LISTFILE=pepfile.lst
 PEPDIR=pep
 CDSDIR=cds

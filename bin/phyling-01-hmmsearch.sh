@@ -30,7 +30,7 @@ elif [ $QUEUEING == "slurm" ]; then
     echo "Run srun job hmmsearch"
     for INPUTFILE in $(cat $LISTFILE)
     do
-	echo "srun --ntasks $JOBCPU --nodes 1 --export=INPUTFILE $SUBJOB_SCRIPT"
+	echo "srun --ntasks $JOBCPU --nodes 1 --export=IN=$INPUTFILE $SUBJOB_SCRIPT"
     done
 else
  echo "Run in serial"
