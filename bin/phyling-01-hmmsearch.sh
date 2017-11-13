@@ -25,17 +25,17 @@ fi
 if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr "$TOTALCPU / $JOBCPU")
     echo "Run parallel job hmmsearch"
-    echo "parallel -j $JOBPARALLEL $SUBJOB_SCRIPT < $LISTFILE"
+    parallel -j $JOBPARALLEL $SUBJOB_SCRIPT < $LISTFILE
 elif [ $QUEUEING == "slurm" ]; then
     echo "Run srun job hmmsearch"
     for INPUTFILE in $(cat $LISTFILE)
     do
-	echo "srun --ntasks $JOBCPU --nodes 1 --export=IN=$INPUTFILE $SUBJOB_SCRIPT"
+	sbatch --ntasks $JOBCPU --nodes 1 --export=IN=$INPUTFILE $SUBJOB_SCRIPT
     done
 else
  echo "Run in serial"
  for file in $(cat $LISTFILE)
  do
-   echo "$SUBJOB_SCRIPT $file"
+   $SUBJOB_SCRIPT $file
  done
 fi
