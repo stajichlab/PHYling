@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+LISTFILE=pepfile.lst
 PEPDIR=pep
 CDSDIR=cds
 PEPEXT=aa.fasta
@@ -35,8 +36,8 @@ if [ ! -f prefix.tab ]; then
 else
     echo "prefix.tab already exists, not updating"
 fi
-echo "make pepfile.lst for hmmsearch runs"
+echo "make $LISTFILE for hmmsearch runs"
 for f in $PEPDIR/*.$PEPEXT
 do
     basename $f
-done > pepfile.lst
+done > $LISTFILE
