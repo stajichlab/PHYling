@@ -30,7 +30,7 @@ if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr $TOTALCPU / $JOBCPU)
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
-    echo "ls $ALN_OUTDIR/$HMM/*.$PEPEXT | parallel -j $JOBPARALLEL $SUBJOB_SCRIPT"
+    ls $ALN_OUTDIR/$HMM/*.$PEPEXT | parallel -j $JOBPARALLEL $SUBJOB_SCRIPT
 elif [ $QUEUEING == "slurm" ]; then
     echo "Run srun job hmmsearch"
     for INPUTFILE in $(ls $ALN_OUTDIR/$HMM/*.$PEPEXT)
