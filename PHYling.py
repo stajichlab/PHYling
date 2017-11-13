@@ -54,7 +54,8 @@ Description: Script will setup initial data directory and files. Expects an HMM 
              config.txt and 'pep' folder as specified in config.txt file. An optional 'cds' folder
 """ % (sys.argv[1], version)
         arguments = sys.argv[2:]
-        parser = argparse.ArgumentParser(description=help,add_help=True,formatter_class=argparse.RawDescriptionHelpFormatter)
+        parser = argparse.ArgumentParser(description=help,add_help=True,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
         args = parser.parse_args(arguments)
         cmd = os.path.join(script_path, 'bin', 'phyling-00-initialize.sh')
         subprocess.call(cmd)
@@ -70,7 +71,8 @@ Arguments:   -t fungi [default]
 
 """ % (sys.argv[1], version)
         arguments = sys.argv[2:]
-        parser = argparse.ArgumentParser(description=help,add_help=True,formatter_class=argparse.RawDescriptionHelpFormatter)
+        parser = argparse.ArgumentParser(description=help,add_help=True,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
         parser.add_argument('-t','--type',default='fungi')
         args = parser.parse_args(arguments)
         url = ""
@@ -100,6 +102,7 @@ Arguments:   -t fungi [default]
                         print(fromf)
                         shutil.move(fromf,config["HMM_FOLDER"])
         print("%s HMMs installed. URL=%s Outfile=%s Dest=%s" % (args.type,url,outfile,config["HMM_FOLDER"]))
+        
     if re.match("(hmm|search)",sys.argv[1].lower()):
         help = """
 Usage:       PHYling %s <arguments>
@@ -113,5 +116,25 @@ Description: Script will search HMM set defined in config.txt against the genome
         args = parser.parse_args(arguments)
         
         cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
-        logging.warning("running {}".format(cmd))
+        subprocess.call(cmd)
+
+    elif re.match("aln",sys.argv[1].lower()):        
+        help = """
+Usage:       PHYling %s <arguments>
+version:     %s
+
+Description: Script will construct unaligned fasta files of protein and cds (if found) and
+             perform multiple alignments
+             
+""" % ('aln', version)
+        arguments = sys.argv[2:]
+        parser = argparse.ArgumentParser(description=help,add_help=True,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
+        # hmmer or muscle for multiple alignment?
+        args = parser.parse_args(arguments)
+        # optional additional arguments might be -force to make sure to overwrite all files
+        # and/or a 'clean' option to remove existing files first
+        cmd = os.path.join(script_path, 'bin', 'phyling-02-makeunaln.sh')
+        subprocess.call(cmd)
+        cmd = os.path.join(script_path, 'bin', 'phyling-03-aln.sh')
         subprocess.call(cmd)
