@@ -14,9 +14,7 @@ if [ $MODULESHOME ]; then
 #    module load BMGE # is this too slow?
 fi
 
-MARKER=$HMM
-
-DIR=aln/$MARKER
+ALN_OUTDIR=aln
 HMM_FOLDER=HMM
 LIST=alnlist.$MARKER # this is the list file
 SCRIPTDIR=$(dirname $0)
@@ -31,8 +29,8 @@ fi
 if [ ! $HMM ]; then
  echo "need to a config file to set the HMM folder name"
 fi
-
-DBDIR=${HMM_FOLDER}/${MARKER}/HMM3
+DIR=${ALN_OUTDIR}/$HMM
+DBDIR=${HMM_FOLDER}/${HMM}/HMM3
 
 if [ ! $IN ]; then
   IN=$1
