@@ -2,9 +2,10 @@
 
 #wrapper for PHYling
 
-import sys, os, subprocess, inspect, tarfile, shutil, argparse, urllib.request, configparser
+import sys, os, subprocess, inspect, tarfile, shutil, argparse, urllib.request, configparser, re
 from pathlib import Path
 
+import logging
 
 Config_file = 'config.txt'
 script_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -18,6 +19,7 @@ if os.path.exists(Config_file):
     with open(Config_file,"r") as configparse:
         for line in configparse:
             line = line.strip()
+            line = re.sub(r"\s*#.+$","",line)
             keyval = line.split("=")
             config[keyval[0]] = keyval[1]
     if not('HMM_FOLDER' in config):
@@ -98,3 +100,18 @@ Arguments:   -t fungi [default]
                         print(fromf)
                         shutil.move(fromf,config["HMM_FOLDER"])
         print("%s HMMs installed. URL=%s Outfile=%s Dest=%s" % (args.type,url,outfile,config["HMM_FOLDER"]))
+    if re.match("(hmm|search)",sys.argv[1].lower()):
+        help = """
+Usage:       PHYling %s <arguments>
+version:     %s
+
+Description: Script will search HMM set defined in config.txt against the genomes in pep
+             
+""" % ('search', version)
+        arguments = sys.argv[2:]
+        parser = argparse.ArgumentParser(description=help,add_help=True,formatter_class=argparse.RawDescriptionHelpFormatter)
+        args = parser.parse_args(arguments)
+        
+        cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
+        logging.warning("running {}".format(cmd))
+        subprocess.call(cmd)
