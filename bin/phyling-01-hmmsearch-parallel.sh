@@ -5,6 +5,7 @@
 if [ $MODULESHOME ]; then
     module load hmmer/3
 fi
+
 PEPDIR=pep
 PEPEXT=aa.fasta
 HMM_FOLDER=HMM
@@ -12,6 +13,7 @@ HMMSEARCH_CUTOFF=1e-10
 HMMSEARCH_OUT=search
 LOG_FOLDER=logs
 CPU=2
+
 if [ -f config.txt ]; then
  source config.txt
 else
@@ -30,6 +32,7 @@ if [ ! $IN ]; then
 	exit
     fi
 fi
+
 IN=$(basename $IN)
 NM=$(basename $IN .$PEPEXT)
 echo "g=$IN NM=$NM"
@@ -46,7 +49,13 @@ fi
 
 if [[ ! -f "$OUT/$NM.domtbl" ||
       $PEPDIR/$IN -nt $OUT/$NM.domtbl ]]; then
- hmmsearch --cpu $CPU -E $HMMSEARCH_CUTOFF --domtblout $OUT/$NM.domtbl $MARKERS $PEPDIR/$IN >& $OUT/$NM.log
+    hmmsearch --cpu $CPU -E $HMMSEARCH_CUTOFF --domtblout $OUT/$NM.domtbl $MARKERS $PEPDIR/$IN >& $OUT/$NM.log
 else
  echo "skipping $NM - has already run"
+fi
+
+if [ ! -f $OUT/$NM.best ]; then
+    base=$(dirname $0)
+#    echo "    $base/../util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF --input $OUT/$NM.domtbl > $OUT/$NM.best"
+    $base/../util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF --input $OUT/$NM.domtbl > $OUT/$NM.best
 fi

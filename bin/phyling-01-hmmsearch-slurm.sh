@@ -28,28 +28,20 @@ if [ ! $HMM ]; then
  echo "need to a config file to set the HMM folder name"
 fi
 
-N=$SLURM_ARRAY_TASK_ID
 MARKERS=HMM/$HMM/markers_3.hmmb
 OUT=$HMMSEARCH_OUT/$HMM
 
 # can pass which file to process on cmdline too, eg bash jobs/01_hmmsearch.sh 1
-if [ ! $N ]; then
-  N=$1
+if [ ! $IN ]; then
+  IN=$1
 fi
-
-#if [ ! $N ]; then
-# echo "need to have a job id"
-# exit;
-#fi
 
 if [ $SLURM_CPUS_ON_NODE ]; then
  CPU=$SLURM_CPUS_ON_NODE
 fi
 
 mkdir -p $OUT
-# translate the number to a line number in the list of proteomes file to determine what to run
-#G=`sed -n ${N}p $LIST`
-echo "$IN"
+
 # convention is they all end in .aa.fasta - change this if not or make a variable
 NM=`basename $IN.aa.fasta`
 echo "g=$IN"
