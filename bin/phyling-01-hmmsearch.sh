@@ -15,16 +15,10 @@ fi
 SCRIPT_DIR=$(dirname $0)
 SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-01-hmmsearch-$QUEUEING.sh
 
-JOBCOUNT=$(wc -l $LISTFILE)
-
-if [[ $JOBCOUNT == 0 || $JOBCOUNT == "" ]]; then
-    echo "No files to process, did you run PHYling init?"
-    exit
-fi
-
 if [ $QUEUEING == "parallel" ]; then
-    JOBPARALLEL=$(expr "$TOTALCPU / $JOBCPU")
+    JOBPARALLEL=$(expr $TOTALCPU / $JOBCPU)
     echo "Run parallel job hmmsearch"
+    #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
     parallel -j $JOBPARALLEL $SUBJOB_SCRIPT < $LISTFILE
 elif [ $QUEUEING == "slurm" ]; then
     echo "Run srun job hmmsearch"
