@@ -1,8 +1,10 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
+LISTFILE=pepfile.lst
 LOG_FOLDER=logs
 QUEUEING=parallel
-CPU=4
+JOBCPU=2
+TOTALCPU=4
 if [ -f config.txt ]; then
  source config.txt
 else
@@ -13,7 +15,7 @@ fi
 SCRIPT_DIR=$(dirname $0)
 SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-01-hmmsearch-$QUEUEING.sh
 
-JOBCOUNT=$(wc -l pepfile.lst)
+JOBCOUNT=$(wc -l $LISTFILE)
 
 if [[ $JOBCOUNT == 0 || $JOBCOUNT == "" ]]; then
     echo "No files to process, did you run PHYling init?"
@@ -21,15 +23,19 @@ if [[ $JOBCOUNT == 0 || $JOBCOUNT == "" ]]; then
 fi
 
 if [ $QUEUEING == "parallel" ]; then
-    echo "run parallel job set"
-    echo "parallel $SUBJOB_SCRIPT < pepfile.lst
-elsif [ $QUEUEING == "slurm" ]; then
-    echo "sbatch --array=1-$JOBCOUNT $SUBJOB_SCRIPT"
+    JOBPARALLEL=$(expr "$TOTALCPU / $JOBCPU")
+    echo "Run parallel job hmmsearch"
+    echo "parallel -j $JOBPARALLEL $SUBJOB_SCRIPT < $LISTFILE"
+elif [ $QUEUEING == "slurm" ]; then
+    echo "Run srun job hmmsearch"
+    for INPUTFILE in $(cat $LISTFILE)
+    do
+	echo "srun --ntasks $JOBCPU --nodes 1 --export=INPUTFILE $SUBJOB_SCRIPT"
+    done
 else
- echo "Just run in serial"
- for file in $(cat pepfile.lst)
+ echo "Run in serial"
+ for file in $(cat $LISTFILE)
  do
    echo "$SUBJOB_SCRIPT $file"
  done
 fi
-
