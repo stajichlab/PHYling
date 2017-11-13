@@ -1,15 +1,22 @@
 #!/usr/bin/bash
-
 #SBATCH --nodes=1
 #SBATCH --ntasks=2
 #SBATCH --mem-per-cpu=1G
 #SBATCH --job-name=hmmsearch
 #SBATCH --time=2:00:00
-#SBATCH --output=logs/hmmsearch.%A_%a.out
+#SBATCH --output=logs/hmmsearch.%A.out
 
-module load hmmer/3
-
+if [ $MODULESHOME ]; then
+    module load hmmer/3
+fi
+PEPDIR=pep
+PEPEXT=aa.fasta
+HMM_FOLDER=HMM
+HMMSEARCH_CUTOFF=1e-10
+HMMSEARCH_OUT=search
 LOG_FOLDER=logs
+CPU=2
+
 if [ -f config.txt ]; then
  source config.txt
 else
@@ -22,39 +29,33 @@ if [ ! $HMM ]; then
 fi
 
 N=$SLURM_ARRAY_TASK_ID
-PEPDIR=pep
 MARKERS=HMM/$HMM/markers_3.hmmb
-CUTOFF=1e-10
-OUT=search/$HMM
-LIST=list # this is the list file
+OUT=$HMMSEARCH_OUT/$HMM
 
 # can pass which file to process on cmdline too, eg bash jobs/01_hmmsearch.sh 1
 if [ ! $N ]; then
   N=$1
 fi
 
-if [ ! $N ]; then
- echo "need to have a job id"
- exit;
-fi
+#if [ ! $N ]; then
+# echo "need to have a job id"
+# exit;
+#fi
 
-# number of processors to use set by PBS - can change or set this to a variable
-# in config perhaps ?
-CPU=$SLURM_CPUS_ON_NODE
-if [ ! $CPU ]; then
- CPU=1
+if [ $SLURM_CPUS_ON_NODE ]; then
+ CPU=$SLURM_CPUS_ON_NODE
 fi
 
 mkdir -p $OUT
 # translate the number to a line number in the list of proteomes file to determine what to run
-G=`sed -n ${N}p $LIST`
-
+#G=`sed -n ${N}p $LIST`
+echo "$IN"
 # convention is they all end in .aa.fasta - change this if not or make a variable
-NM=`basename $G .aa.fasta`
-echo "g=$G"
+NM=`basename $IN.aa.fasta`
+echo "g=$IN"
 
-if [[ ! -f "$OUT/$NM.domtbl" || $PEPDIR/$G -nt $OUT/$NM.domtbl ]]; then
- hmmsearch --cpu $CPU -E $CUTOFF --domtblout $OUT/$NM.domtbl $MARKERS $PEPDIR/$G >& $OUT/$NM.log
+if [[ ! -f "$OUT/$NM.domtbl" || $PEPDIR/$IN -nt $OUT/$NM.domtbl ]]; then
+ echo "hmmsearch --cpu $CPU -E $HMMSEARCH_CUTOFF --domtblout $OUT/$NM.domtbl $MARKERS $PEPDIR/$IN >& $OUT/$NM.log"
 else
  echo "skipping $NM - has already run"
 fi
