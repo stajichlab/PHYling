@@ -56,7 +56,7 @@ fi
 
 if [ -f $DIR/$marker.cds.fasta ]; then
     if [ ! -f $DIR/$marker.cdsaln.trim ]; then
-	$SCRIPTDIR/util/bp_mrtrans.pl -if clustalw -of fasta \
+	$SCRIPTDIR/../util/bp_mrtrans.pl -if clustalw -of fasta \
 				      -i $DIR/$marker.aln \
 				      -s $DIR/$marker.cds.fasta \
 				      -o $DIR/$marker.cdsaln
