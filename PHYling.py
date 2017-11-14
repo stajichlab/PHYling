@@ -2,17 +2,26 @@
 
 #wrapper for PHYling
 
-import sys, os, subprocess, inspect, tarfile, shutil, argparse, urllib.request, configparser, re
+import sys, os, subprocess, inspect, tarfile, shutil, argparse
+import urllib.request, configparser, re
+import json, logging
 from pathlib import Path
 
-import logging
-
-Config_file = 'config.txt'
 script_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 sys.path.insert(0,script_path)
 
-HMMs_URL = { 'fungi': 'https://github.com/1KFG/Phylogenomics_HMMs/releases/download/v1.0/fungal_HMMs-1.0.zip',
-}
+URL_file      = os.path.join(script_path,"lib","urls.json")
+Messages_file = os.path.join(script_path,"lib","messages.json") # abstract this later based on different languages
+HMMs_URL = {}
+Messages = {}
+with open(URL_file,"r") as jsonfile:  
+    jsonToPython = json.loads(jsonfile.read())
+    HMMs_URL = jsonToPython['HMMs']
+
+with open(Messages_file,"r") as jsonfile:  
+    Messages = json.loads(jsonfile.read())
+
+Config_file = 'config.txt'
 
 config = {}
 if os.path.exists(Config_file):
@@ -30,29 +39,11 @@ else:
     
 
 version = '0.1'
-default_help = """
-Usage:       PHYling <command> <arguments>
-version:     %s
-
-Description: PHYling is a package of scripts to extract phylogenomic markers
-             Dependencies:  HMMER3 MUSCLE RAxML
-
-init:        Setup or recreate initialize files
-download:    Download HMM markers
-
-Written by Jason Stajich (2014-2017) jason.stajich[at]ucr.edu or jasonstajich.phd[AT]gmail.com
- Started in https://github.com/1KFG/Phylogenomics and https://github.com/stajichlab/phyling
-        """ % version
+default_help = Messages['commands']['default'] % version
 
 if len(sys.argv) > 1:
     if sys.argv[1].lower() == 'init' or sys.argv[1].lower() == 'initialize' or sys.argv[1].lower() == 'setup':
-        help = """
-Usage:       PHYling %s <arguments>
-version:     %s
-
-Description: Script will setup initial data directory and files. Expects an HMM folder
-             config.txt and 'pep' folder as specified in config.txt file. An optional 'cds' folder
-""" % (sys.argv[1], version)
+        help = Messages['commands']['initialize'] % (sys.argv[1], version)
         arguments = sys.argv[2:]
         parser = argparse.ArgumentParser(description=help,add_help=True,
                                          formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -61,15 +52,7 @@ Description: Script will setup initial data directory and files. Expects an HMM 
         subprocess.call(cmd)
 
     if sys.argv[1].lower() == 'download':
-        help = """
-Usage:       PHYling %s <arguments>
-version:     %s
-
-Description: Download HMM files for pre-defined phylogenomic markers. 
-
-Arguments:   -t fungi [default] 
-
-""" % (sys.argv[1], version)
+        help = Messages['commands']['download'] % (sys.argv[1], version)
         arguments = sys.argv[2:]
         parser = argparse.ArgumentParser(description=help,add_help=True,
                                          formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -77,6 +60,7 @@ Arguments:   -t fungi [default]
         args = parser.parse_args(arguments)
         url = ""
         outfile = args.type + "_HMMs.zip"
+
         if args.type in HMMs_URL:
             url = HMMs_URL[args.type]
 
@@ -104,29 +88,17 @@ Arguments:   -t fungi [default]
         print("%s HMMs installed. URL=%s Outfile=%s Dest=%s" % (args.type,url,outfile,config["HMM_FOLDER"]))
         
     if re.match("(hmm|search)",sys.argv[1].lower()):
-        help = """
-Usage:       PHYling %s <arguments>
-version:     %s
-
-Description: Script will search HMM set defined in config.txt against the genomes in pep
-             
-""" % ('search', version)
+        help = Messages['commands']['search'] % ('search', version)
         arguments = sys.argv[2:]
-        parser = argparse.ArgumentParser(description=help,add_help=True,formatter_class=argparse.RawDescriptionHelpFormatter)
+        parser = argparse.ArgumentParser(description=help,add_help=True,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
         args = parser.parse_args(arguments)
         
         cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
         subprocess.call(cmd)
 
     elif re.match("aln",sys.argv[1].lower()):        
-        help = """
-Usage:       PHYling %s <arguments>
-version:     %s
-
-Description: Script will construct unaligned fasta files of protein and cds (if found) and
-             perform multiple alignments
-             
-""" % ('aln', version)
+        help = Messages['commands']['aln'] % ('aln', version)
         arguments = sys.argv[2:]
         parser = argparse.ArgumentParser(description=help,add_help=True,
                                          formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -138,3 +110,17 @@ Description: Script will construct unaligned fasta files of protein and cds (if 
         subprocess.call(cmd)
         cmd = os.path.join(script_path, 'bin', 'phyling-03-aln.sh')
         subprocess.call(cmd)
+    elif sys.argv[1] == "version":
+        print("PHYling v%s" % version)
+    elif sys.argv[1] == "citation":
+        print(Messages["citation"])
+
+
+    else:
+        print("%s option not recognized" % sys.argv[1])
+        print(default_help)
+
+
+else:
+    print(default_help)
+
