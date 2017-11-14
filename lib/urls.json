@@ -1,0 +1,5 @@
+{
+    "HMMs": {
+	"fungi": "https://github.com/1KFG/Phylogenomics_HMMs/releases/download/v1.0/fungal_HMMs-1.0.zip"
+    }
+}
