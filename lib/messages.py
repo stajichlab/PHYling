@@ -46,17 +46,56 @@ Arguments:   -t fungi [default]
 Usage:       PHYling %s <arguments>
 version:     %s
 
-Description: Script will search HMM set defined in config.txt against the genomes in pep
+Description: Search HMM set defined in config.txt against the genomes in pep
              
 """,
             "aln": """
 Usage:       PHYling %s <arguments>
 version:     %s
 
-Description: Script will construct unaligned fasta files of protein and cds (if found) and
+Description: Construct unaligned fasta files of protein and cds (if found) and
              perform multiple alignments
              
+""",
+            "superaln": """
+Usage:       PHYling %s <arguments>
+version:     %s
+
+Description: Concatenate gene alignments into a superalignment
+
+Options:    -a [denovo|hmmalign]
+             
+""",        
+            "phylo": """
+Usage:       PHYling %s <arguments>
+version:     %s
+
+Description: Run Phylogenetic reconstruction on superalignment
+
+Options:     -t [raxml|iqtree|fasttree]
+             -m [aa|cds]
+             -a [denovo|hmmalign]
+""",
+            "genetrees": """
+Usage:       PHYling %s <arguments>
+version:     %s
+
+Description: Run Phylogenetic reconstruction on each gene from marker
+
+Options:     -t [raxml|fasttree]
+             -m [aa|cds]
+""",
+            "coalesce": """
+Usage:       PHYling %s <arguments>
+version:     %s
+
+Description: Run ASTRAL gene tree reconciliation software
+
+Options:     -t [raxml|iqtree|fasttree] - source tree names
+             -m [aa|cds]                - protein or cds trees
+             -b                         - sample bootstrap files if generated (RAXML)
 """
+
         },
         "citation": """
 Stajich JE. 2017 PHYling: Phylogenomic pipeline from core markers on genomes to unassembled reads. https://github.com/stajichlab/PHYling_unified

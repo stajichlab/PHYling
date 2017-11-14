@@ -112,6 +112,38 @@ if len(sys.argv) > 1:
         subprocess.call(cmd)
         cmd = os.path.join(script_path, 'bin', 'phyling-03-aln.sh')
         subprocess.call(cmd)
+
+    elif sys.argv[1] == "superaln":
+        help = Messages['commands']['superaln'] % (sys.argv[1], version)
+        arguments = sys.argv[2:]
+        parser = argparse.ArgumentParser(description=help,add_help=True,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
+        # hmmer or muscle for multiple alignment?
+        args = parser.parse_args(arguments)
+
+    elif sys.argv[1] == "phylo":
+        help = Messages['commands']['phylo'] % (sys.argv[1], version)
+        arguments = sys.argv[2:]
+        parser = argparse.ArgumentParser(description=help,add_help=True,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
+        # hmmer or muscle for multiple alignment?
+        args = parser.parse_args(arguments)
+
+    elif re.match(r"genetree",sys.argv[1].lower()): 
+        help = Messages['commands']['genetrees'] % (sys.argv[1], version)
+        arguments = sys.argv[2:]
+        parser = argparse.ArgumentParser(description=help,add_help=True,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
+        # hmmer or muscle for multiple alignment?
+        args = parser.parse_args(arguments)
+    elif re.match(r"coal",sys.argv[1]):
+        help = Messages['commands']['coalesce'] % (sys.argv[1], version)
+        arguments = sys.argv[2:]
+        parser = argparse.ArgumentParser(description=help,add_help=True,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
+        # hmmer or muscle for multiple alignment?
+        args = parser.parse_args(arguments)
+
     elif sys.argv[1] == "version":
         print("PHYling v%s" % version)
     elif sys.argv[1] == "citation":
