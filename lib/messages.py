@@ -2,9 +2,9 @@
 import json,os,inspect
 
 Messages = { 
-    "commands": 
-    {
-        "default": """
+    "en": {
+        "commands": {
+            "default": """
 Usage:       PHYling <command> <arguments>
 version:     %s
 Description: PHYling is a package of scripts to extract phylogenomic markers
@@ -27,7 +27,7 @@ jason.stajich[at]ucr.edu or jasonstajich.phd[AT]gmail.com
 Initially written https://github.com/1KFG/Phylogenomics and
 https://github.com/stajichlab/phyling
 """,
-        "initialize": """
+            "initialize": """
 Usage:       PHYling %s <arguments>
 version:     %s
 
@@ -42,14 +42,14 @@ Description: Download HMM files for pre-defined phylogenomic markers.
 
 Arguments:   -t fungi [default]
 """,
-        "search": """
+            "search": """
 Usage:       PHYling %s <arguments>
 version:     %s
 
 Description: Script will search HMM set defined in config.txt against the genomes in pep
              
 """,
-        "aln": """
+            "aln": """
 Usage:       PHYling %s <arguments>
 version:     %s
 
@@ -57,10 +57,11 @@ Description: Script will construct unaligned fasta files of protein and cds (if 
              perform multiple alignments
              
 """
-    },
-    "citation": """
+        },
+        "citation": """
 Stajich JE. 2017 PHYling: Phylogenomic pipeline from core markers on genomes to unassembled reads. https://github.com/stajichlab/PHYling_unified
 """
+    }
 }
 script_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 

@@ -7,6 +7,8 @@ import urllib.request, configparser, re
 import json, logging
 from pathlib import Path
 
+language = "en"
+
 script_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 sys.path.insert(0,script_path)
 
@@ -19,7 +21,7 @@ with open(URL_file,"r") as jsonfile:
     HMMs_URL = jsonToPython['HMMs']
 
 with open(Messages_file,"r") as jsonfile:  
-    Messages = json.loads(jsonfile.read())
+    Messages = json.loads(jsonfile.read())[language]    
 
 Config_file = 'config.txt'
 
