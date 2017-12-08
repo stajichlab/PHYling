@@ -5,14 +5,16 @@
 import sys, os, subprocess, inspect, tarfile, shutil, argparse
 import urllib.request, configparser, re
 import json, logging
-from pathlib import Path
-
 import zipfile
+#from pathlib import Path
+#phylingpath = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),"lib")
+#print(phylingpath)
+import lib.libPHYling as PHYling
+
+logging.basicConfig()
 
 # TODO: general variables and paths need to be set and initialized
 # here at the beginning
-
-language = "en"
 
 # user specific config file - the nane of this should be overrideable
 Config_file = 'config.txt'
@@ -23,6 +25,40 @@ version = '0.1' #phyling release version
 
 script_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 sys.path.insert(0,script_path)
+
+# some hard coded variables
+CDBYANKEXT = '.cidx'
+
+# set some defaults which can be overridden by config.txt
+# currently assume that input 
+config = { 'HMM_FOLDER': 'HMM',
+           'HMM'       : 'AFTOL70',
+           'PEPDIR'    : 'pep',
+           'INPEPEXT'  : 'aa.fasta', # input data
+           'OUTPEPEXT' : 'aa.fa', # output alignment files
+           'CDSDIR'    : 'cds',
+           'INCDSEXT'  : 'cds.fasta', # input data
+           'OUTCDSEXT' : 'cds.fa', # output alignment files
+           'BESTHITEXT': 'best',
+           'HMMSEARCH_CUTOFF': 1e-30,
+           'HMMSEARCH_OUTDIR': 'search',
+           'ALN_OUTDIR': 'aln',
+           'ALLSEQNAME': 'allseq',
+           'LANGUAGE'  : 'en',
+           'PREFIX'    : 'PHY'
+           
+}
+
+
+if os.path.exists(Config_file):
+    with open(Config_file,"r") as configparse:
+        for line in configparse:
+            line = line.strip()
+            line = re.sub(r"\s*#.+$","",line)
+            keyval = line.split("=")
+            config[keyval[0]] = keyval[1]
+else:
+    print("Expecting a config.txt file to define the input folders, outgroup, and HMM marker set")
 
 # this code loads up some config files which list where the HMM libraries
 # can be downloaded from
@@ -35,24 +71,10 @@ with open(URL_file,"r") as jsonfile:
     HMMs_URL = jsonToPython['HMMs']
 
 with open(Messages_file,"r") as jsonfile:  
-    Messages = json.loads(jsonfile.read())[language]    
+    Messages = json.loads(jsonfile.read())[config["LANGUAGE"]]    
 
-
-config = {}
-if os.path.exists(Config_file):
-    with open(Config_file,"r") as configparse:
-        for line in configparse:
-            line = line.strip()
-            line = re.sub(r"\s*#.+$","",line)
-            keyval = line.split("=")
-            config[keyval[0]] = keyval[1]
-    if not('HMM_FOLDER' in config):
-        config["HMM_FOLDER"] = 'HMM'    
-else:
-    print("Expecting a config.txt file to define the input folders, outgroup, and HMM marker set")
-    sys.exit(1)
-    
 default_help = Messages['commands']['default'] % version
+    
 
 # if no arguments, print out help message
 if len(sys.argv) <= 1: 
@@ -94,7 +116,7 @@ elif subprog == 'download':
                 zip_ref.extractall(unzippath)
             
             if not os.path.exists(config["HMM_FOLDER"]):
-                os.mkdir(config["HMM_FOLDER"])
+                os.makedirs(config["HMM_FOLDER"])
 
             for subdir in os.listdir(unzippath):
                 dlong = os.path.join(unzippath,subdir)
@@ -110,8 +132,16 @@ elif re.match("(hmm|search)",subprog):
     help = Messages['commands']['search'] % ('search', version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-f','--force', action='store_true')
     args = parser.parse_args(arguments)
-        
+
+    if args.force:
+        print(args.force)
+        searchfolder = os.path.join(config["HMMSEARCH_OUTDIR"], config["HMM"])
+        for file in os.listdir(searchfolder):
+            if file.endswith(".domtbl") or file.endswith(".log") or file.endswith("."+config["BESTHITEXT"]):
+                os.unlink(os.path.join(searchfolder,file))
+                
     cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
     subprocess.call(cmd)
 
@@ -120,13 +150,56 @@ elif re.match("aln",subprog):
     parser = argparse.ArgumentParser(description=help,add_help=True,
                                          formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?
+    # force clean DB and align
+    parser.add_argument('-f','--force', action='store_true') 
+
+    # clean align folder
+    parser.add_argument('-c','--cleanaln', action='store_true') 
     args = parser.parse_args(arguments)
-    # optional additional arguments might be -force to make sure to overwrite all files
-    # and/or a 'clean' option to remove existing files first
-    cmd = os.path.join(script_path, 'bin', 'phyling-02-makeunaln.sh')
-    subprocess.call(cmd)
-    cmd = os.path.join(script_path, 'bin', 'phyling-03-aln.sh')
-    subprocess.call(cmd)
+
+    pep_dbidx = os.path.join(config["PEPDIR"],config["ALLSEQNAME"] + CDBYANKEXT)
+    
+    PHYling.init_allseqdb(config["PEPDIR"],config["ALLSEQNAME"],
+                          config["INPEPEXT"],args.force)
+    
+    searchdir = os.path.join(config["HMMSEARCH_OUTDIR"], config["HMM"])
+    alndir = os.path.join(config["ALN_OUTDIR"],config["HMM"])
+
+    # parse the best hit files, make ortholog table and write out genes
+    # to a single file per ortholog  - first do the proteins
+    PHYling.make_unaln_files(searchdir,
+                             config["BESTHITEXT"],config['HMMSEARCH_CUTOFF'],
+                             pep_dbidx,
+                             alndir, config["OUTPEPEXT"],
+                             args.force or args.cleanaln)
+
+    # now re-parse the best hit files, make ortholog table and write out genes
+    # to a single file per ortholog for the coding sequence files
+    # assuming there is a CDS folder (skip if not)
+
+    if os.path.exists(config["CDSDIR"]):
+        PHYling.init_allseqdb(config["CDSDIR"],config["ALLSEQNAME"],
+                              config["INCDSEXT"],args.force)
+        cds_dbidx = os.path.join(config["CDSDIR"],
+                               config["ALLSEQNAME"] + CDBYANKEXT)
+
+        PHYling.make_unaln_files(searchdir,
+                                 config["BESTHITEXT"],
+                                 config['HMMSEARCH_CUTOFF'],
+                                 cds_dbidx,
+                                 alndir, config["OUTCDSEXT"],
+                                 args.force or args.cleanaln)
+
+    # either force or cleanaln flag sufficient to regenerate alignment files
+    
+#    if args.clean:
+#        for file in os.listdir(       
+    #for file in os.listdir(searchfolder):
+        
+#    cmd = os.path.join(script_path, 'bin', 'phyling-02-makeunaln.sh')
+#    subprocess.call(cmd)
+#    cmd = os.path.join(script_path, 'bin', 'phyling-03-aln.sh')
+#    subprocess.call(cmd)
 
 elif subprog == "concat":
     help = Messages['commands']['superaln'] % (sys.argv[1], version)
