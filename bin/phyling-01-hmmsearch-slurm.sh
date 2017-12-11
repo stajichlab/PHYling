@@ -26,6 +26,7 @@ fi
 
 if [ ! $PHYLING_DIR ]; then
     echo "need a PHYLING_DIR defined in config.txt or env variable"
+    exit
 fi
 
 if [ ! $HMM ]; then
@@ -56,8 +57,5 @@ else
 fi
 
 if [ ! -f $OUT/$NM.best ]; then
-    base=$(dirname $0)
-    env
-    echo "base is $base for $0"
     ${PHYLING_DIR}/util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF --input $OUT/$NM.domtbl > $OUT/$NM.best
 fi
