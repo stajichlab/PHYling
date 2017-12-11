@@ -28,8 +28,9 @@ if [ ! $HMM ]; then
  echo "need to a config file to set the HMM folder name"
 fi
 
-MARKERS=HMM/$HMM/markers_3.hmmb
+MARKERS=${HMM_FOLDER}/$HMM/markers_3.hmmb
 OUT=$HMMSEARCH_OUT/$HMM
+mkdir -p $OUT
 
 # can pass which file to process on cmdline too, eg bash jobs/01_hmmsearch.sh 1
 if [ ! $IN ]; then
@@ -40,11 +41,9 @@ if [ $SLURM_CPUS_ON_NODE ]; then
  CPU=$SLURM_CPUS_ON_NODE
 fi
 
-mkdir -p $OUT
-
-# convention is they all end in .aa.fasta - change this if not or make a variable
-NM=`basename $IN.aa.fasta`
-echo "g=$IN"
+IN=$(basename $IN)
+NM=$(basename $IN .$PEPEXT)
+echo "g=$IN NM=$NM"
 
 if [[ ! -f "$OUT/$NM.domtbl" || $PEPDIR/$IN -nt $OUT/$NM.domtbl ]]; then
  hmmsearch --cpu $CPU -E $HMMSEARCH_CUTOFF --domtblout $OUT/$NM.domtbl $MARKERS $PEPDIR/$IN >& $OUT/$NM.log
@@ -54,6 +53,7 @@ fi
 
 if [ ! -f $OUT/$NM.best ]; then
     base=$(dirname $0)
+    echo "base is $base for $0"
 #    echo "    $base/../util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF --input $OUT/$NM.domtbl > $OUT/$NM.best"
     $base/../util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF --input $OUT/$NM.domtbl > $OUT/$NM.best
 fi
