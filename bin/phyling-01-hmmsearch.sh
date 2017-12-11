@@ -24,7 +24,7 @@ elif [ $QUEUEING == "slurm" ]; then
     echo "Run srun job hmmsearch"
     for INPUTFILE in $(cat $LISTFILE)
     do
-	sbatch --ntasks $JOBCPU --nodes 1 --export=IN=$INPUTFILE $SUBJOB_SCRIPT
+	sbatch --ntasks $JOBCPU --nodes 1 --export=PHYLING_DIR=$0 --export=IN=$INPUTFILE $SUBJOB_SCRIPT
     done
 else
  echo "Run in serial"
