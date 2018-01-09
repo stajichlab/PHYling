@@ -35,7 +35,8 @@ elif [ $QUEUEING == "slurm" ]; then
     echo "Run srun job hmmsearch"
     for INPUTFILE in $(ls $ALN_OUTDIR/$HMM/*.$PEPEXT)
     do
-	sbatch --ntasks $JOBCPU --nodes 1 --export=IN=$INPUTFILE $SUBJOB_SCRIPT
+      ls $ALN_OUTDIR/$HMM/*.$PEPEXT | parallel -j $JOBPARALLEL srun --ntasks 1 --nodes 1 --export=IN={} $SUBJOB_SCRIPT
+	#sbatch --ntasks $JOBCPU --nodes 1 --export=IN=$INPUTFILE $SUBJOB_SCRIPT
     done
 else
  echo "Run in serial"
