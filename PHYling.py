@@ -30,7 +30,7 @@ sys.path.insert(0,script_path)
 CDBYANKEXT = '.cidx'
 
 # set some defaults which can be overridden by config.txt
-# currently assume that input 
+# currently assume that input
 config = { 'HMM_FOLDER': 'HMM',
            'HMM'       : 'AFTOL70',
            'PEPDIR'    : 'pep',
@@ -46,7 +46,7 @@ config = { 'HMM_FOLDER': 'HMM',
            'ALLSEQNAME': 'allseq',
            'LANGUAGE'  : 'en',
            'PREFIX'    : 'PHY'
-           
+
 }
 
 
@@ -66,18 +66,18 @@ URL_file      = os.path.join(script_path,"lib","urls.json")
 Messages_file = os.path.join(script_path,"lib","messages.json") # abstract this later based on different languages
 HMMs_URL = {}
 Messages = {}
-with open(URL_file,"r") as jsonfile:  
+with open(URL_file,"r") as jsonfile:
     jsonToPython = json.loads(jsonfile.read())
     HMMs_URL = jsonToPython['HMMs']
 
-with open(Messages_file,"r") as jsonfile:  
-    Messages = json.loads(jsonfile.read())[config["LANGUAGE"]]    
+with open(Messages_file,"r") as jsonfile:
+    Messages = json.loads(jsonfile.read())[config["LANGUAGE"]]
 
 default_help = Messages['commands']['default'] % version
-    
+
 
 # if no arguments, print out help message
-if len(sys.argv) <= 1: 
+if len(sys.argv) <= 1:
     print(default_help)
     exit(1)
 
@@ -110,11 +110,11 @@ elif subprog == 'download':
             with urllib.request.urlopen(url) as response, open(outfile, 'wb') as out_file:
                 shutil.copyfileobj(response, out_file)
                 unzippath = args.type + "_HMMs"
-            
+
             if not os.path.exists(unzippath):
                 zip_ref = zipfile.ZipFile(outfile, 'r')
                 zip_ref.extractall(unzippath)
-            
+
             if not os.path.exists(config["HMM_FOLDER"]):
                 os.makedirs(config["HMM_FOLDER"])
 
@@ -127,7 +127,7 @@ elif subprog == 'download':
                         print(fromf)
                         shutil.move(fromf,config["HMM_FOLDER"])
                         print("%s HMMs installed. URL=%s Outfile=%s Dest=%s" % (args.type,url,outfile,config["HMM_FOLDER"]))
-        
+
 elif re.match("(hmm|search)",subprog):
     help = Messages['commands']['search'] % ('search', version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
@@ -141,27 +141,29 @@ elif re.match("(hmm|search)",subprog):
         for file in os.listdir(searchfolder):
             if file.endswith(".domtbl") or file.endswith(".log") or file.endswith("."+config["BESTHITEXT"]):
                 os.unlink(os.path.join(searchfolder,file))
-                
+
     cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
     subprocess.call(cmd)
 
-elif re.match("aln",subprog):        
+elif re.match("aln",subprog):
     help = Messages['commands']['aln'] % ('aln', version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
                                          formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?
+    parser.add_argument('-t','--type', action='store_true')
+
     # force clean DB and align
-    parser.add_argument('-f','--force', action='store_true') 
+    parser.add_argument('-f','--force', action='store_true')
 
     # clean align folder
-    parser.add_argument('-c','--cleanaln', action='store_true') 
+    parser.add_argument('-c','--cleanaln', action='store_true')
     args = parser.parse_args(arguments)
 
     pep_dbidx = os.path.join(config["PEPDIR"],config["ALLSEQNAME"] + CDBYANKEXT)
-    
+
     PHYling.init_allseqdb(config["PEPDIR"],config["ALLSEQNAME"],
                           config["INPEPEXT"],args.force)
-    
+
     searchdir = os.path.join(config["HMMSEARCH_OUTDIR"], config["HMM"])
     alndir = os.path.join(config["ALN_OUTDIR"],config["HMM"])
 
@@ -191,11 +193,12 @@ elif re.match("aln",subprog):
                                  args.force or args.cleanaln)
 
     # either force or cleanaln flag sufficient to regenerate alignment files
-    
+
 #    if args.clean:
-#        for file in os.listdir(       
+#        for file in os.listdir(
     #for file in os.listdir(searchfolder):
-        
+# run aln hmmalign or muscle
+
 #    cmd = os.path.join(script_path, 'bin', 'phyling-02-makeunaln.sh')
 #    subprocess.call(cmd)
 #    cmd = os.path.join(script_path, 'bin', 'phyling-03-aln.sh')
