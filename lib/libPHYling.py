@@ -52,7 +52,8 @@ def init_allseqdb(dbfolder,dbname, dbext, force):
         subprocess.call([Apps["cdbfasta"],dbpath])
 
 
-def make_unaln_files (search_dir, best_extension, cutoff, dbidx, outdir, outext, force):
+def make_unaln_files (search_dir, best_extension, cutoff, 
+                      dbidx, outdir, outext, force):
     orthologs = {}
     
     if not os.path.exists(outdir):
@@ -72,11 +73,14 @@ def make_unaln_files (search_dir, best_extension, cutoff, dbidx, outdir, outext,
                             orthologs[row[0]].append(row[1])
                         else:
                             orthologs[row[0]] = [ row[1] ]
+
     for orth in orthologs:
         print(orth)
-        
-        p = subprocess.Popen([Apps["cdbyank"],dbidx, "-o '%s.%s'" % (os.path.join(outdir,orth),outext)],stdin=PIPE)
+        outfile = "%s.%s" % (os.path.join(outdir,orth), outext)
+        p = subprocess.Popen([Apps["cdbyank"],dbidx,
+                              "-o",outfile],stdin=PIPE)
+        instr = ""
         for gene in orthologs[orth]:
-            print(gene)
-            p.communicate(input=str(gene+"\n"))
+            instr += "%s\n"%(gene)
+        p.communicate(input=instr.encode())
                 
