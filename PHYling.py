@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 
-#wrapper for PHYling
+# 
 
 import sys, os, subprocess, inspect, tarfile, shutil, argparse
 import urllib.request, configparser, re
 import json, logging
 import zipfile
+
+from urllib.request import urlopen
+
 #from pathlib import Path
 #phylingpath = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),"lib")
 #print(phylingpath)
+
 import lib.libPHYling as PHYling
 
 logging.basicConfig()
@@ -19,7 +23,7 @@ logging.basicConfig()
 # user specific config file - the nane of this should be overrideable
 Config_file = 'config.txt'
 
-version = '0.1' #phyling release version
+version = '0.2' #phyling release version
 
 # sys.argv parsing should occur to get/set an alternative config file name
 
@@ -88,7 +92,7 @@ arguments = sys.argv[2:]
 if subprog == 'init' or subprog == 'initialize' or subprog == 'setup':
     help = Messages['commands']['initialize'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+                 formatter_class=argparse.RawDescriptionHelpFormatter)
     # parse the rest of the argument
     args = parser.parse_args(arguments)
     cmd = os.path.join(script_path, 'bin', 'phyling-00-initialize.sh')
@@ -96,7 +100,8 @@ if subprog == 'init' or subprog == 'initialize' or subprog == 'setup':
 elif subprog == 'download':
     help = Messages['commands']['download'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+                formatter_class=argparse.RawDescriptionHelpFormatter)
+
     parser.add_argument('-t','--type',default='fungi')
     args = parser.parse_args(arguments)
     url = ""
@@ -107,7 +112,7 @@ elif subprog == 'download':
         url = HMMs_URL[args.type]
 
         if not os.path.exists(outfile):
-            with urllib.request.urlopen(url) as response, open(outfile, 'wb') as out_file:
+            with urlopen(url) as response, open(outfile, 'wb') as out_file:
                 shutil.copyfileobj(response, out_file)
                 unzippath = args.type + "_HMMs"
 
@@ -132,7 +137,7 @@ elif re.match("(hmm|search)",subprog):
     help = Messages['commands']['search'] % ('search', version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-f','--force', action='store_true')
+    parser.add_argument('-f','--force', action='store_true',type=bool)
     args = parser.parse_args(arguments)
 
     if args.force:
@@ -144,7 +149,7 @@ elif re.match("(hmm|search)",subprog):
                 os.unlink(os.path.join(searchfolder,file))
 
     cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
-    subprocess.call(cmd)
+    subprocess.call([cmd,"-f",args.force])
 
 elif re.match("aln",subprog):
     help = Messages['commands']['aln'] % ('aln', version)
@@ -197,7 +202,10 @@ elif re.match("aln",subprog):
     # do we sub-divide by type (muscle,hmmalign here)
     cmd = os.path.join(script_path, 'bin', 'phyling-02-aln.sh')
     print(cmd)
-    subprocess.call([cmd,args.type,"CLEAN=%d"%(args.cleanaln)])
+    subprocess.call([cmd,
+                     "-t",args.type,
+                     "-c","%d"%(int(args.cleanaln == 'true')),
+                     "-f","%d"%(int(args.force == 'true'))])
 
 
 elif subprog == "concat":
@@ -209,20 +217,20 @@ elif subprog == "concat":
 elif subprog == "phylo":
     help = Messages['commands']['phylo'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+                    formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?
     args = parser.parse_args(arguments)
 
 elif re.match(r"genetree",subprog):
     help = Messages['commands']['genetrees'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
-                                         formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?
     args = parser.parse_args(arguments)
 elif re.match(r"coal",subprog) or subprog == "astral":
     help = Messages['commands']['coalesce'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+                formatter_class=argparse.RawDescriptionHelpFormatter)
     args = parser.parse_args(arguments)
 
 elif subprog == "version":
