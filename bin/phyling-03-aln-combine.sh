@@ -21,7 +21,14 @@ fi
 if [ ! $PHYLING_DIR ]; then
     PHYLING_DIR=$(basename $0)../
 fi
+DIR=$ALN_OUTDIR/$HMM
+COUNT=$(wc -l $QUERYDBS | awk '{print $1}')
+if [ ! $COUNT ]; then
+ echo "NO QUERYDBS variable on config.txt?"
+ COUNT="XX"
+fi
 
+OUT=$PREFIX.${COUNT}_taxa.${HMM}.fasaln
 while getopts d:o:v:i:s:e:r:p: option
 do
  case "${option}"
@@ -64,4 +71,5 @@ if [ $PARTITIONS ]; then
     ARGS+=" -p $PARTITIONS"
 fi
 
+echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT $ARGS"
 $PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT $ARGS

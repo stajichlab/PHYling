@@ -75,11 +75,11 @@ for file in os.listdir(args.dir):
         if args.include:
             warnings.warn("checking if",stem,"is in the allowed set")
             if stem in allowed:
-                files.append([stem,os.path.join(dir,file)])
+                files.append([stem,os.path.join(args.dir,file)])
         else:
             # pushing all files in since we did not set a restricted set
             # this is default behavior
-            files.append([stem,os.path.join(dir,file)])
+            files.append([stem,os.path.join(args.dir,file)])
 
 if args.rand:
     randfiles = random.shuffle(files)
@@ -97,7 +97,7 @@ for file in files:
 
     seqs = PHYling.read_fasta(fullfile)
 
-    alnlen = length(seqs[0][1]) # first sequence, the alignseq is index [1]
+    alnlen = len(seqs[0][1]) # first sequence, the alignseq is index [1]
     now = last + alnlen - 1
     
     partitions.append("%s, %s = %d-%d" % (args.moltype, stem, last,now))
@@ -132,9 +132,9 @@ for file in files:
 with open(args.outfile,"w") as fh:
     for seqid in matrix:
         data = matrix[seqid]
-        fh.write(">%s\n",seqid)
+        fh.write(">%s\n"%(seqid))
         for i in range(0, len(data), wrap):
-            fh.write(data[i:i + self.wrap] + "\n")
+            fh.write(data[i:i + wrap] + "\n")
 
 with open(partition_file,"w") as ofh:
     for p in partitions:

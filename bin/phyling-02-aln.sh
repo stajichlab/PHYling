@@ -52,7 +52,8 @@ if [ $QUEUEING == "parallel" ]; then
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
     parallel -j $JOBPARALLEL $SUBJOB_SCRIPT -f $FORCE -c $CLEAN -i {} < $ALNFILES
-    $COMBINE_SCRIPT
+    $COMBINE_SCRIPT 
+
 elif [ $QUEUEING == "slurm" ]; then
     QUEUECMD=""
     if [ $QUEUE ]; then
