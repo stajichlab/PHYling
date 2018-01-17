@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-#SBATCH --time 2:00:00 --out=logs/init.log -J init
-LISTFILE=pepfile.lst
+#SBATCH --time 2:00:00 --out=init.log -J init
+QUERYDBS=pepfile.lst
 PEPDIR=pep
 CDSDIR=cds
 PEPEXT=aa.fasta
@@ -10,6 +10,8 @@ if [ ! -f config.txt ]; then
  echo "Need a config.txt file"
  exit
 fi
+
+mkdir -p $LOG_FOLDER
 
 source ./config.txt
 # make sure log folder is created
@@ -36,8 +38,8 @@ if [ ! -f prefix.tab ]; then
 else
     echo "prefix.tab already exists, not updating"
 fi
-echo "make $LISTFILE for hmmsearch runs"
+echo "make $QUERYDBS for hmmsearch runs"
 for f in $PEPDIR/*.$PEPEXT
 do
     basename $f
-done > $LISTFILE
+done > $QUERYDBS

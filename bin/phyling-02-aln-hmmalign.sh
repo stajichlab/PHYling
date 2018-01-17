@@ -1,13 +1,19 @@
-#!/usr/bin/bash
+#!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --job-name=hmmalign
-#SBATCH --time=3:00:00
-#SBATCH --mem-per-cpu=3G
-#SBATCH --output=hmmalign.%A_%a.out
-#SBATCH -p intel
+#SBATCH --mem=4G
+#SBATCH --job-name=hmmsearch
+#SBATCH --time=2:00:00
+#SBATCH --output=logs/hmmaln.%A_%a.out
+
+LOG_FOLDER=logs
+QUEUEING=parallel
+JOBCPU=1
+TOTALCPU=4
+SCRIPTDIR=$(which PHYling | dirname)
 
 if [ $MODULESHOME ]; then
+    module load hmmer/3
     module load trimal
     module load hmmer/3
     module load java
@@ -16,8 +22,7 @@ fi
 
 ALN_OUTDIR=aln
 HMM_FOLDER=HMM
-LIST=alnlist.$MARKER # this is the list file
-SCRIPTDIR=$(dirname $0)
+ALNFILES=alnlist.$MARKER # this is the list file
 
 if [ -f config.txt ]; then
  source config.txt
@@ -26,15 +31,24 @@ else
  exit
 fi
 
+if [ ! $ALNFILES ]; then
+    ALNFILES=alnlist.$HMM
+fi
+
+if [ ! -f $ALNFILES ]; then
+    echo "expected an ALNFILES: $ALNFILES to exist"
+    exit
+fi
+
 if [ ! $HMM ]; then
  echo "need to a config file to set the HMM folder name"
+ exit
 fi
+
 DIR=${ALN_OUTDIR}/$HMM
 DBDIR=${HMM_FOLDER}/${HMM}/HMM3
 
-if [ ! $IN ]; then
-  IN=$1
-fi
+IN=$1
 
 marker=`basename $IN .aa.fasta`
 echo "marker is $marker for gene $IN"
@@ -45,7 +59,7 @@ if [ ! -f $DIR/$marker.msa ]; then
 fi
 
 if [ ! -f $DIR/$marker.aln ]; then
-    esl-reformat --replace=\*:-  --gapsym=- clustal $DIR/$marker.msa > $DIR/$marker.1.aln
+    esl-reformat --replace=\*:- --gapsym=- clustal $DIR/$marker.msa > $DIR/$marker.1.aln
     esl-reformat --replace=x:- clustal $DIR/$marker.1.aln > $DIR/$marker.aln
 fi
 
@@ -54,12 +68,12 @@ if [ ! -f $DIR/$marker.msa.trim ]; then
     trimal -automated1 -fasta -in $DIR/$marker.msa.filter -out $DIR/$marker.msa.trim 
 fi
 
-if [ -f $DIR/$marker.cds.fasta ]; then
-    if [ ! -f $DIR/$marker.cdsaln.trim ]; then
-	$SCRIPTDIR/../util/bp_mrtrans.pl -if clustalw -of fasta \
-				      -i $DIR/$marker.aln \
-				      -s $DIR/$marker.cds.fasta \
-				      -o $DIR/$marker.cdsaln
+#if [ -f $DIR/$marker.cds.fasta ]; then
+#    if [ ! -f $DIR/$marker.cdsaln.trim ]; then
+#	$SCRIPTDIR/util/bp_mrtrans.pl -if clustalw -of fasta \
+#				      -i $DIR/$marker.aln \
+#				      -s $DIR/$marker.cds.fasta \
+#				      -o $DIR/$marker.cdsaln
 #	java -jar $BMGE -t CODON -i $DIR/$marker.cdsaln -of $DIR/$marker.cdsaln.trim
-    fi
-fi
+#    fi
+#fi

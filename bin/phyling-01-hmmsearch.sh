@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-LISTFILE=pepfile.lst
+QUERYDBS=pepfile.lst
 LOG_FOLDER=logs
 QUEUEING=parallel
 JOBCPU=2
@@ -13,28 +13,25 @@ else
 fi
 
 SCRIPT_DIR=$(dirname $0)
-SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-01-hmmsearch-$QUEUEING.sh
+SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-01-hmmsearch-run.sh
 
 if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr $TOTALCPU / $JOBCPU)
     echo "Run parallel job hmmsearch"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
-    parallel -j $JOBPARALLEL $SUBJOB_SCRIPT < $LISTFILE
+    parallel -j $JOBPARALLEL $SUBJOB_SCRIPT < $QUERYDBS
 elif [ $QUEUEING == "slurm" ]; then
-    echo "Run srun job hmmsearch"
     QUEUECMD=""
     if [ $QUEUE ]; then
 	QUEUECMD="-p $QUEUE"
     fi
-    
-    for INPUTFILE in $(cat $LISTFILE)
-    do
-	sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$0 --export=IN=$INPUTFILE $SUBJOB_SCRIPT
-    done
+    FILECOUNT=$(wc -l $QUERYDBS | awk '{print $1}')
+    sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$0 \
+	--array=1-${FILECOUNT} $SUBJOB_SCRIPT
 else
  echo "Run in serial"
- for file in $(cat $LISTFILE)
+ for file in $(cat $QUERYDBS)
  do
-   $SUBJOB_SCRIPT $file
+     $SUBJOB_SCRIPT $file
  done
 fi
