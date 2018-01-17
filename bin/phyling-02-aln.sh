@@ -28,12 +28,18 @@ if [ ! $ALNFILES ]; then
     ALNFILES=alnlist.$HMM
 fi
 
-if [[ ! -f $ALNFILES || $CLEAN ]]; then
-    find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT" > $ALNFILES
-fi
+while getopts t:c:f: option
+do
+ case "${option}"
+ in
+ t) ALNTOOL=${OPTARG};;
+ c) CLEAN=${OPTARG};;
+ f) FORCE=${OPTARG};;
+ esac
+done
 
-if [ $1 ]; then
-    ALNTOOL=$1
+if [[ ! -f $ALNFILES || $CLEAN || $FORCE ]]; then
+    find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT" > $ALNFILES
 fi
 
 SCRIPT_DIR=$(dirname $0)
@@ -43,7 +49,7 @@ if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr $TOTALCPU "/" $JOBCPU)
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
-    parallel -j $JOBPARALLEL $SUBJOB_SCRIPT < $ALNFILES
+    parallel -j $JOBPARALLEL $SUBJOB_SCRIPT -f $FORCE -i {} < $ALNFILES
     # do combine here
     
 elif [ $QUEUEING == "slurm" ]; then
@@ -54,7 +60,8 @@ elif [ $QUEUEING == "slurm" ]; then
     ALNCT=$(wc -l $ALNFILES | awk '{print $1}')
     PHYLING_DIR=$(dirname $0)
     echo "PHYLING_DIR is $PHYLING_DIR"
-    submid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR \
+    submitid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD \
+	--export=PHYLING_DIR=$PHYLING_DIR --export=FORCE=$FORCE \
 	--array=1-${ALNCT} $SUBJOB_SCRIPT)
     
     # do combining as another slurm job
@@ -62,7 +69,7 @@ else
  echo "Run in serial"
  for file in $( find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT")
  do
-   $SUBJOB_SCRIPT $file
+   $SUBJOB_SCRIPT -f $FORCE $file
  done
  
  # do combine here (how to avoid duplicate code with the parallel stuff above

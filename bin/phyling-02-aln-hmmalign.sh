@@ -32,6 +32,18 @@ else
  exit
 fi
 
+
+while getopts f:i: option
+do
+ case "${option}"
+ in
+ f) FORCE=${OPTARG};;
+ i) IN=${OPTARG};;
+ esac
+done
+
+echo "FORCE to $0 is $FORCE IN is $IN"
+
 if [ ! $ALNFILES ]; then
     ALNFILES=alnlist.$HMM
 fi
@@ -63,19 +75,21 @@ fi
 marker=$(basename $IN .$OUTPEPEXT)
 echo "IN=$IN gene=$marker"
 
-if [ ! -f $DIR/$marker.msa ]; then
+if [[ $FORCE || ! -f $DIR/$marker.msa ]]; then
     hmmalign --trim --amino $DBDIR/$marker.hmm $IN > $DIR/$marker.msa
     # hmmalign --trim --amino $DBDIR/$marker.hmm $DIR/$marker.$PEPEXT | perl -p -e 's/^>(\d+)\|/>/' > $DIR/$marker.msa
 fi
 
-if [ ! -f $DIR/$marker.aln ]; then
+if [[ $FORCE || ! -f $DIR/$marker.aln ]]; then
     esl-reformat --replace=\*:- --gapsym=- clustal $DIR/$marker.msa > $DIR/$marker.1.aln
     esl-reformat --replace=x:- clustal $DIR/$marker.1.aln > $DIR/$marker.aln
 fi
 
-if [ ! -f $DIR/$marker.msa.trim ]; then
-    trimal -resoverlap 0.50 -seqoverlap 60 -in $DIR/$marker.aln -out $DIR/$marker.msa.filter
-    trimal -automated1 -fasta -in $DIR/$marker.msa.filter -out $DIR/$marker.msa.trim 
+if [[ $FORCE || ! -f $DIR/$marker.msa.trim ]]; then
+    trimal -resoverlap 0.50 -seqoverlap 60 -in $DIR/$marker.aln \
+	-out $DIR/$marker.msa.filter
+    trimal -automated1 -fasta -in $DIR/$marker.msa.filter \
+	-out $DIR/$marker.msa.trim 
 fi
 
 #if [ -f $DIR/$marker.cds.fasta ]; then
