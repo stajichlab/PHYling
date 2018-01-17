@@ -39,7 +39,7 @@ do
  esac
 done
 
-if [[ ! -f $ALNFILES || $CLEAN || $FORCE ]]; then
+if [[ ! -f $ALNFILES || $CLEAN == "1" || $FORCE == "1" ]]; then
     find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT" > $ALNFILES
 fi
 

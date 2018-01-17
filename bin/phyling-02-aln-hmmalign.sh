@@ -73,17 +73,18 @@ fi
 marker=$(basename $IN .$OUTPEPEXT)
 echo "IN=$IN gene=$marker"
 
-if [[ $FORCE || ! -f $DIR/$marker.msa ]]; then
+if [[ $FORCE == "1" || ! -f $DIR/$marker.msa ]]; then
     hmmalign --trim --amino $DBDIR/$marker.hmm $IN > $DIR/$marker.msa
     # hmmalign --trim --amino $DBDIR/$marker.hmm $DIR/$marker.$PEPEXT | perl -p -e 's/^>(\d+)\|/>/' > $DIR/$marker.msa
 fi
 
-if [[ $FORCE || ! -f $DIR/$marker.aln ]]; then
+if [[ $FORCE == "1" || ! -f $DIR/$marker.aln ]]; then
     esl-reformat --replace=\*:- --gapsym=- clustal $DIR/$marker.msa > $DIR/$marker.1.aln
     esl-reformat --replace=x:- clustal $DIR/$marker.1.aln > $DIR/$marker.aln
 fi
 
-if [[ $FORCE || ! -f $DIR/$marker.msa.trim ]]; then
+if [[ $FORCE == "1" || ! -f $DIR/$marker.msa.trim ]]; then
+    echo "running because no $DIR/$marker.msa.trim or $FORCE "
     trimal -resoverlap 0.50 -seqoverlap 60 -in $DIR/$marker.aln \
 	-out $DIR/$marker.msa.filter
     trimal -automated1 -fasta -in $DIR/$marker.msa.filter \
