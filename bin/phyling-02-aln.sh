@@ -5,7 +5,8 @@ LOG_FOLDER=logs
 QUEUEING=parallel
 JOBCPU=1
 TOTALCPU=4
-PEPEXT=aa.fasta
+OUTPEPEXT=aa.fa
+OUTCDSEXT=cds.fa
 ALN_OUTDIR=aln
 ALNTOOL=hmmalign
 
@@ -28,7 +29,7 @@ if [ ! $ALNFILES ]; then
 fi
 
 if [[ ! -f $ALNFILES || $CLEAN ]]; then
-    find $ALN_OUTDIR/$HMM -name "*.$PEPEXT" -exec basename {} \; > $ALNFILES
+    find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT" > $ALNFILES
 fi
 
 if [ $1 ]; then
@@ -36,18 +37,16 @@ if [ $1 ]; then
 fi
 
 SCRIPT_DIR=$(dirname $0)
-SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-03-aln-$ALNTOOL.sh
+SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-02-aln-$ALNTOOL.sh
 
 if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr $TOTALCPU "/" $JOBCPU)
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
     parallel -j $JOBPARALLEL $SUBJOB_SCRIPT < $ALNFILES
-    # do combine
+    # do combine here
     
 elif [ $QUEUEING == "slurm" ]; then
-    echo "Run srun job hmmsearch"
-    #parallel -j $JOBPARALLEL srun --ntasks 1 --nodes 1 --export=IN={} $SUBJOB_SCRIPT 
     QUEUECMD=""
     if [ $QUEUE ]; then
 	QUEUECMD="-p $QUEUE"
@@ -57,11 +56,16 @@ elif [ $QUEUEING == "slurm" ]; then
     echo "PHYLING_DIR is $PHYLING_DIR"
     submid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR \
 	--array=1-${ALNCT} $SUBJOB_SCRIPT)
-
+    
+    # do combining as another slurm job
 else
  echo "Run in serial"
- for file in $( find $ALN_OUTDIR/$HMM -name "*.$PEPEXT")
+ for file in $( find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT")
  do
    $SUBJOB_SCRIPT $file
  done
+ 
+ # do combine here (how to avoid duplicate code with the parallel stuff above
+
 fi
+

@@ -139,7 +139,8 @@ elif re.match("(hmm|search)",subprog):
         print(args.force)
         searchfolder = os.path.join(config["HMMSEARCH_OUTDIR"], config["HMM"])
         for file in os.listdir(searchfolder):
-            if file.endswith(".domtbl") or file.endswith(".log") or file.endswith("."+config["BESTHITEXT"]):
+            if( file.endswith(".domtbl") or file.endswith(".log")
+                or file.endswith("."+config["BESTHITEXT"])):
                 os.unlink(os.path.join(searchfolder,file))
 
     cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
@@ -148,9 +149,9 @@ elif re.match("(hmm|search)",subprog):
 elif re.match("aln",subprog):
     help = Messages['commands']['aln'] % ('aln', version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
-                                         formatter_class=argparse.RawDescriptionHelpFormatter)
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?
-    parser.add_argument('-t','--type', action='store_true')
+    parser.add_argument('-t','--type', action='store_true',default="hmmalign")
 
     # force clean DB and align
     parser.add_argument('-f','--force', action='store_true')
@@ -193,16 +194,11 @@ elif re.match("aln",subprog):
                                  args.force or args.cleanaln)
 
     # either force or cleanaln flag sufficient to regenerate alignment files
+    # do we sub-divide by type (muscle,hmmalign here)
+    cmd = os.path.join(script_path, 'bin', 'phyling-02-aln.sh')
+    print(cmd)
+    subprocess.call([cmd,args.type,"CLEAN=%d"%(args.cleanaln)])
 
-#    if args.clean:
-#        for file in os.listdir(
-    #for file in os.listdir(searchfolder):
-# run aln hmmalign or muscle
-
-#    cmd = os.path.join(script_path, 'bin', 'phyling-02-makeunaln.sh')
-#    subprocess.call(cmd)
-#    cmd = os.path.join(script_path, 'bin', 'phyling-03-aln.sh')
-#    subprocess.call(cmd)
 
 elif subprog == "concat":
     help = Messages['commands']['superaln'] % (sys.argv[1], version)

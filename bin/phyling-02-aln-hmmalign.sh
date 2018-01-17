@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --mem=4G
-#SBATCH --job-name=hmmsearch
+#SBATCH --job-name=hmmalign
 #SBATCH --time=2:00:00
 #SBATCH --output=logs/hmmaln.%A_%a.out
 
@@ -10,7 +10,9 @@ LOG_FOLDER=logs
 QUEUEING=parallel
 JOBCPU=1
 TOTALCPU=4
-SCRIPTDIR=$(which PHYling | dirname)
+OUTPEPEXT=aa.fa
+OUTCDSEXT=cds.fa
+#SCRIPTDIR=$(which PHYling | dirname)
 
 if [ $MODULESHOME ]; then
     module load hmmer/3
@@ -22,7 +24,6 @@ fi
 
 ALN_OUTDIR=aln
 HMM_FOLDER=HMM
-ALNFILES=alnlist.$MARKER # this is the list file
 
 if [ -f config.txt ]; then
  source config.txt
@@ -48,14 +49,23 @@ fi
 DIR=${ALN_OUTDIR}/$HMM
 DBDIR=${HMM_FOLDER}/${HMM}/HMM3
 
-IN=$1
+if [ ${SLURM_ARRAY_TASK_ID} ]; then
+    IN=$(sed -n ${SLURM_ARRAY_TASK_ID}p $ALNFILES)
+elif [ ! $IN ]; then
+# can pass which file to process on cmdline too, eg bash jobs/01_hmmsearch.sh 1
+  IN=$1
+fi
 
-marker=`basename $IN .aa.fasta`
-echo "marker is $marker for gene $IN"
+if [ ${SLURM_CPUS_ON_NODE} ]; then
+ CPU=${SLURM_CPUS_ON_NODE}
+fi
+
+marker=$(basename $IN .$OUTPEPEXT)
+echo "IN=$IN gene=$marker"
 
 if [ ! -f $DIR/$marker.msa ]; then
     hmmalign --trim --amino $DBDIR/$marker.hmm $IN > $DIR/$marker.msa
-    # hmmalign --trim --amino $DBDIR/$marker.hmm $DIR/$marker.aa.fasta | perl -p -e 's/^>(\d+)\|/>/' > $DIR/$marker.msa
+    # hmmalign --trim --amino $DBDIR/$marker.hmm $DIR/$marker.$PEPEXT | perl -p -e 's/^>(\d+)\|/>/' > $DIR/$marker.msa
 fi
 
 if [ ! -f $DIR/$marker.aln ]; then
