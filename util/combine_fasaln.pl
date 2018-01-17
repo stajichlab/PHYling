@@ -1,10 +1,12 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
+
 use Bio::AlignIO;
 use Bio::SimpleAlign;
 use Bio::LocatableSeq;
 use Getopt::Long;
+
 my $iformat = 'fasta';
 my $oformat = 'nexus';
 my $outfile = 'allseq.nex';
