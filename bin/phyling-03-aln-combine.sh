@@ -11,6 +11,17 @@ if [ $MODULESHOME ]; then
     module switch python/3
 fi
 
+if [ -f config.txt ]; then
+ source config.txt
+else
+ echo "need config file to set HMM and other variables"
+ exit
+fi
+
+if [ ! $PHYLING_DIR ]; then
+    PHYLING_DIR=$(basename $0)../
+fi
+
 while getopts d:o:v:i:s:e:r:p: option
 do
  case "${option}"
@@ -53,4 +64,4 @@ if [ $PARTITIONS ]; then
     ARGS+=" -p $PARTITIONS"
 fi
 
-./util/combine_multiseq_aln.py -d $DIR -o $OUT $ARGS
+$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT $ARGS
