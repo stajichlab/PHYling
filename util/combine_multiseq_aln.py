@@ -94,13 +94,13 @@ if args.rand:
 for file in files:
     stem     = file[0]
     fullfile = file[1]
-
+    fstem = re.sub(r'\.msa','',stem)
     seqs = PHYling.read_fasta(fullfile)
 
     alnlen = len(seqs[0][1]) # first sequence, the alignseq is index [1]
     now = last + alnlen - 1
     
-    partitions.append("%s, %s = %d-%d" % (args.moltype, stem, last,now))
+    partitions.append("%s, %s = %d-%d" % (args.moltype, fstem, last,now))
     last = now + 1
 
     seen = {}
@@ -138,4 +138,4 @@ with open(args.outfile,"w") as fh:
 
 with open(partition_file,"w") as ofh:
     for p in partitions:
-        ofh.write(p)
+        ofh.write(p+"\n")

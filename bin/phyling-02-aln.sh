@@ -62,9 +62,7 @@ elif [ $QUEUEING == "slurm" ]; then
     ALNCT=$(wc -l $ALNFILES | awk '{print $1}')
     PHYLING_DIR=$(dirname $0)
     echo "PHYLING_DIR is $PHYLING_DIR"
-    submitid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD \
-	--export=PHYLING_DIR=$PHYLING_DIR --export=FORCE=$FORCE \
-	--array=1-${ALNCT} $SUBJOB_SCRIPT)
+    submitid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR --export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT | awk '{print $4}')
     sbatch --dependency=afterok:$submitid $QUEUECMD $COMBINE_SCRIPT
     
 else
