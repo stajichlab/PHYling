@@ -28,6 +28,7 @@ if [ ! $ALNFILES ]; then
     ALNFILES=alnlist.$HMM
 fi
 
+#echo "02-aln args are $@"
 while getopts t:c:f: option
 do
  case "${option}"
@@ -49,7 +50,7 @@ if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr $TOTALCPU "/" $JOBCPU)
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
-    parallel -j $JOBPARALLEL $SUBJOB_SCRIPT -f $FORCE -i {} < $ALNFILES
+    parallel -j $JOBPARALLEL $SUBJOB_SCRIPT -f $FORCE -c $CLEAN -i {} < $ALNFILES
     # do combine here
     
 elif [ $QUEUEING == "slurm" ]; then

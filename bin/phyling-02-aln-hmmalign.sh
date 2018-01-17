@@ -32,17 +32,18 @@ else
  exit
 fi
 
-
-while getopts f:i: option
+#echo "$@"
+while getopts c:f:i: option
 do
  case "${option}"
  in
- f) FORCE=${OPTARG};;
- i) IN=${OPTARG};;
+  c) CLEAN=${OPTARG};;
+  f) FORCE=${OPTARG};;
+  i) IN=${OPTARG};;
  esac
 done
 
-echo "FORCE to $0 is $FORCE IN is $IN"
+#echo "FORCE=$FORCE IN=$IN CLEAN=$CLEAN"
 
 if [ ! $ALNFILES ]; then
     ALNFILES=alnlist.$HMM
@@ -63,9 +64,6 @@ DBDIR=${HMM_FOLDER}/${HMM}/HMM3
 
 if [ ${SLURM_ARRAY_TASK_ID} ]; then
     IN=$(sed -n ${SLURM_ARRAY_TASK_ID}p $ALNFILES)
-elif [ ! $IN ]; then
-# can pass which file to process on cmdline too, eg bash jobs/01_hmmsearch.sh 1
-  IN=$1
 fi
 
 if [ ${SLURM_CPUS_ON_NODE} ]; then
