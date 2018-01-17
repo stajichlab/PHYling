@@ -204,8 +204,8 @@ elif re.match("aln",subprog):
     print(cmd)
     subprocess.call([cmd,
                      "-t",args.type,
-                     "-c","%d"%(int(args.cleanaln == 'true')),
-                     "-f","%d"%(int(args.force == 'true'))])
+                     "-c","%d"%(int(args.cleanaln)),
+                     "-f","%d"%(int(args.force))])
 
 
 elif subprog == "concat":
