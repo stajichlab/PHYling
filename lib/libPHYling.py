@@ -84,3 +84,27 @@ def make_unaln_files (search_dir, best_extension, cutoff,
             instr += "%s\n"%(gene)
         p.communicate(input=instr.encode())
                 
+# sequences = read_fasta
+def read_fasta (file):
+    seq = ""
+    fasta_pat = re.compile(">(\S+)")
+    seqs = []
+    with open(file, 'r') as f:
+        seenheader = 0
+        id = ""
+        for line in f:
+            line = line.strip()
+            m = fasta_pat.match(line);
+            if m:
+                id = m.group(1)
+                if seenheader:
+                    seq = re.sub("\s+","",seq)
+                    seqs.append([id,seq])
+                    id = ""
+                    seq = ""
+                seenheader = 1
+            else:
+                seq += line
+        seqs.append([id,seq])
+        
+    return seqs
