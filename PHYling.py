@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-
-# 
+#!/usr/bin/env python3 
 
 import sys, os, subprocess, inspect, tarfile, shutil, argparse
 import urllib.request, configparser, re
@@ -89,6 +87,7 @@ if len(sys.argv) <= 1:
 # e.g. init, download, ...
 subprog = sys.argv[1].lower()
 arguments = sys.argv[2:]
+
 if subprog == 'init' or subprog == 'initialize' or subprog == 'setup':
     help = Messages['commands']['initialize'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(description=help,add_help=True,

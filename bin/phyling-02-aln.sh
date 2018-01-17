@@ -45,14 +45,14 @@ fi
 
 SCRIPT_DIR=$(dirname $0)
 SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-02-aln-$ALNTOOL.sh
+COMBINE_SCRIPT=${SCRIPT_DIR}/phyling-03-aln-combine.sh
 
 if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr $TOTALCPU "/" $JOBCPU)
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
     parallel -j $JOBPARALLEL $SUBJOB_SCRIPT -f $FORCE -c $CLEAN -i {} < $ALNFILES
-    # do combine here
-    
+    $COMBINE_SCRIPT
 elif [ $QUEUEING == "slurm" ]; then
     QUEUECMD=""
     if [ $QUEUE ]; then
@@ -64,8 +64,8 @@ elif [ $QUEUEING == "slurm" ]; then
     submitid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD \
 	--export=PHYLING_DIR=$PHYLING_DIR --export=FORCE=$FORCE \
 	--array=1-${ALNCT} $SUBJOB_SCRIPT)
+    sbatch --dependency=afterok:$submitid $QUEUECMD $COMBINE_SCRIPT
     
-    # do combining as another slurm job
 else
  echo "Run in serial"
  for file in $( find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT")
