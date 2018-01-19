@@ -54,16 +54,19 @@ IN=$(basename $IN)
 NM=$(basename $IN .$PEPEXT)
 echo "g=$IN NM=$NM"
 
-if [[ ! -f "$OUT/$NM.domtbl" || $PEPDIR/$IN -nt $OUT/$NM.domtbl ]]; then
+INFILE=$PEPDIR/$IN
+OUTFILE1=$OUT/$NM.domtbl
+OUTFILE2=$OUT/$NM.log
 
- hmmsearch --cpu $CPU -E $HMMSEARCH_CUTOFF \
- --domtblout $OUT/$NM.domtbl $MARKERS $PEPDIR/$IN >& $OUT/$NM.log
+if [[ $FORCE == "1" || ! -f $OUTFILE1 || $INFILE -nt $OUTFILE1  ]]; then
+
+ hmmsearch --cpu $CPU -E $HMMSEARCH_CUTOFF --domtblout $OUTFILE1 $MARKERS $INFILE >& $OUTFILE2
 
 else
  echo "skipping $NM - has already run"
 fi
 
-if [ ! -f $OUT/$NM.best ]; then
-    ${PHYLING_DIR}/util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF \
-     --input $OUT/$NM.domtbl > $OUT/$NM.best
+OUTFILEBEST=$OUT/$NM.best
+if [[ $FORCE == "1" || ! -f $OUTFILEBEST || $OUTFILE1 -nt $OUTFILEBEST ]]; then
+    ${PHYLING_DIR}/util/get_best_hmmtbl.py -c $HMMSEARCH_CUTOFF --input $OUTFILE1 > $OUTFILEBEST
 fi

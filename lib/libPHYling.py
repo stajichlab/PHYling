@@ -77,12 +77,14 @@ def make_unaln_files (search_dir, best_extension, cutoff,
     for orth in orthologs:
         print(orth)
         outfile = "%s.%s" % (os.path.join(outdir,orth), outext)
-        p = subprocess.Popen([Apps["cdbyank"],dbidx,
-                              "-o",outfile],stdin=PIPE)
-        instr = ""
-        for gene in orthologs[orth]:
-            instr += "%s\n"%(gene)
-        p.communicate(input=instr.encode())
+        if force or (not os.path.exists(outfile)):
+            p = subprocess.Popen([Apps["cdbyank"],dbidx,
+                                  "-o",outfile],stdin=PIPE)
+            instr = ""
+            for gene in orthologs[orth]:
+                instr += "%s\n"%(gene)
+            # only call this once with the complete list of IDs otherwise the process gets closed
+            p.communicate(input=instr.encode())
                 
 # sequences = read_fasta
 def read_fasta (file):

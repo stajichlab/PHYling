@@ -6,6 +6,7 @@ CDSDIR=cds
 PEPEXT=aa.fasta
 CDSEXT=cds.fasta
 LOG_FOLDER=logs
+EXPECTED=expected_prefixes.lst
 if [ ! -f config.txt ]; then
  echo "Need a config.txt file"
  exit
@@ -25,7 +26,7 @@ if [ ! -d HMM/${HMM}  ]; then
 fi
 
 echo "make expected_prefixes.lst"
-head -q -n1 $PEPDIR/*.$PEPEXT | awk -F\| '{print $1}' | awk '{print $1}' > expected_prefixes.lst
+head -q -n1 $PEPDIR/*.$PEPEXT | awk -F\| '{print $1}' | awk '{print $1}' > $EXPECTED
 
 if [ ! -f prefix.tab ]; then
     echo "making prefix.tab"

@@ -23,13 +23,14 @@ if [ ! $PHYLING_DIR ]; then
 fi
 DIR=$ALN_OUTDIR/$HMM
 COUNT=$(wc -l $QUERYDBS | awk '{print $1}')
-if [ ! $COUNT ]; then
+if [[ ! $COUNT || $COUNT == "0" ]]; then
  echo "NO QUERYDBS variable on config.txt?"
  COUNT="XX"
 fi
 
 OUT=$PREFIX.${COUNT}_taxa.${HMM}.fasaln
-while getopts d:o:v:i:s:e:r:p: option
+
+while getopts d:o:v:i:s:e:r:p:x: option
 do
  case "${option}"
  in
@@ -41,6 +42,7 @@ do
  e) EXT=$(OPTARG};;
  r) RAND=${OPTARG};;
  p) PARTITIONS=${OPTARG};;
+ x) EXPECTED=${OPTARG};;
  esac
 done
 
@@ -71,5 +73,5 @@ if [ $PARTITIONS ]; then
     ARGS+=" -p $PARTITIONS"
 fi
 
-echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT $ARGS"
-$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT $ARGS
+echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT --expected $EXPECTED $ARGS"
+$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT --expected $EXPECTED $ARGS

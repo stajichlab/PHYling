@@ -130,13 +130,14 @@ elif subprog == 'download':
                         fromf=os.path.join(dlong,'HMM',hmmfolder)
                         print(fromf)
                         shutil.move(fromf,config["HMM_FOLDER"])
-                        print("%s HMMs installed. URL=%s Outfile=%s Dest=%s" % (args.type,url,outfile,config["HMM_FOLDER"]))
+                        print("%s HMMs installed. URL=%s Outfile=%s Dest=%s" % 
+                              (args.type,url,outfile,config["HMM_FOLDER"]))
 
 elif re.match("(hmm|search)",subprog):
     help = Messages['commands']['search'] % ('search', version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-f','--force', action='store_true',type=bool)
+    parser.add_argument('-f','--force', action='store_true')
     args = parser.parse_args(arguments)
 
     if args.force:
@@ -148,7 +149,7 @@ elif re.match("(hmm|search)",subprog):
                 os.unlink(os.path.join(searchfolder,file))
 
     cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
-    subprocess.call([cmd,"-f",args.force])
+    subprocess.call([cmd,"-f","%d"%int(args.force)])
 
 elif re.match("aln",subprog):
     help = Messages['commands']['aln'] % ('aln', version)
@@ -160,7 +161,7 @@ elif re.match("aln",subprog):
     # force clean DB and align
     parser.add_argument('-f','--force', action='store_true')
 
-    # clean align folder
+    # clean align folder (remake starting files)
     parser.add_argument('-c','--cleanaln', action='store_true')
     args = parser.parse_args(arguments)
 
@@ -178,7 +179,7 @@ elif re.match("aln",subprog):
                              config["BESTHITEXT"],config['HMMSEARCH_CUTOFF'],
                              pep_dbidx,
                              alndir, config["OUTPEPEXT"],
-                             args.force or args.cleanaln)
+                             args.cleanaln)
 
     # now re-parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog for the coding sequence files
@@ -187,6 +188,7 @@ elif re.match("aln",subprog):
     if os.path.exists(config["CDSDIR"]):
         PHYling.init_allseqdb(config["CDSDIR"],config["ALLSEQNAME"],
                               config["INCDSEXT"],args.force)
+
         cds_dbidx = os.path.join(config["CDSDIR"],
                                config["ALLSEQNAME"] + CDBYANKEXT)
 
@@ -195,7 +197,7 @@ elif re.match("aln",subprog):
                                  config['HMMSEARCH_CUTOFF'],
                                  cds_dbidx,
                                  alndir, config["OUTCDSEXT"],
-                                 args.force or args.cleanaln)
+                                 args.cleanaln)
 
     # either force or cleanaln flag sufficient to regenerate alignment files
     # do we sub-divide by type (muscle,hmmalign here)
@@ -206,16 +208,9 @@ elif re.match("aln",subprog):
                      "-c","%d"%(int(args.cleanaln)),
                      "-f","%d"%(int(args.force))])
 
-
-elif subprog == "concat":
-    help = Messages['commands']['superaln'] % (sys.argv[1], version)
-    parser = argparse.ArgumentParser(description=help,add_help=True,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    args = parser.parse_args(arguments)
-
 elif subprog == "phylo":
     help = Messages['commands']['phylo'] % (sys.argv[1], version)
-    parser = argparse.ArgumentParser(description=help,add_help=True,
+    parser = argparse.ArgumentParser(description=hqelp,add_help=True,
                     formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?
     args = parser.parse_args(arguments)

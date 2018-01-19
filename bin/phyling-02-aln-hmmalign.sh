@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# could all this be replaced with snakemake/makefile??
+
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --mem=4G
@@ -12,6 +15,10 @@ JOBCPU=1
 TOTALCPU=4
 OUTPEPEXT=aa.fa
 OUTCDSEXT=cds.fa
+RESOVERLAP=0.50
+SEQOVERLAP=60
+TRIMALSCHEME=-automated1
+
 #SCRIPTDIR=$(which PHYling | dirname)
 
 if [ $MODULESHOME ]; then
@@ -73,23 +80,43 @@ fi
 marker=$(basename $IN .$OUTPEPEXT)
 echo "IN=$IN gene=$marker"
 
-if [[ $FORCE == "1" || ! -f $DIR/$marker.msa ]]; then
-    hmmalign --trim --amino $DBDIR/$marker.hmm $IN > $DIR/$marker.msa
-    # hmmalign --trim --amino $DBDIR/$marker.hmm $DIR/$marker.$PEPEXT | perl -p -e 's/^>(\d+)\|/>/' > $DIR/$marker.msa
+OUTFILE=$DIR/$marker.aa.msa
+INFILE=$IN
+if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
+    hmmalign --trim --amino $DBDIR/$marker.hmm $INFILE > $OUTFILE
 fi
 
-if [[ $FORCE == "1" || ! -f $DIR/$marker.aln ]]; then
-    esl-reformat --replace=\*:- --gapsym=- clustal $DIR/$marker.msa > $DIR/$marker.1.aln
-    esl-reformat --replace=x:- clustal $DIR/$marker.1.aln > $DIR/$marker.aln
+INFILE=$OUTFILE # last OUTFILE is new INFILE
+OUTFILE=$DIR/$marker.aa.clnaln
+
+if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
+    esl-reformat --replace=x:- --gapsym=- -o $OUTFILE.tmp afa $INFILE
+    esl-reformat --replace=*:- --gapsym=- -o $OUTFILE afa $OUTFILE.tmp
+    rm $OUTFILE.tmp
 fi
 
-if [[ $FORCE == "1" || ! -f $DIR/$marker.msa.trim ]]; then
-    echo "running because no $DIR/$marker.msa.trim or $FORCE "
-    trimal -resoverlap 0.50 -seqoverlap 60 -in $DIR/$marker.aln \
-	-out $DIR/$marker.msa.filter
-    trimal -automated1 -fasta -in $DIR/$marker.msa.filter \
-	-out $DIR/$marker.msa.trim 
+INFILE=$OUTFILE # last OUTFILE is new INFILE
+OUTFILE=$DIR/$marker.aa.filter
+
+if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
+    trimal -resoverlap 0.50 -seqoverlap 60 -in $INFILE -out $OUTFILE
 fi
+
+INFILE=$OUTFILE # last OUTFILE is new INFILE
+OUTFILE=$DIR/$marker.aa.filter
+
+if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
+    trimal -resoverlap $RESOVERLAP -seqoverlap $SEQOVERLAP -in $INFILE -out $OUTFILE
+fi
+
+INFILE=$OUTFILE # last OUTFILE is new INFILE
+OUTFILE=$DIR/$marker.aa.trim
+
+if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
+    trimal $TRIMALSCHEME -fasta -in $INFILE -out $OUTFILE
+fi
+
+
 
 #if [ -f $DIR/$marker.cds.fasta ]; then
 #    if [ ! -f $DIR/$marker.cdsaln.trim ]; then

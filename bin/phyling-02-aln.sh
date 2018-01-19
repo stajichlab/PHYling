@@ -9,6 +9,7 @@ OUTPEPEXT=aa.fa
 OUTCDSEXT=cds.fa
 ALN_OUTDIR=aln
 ALNTOOL=hmmalign
+EXPECTED=expected_prefixes.lst
 
 if [ -f config.txt ]; then
  source config.txt
@@ -52,7 +53,8 @@ if [ $QUEUEING == "parallel" ]; then
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
     parallel -j $JOBPARALLEL $SUBJOB_SCRIPT -f $FORCE -c $CLEAN -i {} < $ALNFILES
-    $COMBINE_SCRIPT 
+    echo "$COMBINE_SCRIPT -x $EXPECTED"
+    $COMBINE_SCRIPT -x $EXPECTED 
 
 elif [ $QUEUEING == "slurm" ]; then
     QUEUECMD=""
@@ -62,7 +64,8 @@ elif [ $QUEUEING == "slurm" ]; then
     ALNCT=$(wc -l $ALNFILES | awk '{print $1}')
     PHYLING_DIR=$(dirname $0)
     echo "PHYLING_DIR is $PHYLING_DIR"
-    submitid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR --export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT | awk '{print $4}')
+    submitid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR \
+	--export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT | awk '{print $4}')
     sbatch --dependency=afterok:$submitid $QUEUECMD $COMBINE_SCRIPT
     
 else

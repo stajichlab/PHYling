@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(description=help,add_help=True,
 
 parser.add_argument('-d','--dir', required=True,
                     help="The input directory for the alignments")
-parser.add_argument('--ext', default="msa.trim",
+parser.add_argument('--ext', default="aa.trim",
                     help="Extension of the alignments to process (post trimming usually)")
 parser.add_argument('--expected',default="expected_prefixes.lst",
                     help='File which lists the names of input prefixes expected, the union of all prefixes')
