@@ -24,8 +24,6 @@ TRIMALSCHEME=-automated1
 if [ $MODULESHOME ]; then
     module load hmmer/3
     module load trimal
-    module load hmmer/3
-    module load java
 #    module load BMGE # is this too slow?
 fi
 

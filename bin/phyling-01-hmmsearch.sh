@@ -15,6 +15,17 @@ fi
 SCRIPT_DIR=$(dirname $0)
 SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-01-hmmsearch-run.sh
 
+#echo "02-aln args are $@"
+while getopts c:f:q: option
+do
+ case "${option}"
+ in
+ c) CLEAN=${OPTARG};;
+ f) FORCE=${OPTARG};;
+ q) QUEUEING=${OPTARG};;
+ esac
+done
+
 if [ $QUEUEING == "parallel" ]; then
     JOBPARALLEL=$(expr $TOTALCPU / $JOBCPU)
     echo "Run parallel job hmmsearch"

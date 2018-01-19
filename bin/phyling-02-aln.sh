@@ -30,13 +30,14 @@ if [ ! $ALNFILES ]; then
 fi
 
 #echo "02-aln args are $@"
-while getopts t:c:f: option
+while getopts t:c:f:q: option
 do
  case "${option}"
  in
  t) ALNTOOL=${OPTARG};;
  c) CLEAN=${OPTARG};;
  f) FORCE=${OPTARG};;
+ q) QUEUEING=${OPTARG};;
  esac
 done
 
@@ -53,8 +54,12 @@ if [ $QUEUEING == "parallel" ]; then
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
     parallel -j $JOBPARALLEL $SUBJOB_SCRIPT -f $FORCE -c $CLEAN -i {} < $ALNFILES
-    echo "$COMBINE_SCRIPT -x $EXPECTED"
-    $COMBINE_SCRIPT -x $EXPECTED 
+
+    if [ $ALNTOOL == "muscle" ]; then
+	$COMBINE_SCRIPT -x $EXPECTED --ext aa.denovo.trim
+    else
+	$COMBINE_SCRIPT -x $EXPECTED 
+    fi
 
 elif [ $QUEUEING == "slurm" ]; then
     QUEUECMD=""
@@ -66,8 +71,13 @@ elif [ $QUEUEING == "slurm" ]; then
     echo "PHYLING_DIR is $PHYLING_DIR"
     submitid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR \
 	--export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT | awk '{print $4}')
-    sbatch --dependency=afterok:$submitid $QUEUECMD $COMBINE_SCRIPT
-    
+    if [ $ALNTOOL == "muscle" ]; then
+	echo "ready to run with $COMBINE_SCRIPT no extra ext"
+     sbatch --dependency=afterok:$submitid $QUEUECMD --export=EXT=aa.denovo.trim $COMBINE_SCRIPT
+    else
+	echo "ready to run with $COMBINE_SCRIPT no extra ext"
+     sbatch --dependency=afterok:$submitid $QUEUECMD $COMBINE_SCRIPT
+    fi
 else
  echo "Run in serial"
  for file in $( find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT")

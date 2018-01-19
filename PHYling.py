@@ -47,7 +47,9 @@ config = { 'HMM_FOLDER': 'HMM',
            'ALN_OUTDIR': 'aln',
            'ALLSEQNAME': 'allseq',
            'LANGUAGE'  : 'en',
-           'PREFIX'    : 'PHY'
+           'PREFIX'    : 'PHY',
+	   'QUEUEING'  : 'parallel'
+	 
 
 }
 
@@ -137,9 +139,13 @@ elif re.match("(hmm|search)",subprog):
     help = Messages['commands']['search'] % ('search', version)
     parser = argparse.ArgumentParser(description=help,add_help=True,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-f','--force', action='store_true')
+    parser.add_argument('-f','--force', action='store_true',help="force overwriting of files when running")
+    parser.add_argument('-q','--queueing',
+                        help="Queueing parallel, serial, or slurm")
     args = parser.parse_args(arguments)
-
+    if args.queueing is not None:
+        config["QUEUEING"] = args.queueing
+		
     if args.force:
         print(args.force)
         searchfolder = os.path.join(config["HMMSEARCH_OUTDIR"], config["HMM"])
@@ -149,7 +155,9 @@ elif re.match("(hmm|search)",subprog):
                 os.unlink(os.path.join(searchfolder,file))
 
     cmd = os.path.join(script_path, 'bin', 'phyling-01-hmmsearch.sh')
-    subprocess.call([cmd,"-f","%d"%int(args.force)])
+    subprocess.call([cmd,"-f","%d"%int(args.force),
+                     "-q","%s"%(config["QUEUEING"]),
+                     ])
 
 elif re.match("aln",subprog):
     help = Messages['commands']['aln'] % ('aln', version)
@@ -160,10 +168,17 @@ elif re.match("aln",subprog):
 
     # force clean DB and align
     parser.add_argument('-f','--force', action='store_true')
-
+ 
     # clean align folder (remake starting files)
     parser.add_argument('-c','--cleanaln', action='store_true')
+    # override queue option from config file
+    parser.add_argument('-q','--queueing',
+                        help="Queueing parallel, serial, or slurm")
+
     args = parser.parse_args(arguments)
+
+    if args.queueing is not None:
+        config["QUEUEING"] = args.queueing
 
     pep_dbidx = os.path.join(config["PEPDIR"],config["ALLSEQNAME"] + CDBYANKEXT)
 
@@ -206,7 +221,9 @@ elif re.match("aln",subprog):
     subprocess.call([cmd,
                      "-t",args.type,
                      "-c","%d"%(int(args.cleanaln)),
-                     "-f","%d"%(int(args.force))])
+                     "-f","%d"%(int(args.force)),
+                     "-q","%s"%(config["QUEUEING"]),
+                 ])
 
 elif subprog == "phylo":
     help = Messages['commands']['phylo'] % (sys.argv[1], version)
