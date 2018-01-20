@@ -68,7 +68,7 @@ def make_unaln_files (search_dir, best_extension, cutoff,
             with open(os.path.join(search_dir,file),"r") as fh:
                 for line in fh:
                     row = line.strip().split("\t")
-                    if row[2] <= cutoff:
+                    if float(row[2]) <= float(cutoff):
                         if row[0] in orthologs:
                             orthologs[row[0]].append(row[1])
                         else:
@@ -76,14 +76,17 @@ def make_unaln_files (search_dir, best_extension, cutoff,
 
     for orth in orthologs:
         print(orth)
-        outfile = "%s.%s" % (os.path.join(outdir,orth), outext)
+        namesfile = "%s.%s" % (os.path.join(outdir,orth), "names")
+        outfile   = "%s.%s" % (os.path.join(outdir,orth), outext)
+        instr = "\n".join(orthologs[orth]) + "\n"
+        with open(namesfile,"w") as ofh:
+            ofh.write(instr)
+
         if force or (not os.path.exists(outfile)):
             p = subprocess.Popen([Apps["cdbyank"],dbidx,
                                   "-o",outfile],stdin=PIPE)
-            instr = ""
-            for gene in orthologs[orth]:
-                instr += "%s\n"%(gene)
-            # only call this once with the complete list of IDs otherwise the process gets closed
+            # only call this once with the complete list of IDs otherwise 
+            # the process gets closed
             p.communicate(input=instr.encode())
                 
 # sequences = read_fasta
