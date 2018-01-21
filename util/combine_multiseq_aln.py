@@ -91,11 +91,11 @@ if args.rand:
 # process every file, keep track of start and end for the
 # partitions and make a concatenated alignment
 
-for file in files:
-    stem     = file[0]
-    fullfile = file[1]
-    fstem = re.sub(r'\.msa','',stem)
-    seqs = PHYling.read_fasta(fullfile)
+for fname in files:
+    stem     = fname[0]
+    fullfile = fname[1]
+    fstem    = re.sub(r'\.msa','',stem)
+    seqs     = PHYling.read_fasta(fullfile)
 
     alnlen = len(seqs[0][1]) # first sequence, the alignseq is index [1]
     now = last + alnlen - 1
@@ -108,9 +108,14 @@ for file in files:
     for seq in seqs:
         idstr = seq[0]
         seqstr = seq[1]
+	
+        if len(idstr) == 0:
+            warnings.warn("no idstr for", idstr,fname, seqstr)
+            exit()
 
         if len(seqstr) == 0:
             warnings.warn("no length for seq",idstr)
+            exit()
 
         m = re.search(r'([^\|]+)\|',idstr)
         if m:
@@ -126,12 +131,17 @@ for file in files:
         seen[idstr] = 1
 
     for exp in expected:
-        if not (exp in seen):
-            matrix[idstr] += '-' * alnlen
+        if exp not in seen:
+            gapstr = '-' * alnlen
+            if exp in matrix:
+                matrix[exp] += gapstr
+            else:
+                matrix[exp] = gapstr
 
 with open(args.outfile,"w") as fh:
     for seqid in matrix:
         data = matrix[seqid]
+
         fh.write(">%s\n"%(seqid))
         for i in range(0, len(data), wrap):
             fh.write(data[i:i + wrap] + "\n")
