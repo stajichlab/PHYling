@@ -1,8 +1,9 @@
-# python3
+ # python3
 
 import os, logging, subprocess, re
 
 from subprocess import Popen, PIPE, STDOUT
+#from multiprocessing.dummy import Pool as ThreadPool
 
 logging.basicConfig()
 
@@ -53,7 +54,7 @@ def init_allseqdb(dbfolder,dbname, dbext, force):
 
 
 def make_unaln_files (search_dir, best_extension, cutoff, 
-                      dbidx, outdir, outext, force):
+                      dbidx, outdir, outext, force, threads=2):
     orthologs = {}
     
     if not os.path.exists(outdir):
@@ -72,15 +73,20 @@ def make_unaln_files (search_dir, best_extension, cutoff,
                         if row[0] in orthologs:
                             orthologs[row[0]].append(row[1])
                         else:
-                            orthologs[row[0]] = [ row[1] ]
+                            orthologs[row[0]] = [ row[1] ]        
+
+#    pool = ThreadPool(threads) 
+#    results = pool.starmap(run_cdbyank, zip(orthologs,filenames))
+    # this could be multithreaded?
 
     for orth in orthologs:
         print(orth)
-        namesfile = "%s.%s" % (os.path.join(outdir,orth), "names")
+        #namesfile = "%s.%s" % (os.path.join(outdir,orth), "names")
         outfile   = "%s.%s" % (os.path.join(outdir,orth), outext)
         instr = "\n".join(orthologs[orth]) + "\n"
-        with open(namesfile,"w") as ofh:
-            ofh.write(instr)
+
+        #with open(namesfile,"w") as ofh:
+        #    ofh.write(instr)
 
         if force or (not os.path.exists(outfile)):
             p = subprocess.Popen([Apps["cdbyank"],dbidx,
@@ -92,24 +98,26 @@ def make_unaln_files (search_dir, best_extension, cutoff,
 # sequences = read_fasta
 def read_fasta (file):
     seq = ""
-    fasta_pat = re.compile(">(\S+)")
+    fasta_pat = re.compile("^>(\S+)")
     seqs = []
     with open(file, 'r') as f:
         seenheader = 0
         id = ""
         for line in f:
             line = line.strip()
-            m = fasta_pat.match(line);
+            m = fasta_pat.match(line)
+
             if m:
-                id = m.group(1)
                 if seenheader:
                     seq = re.sub("\s+","",seq)
                     seqs.append([id,seq])
                     id = ""
                     seq = ""
+
+                id = m.group(1)
                 seenheader = 1
             else:
                 seq += line
+        # fencepost
         seqs.append([id,seq])
-        
     return seqs
