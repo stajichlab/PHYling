@@ -3,7 +3,7 @@
 import os, logging, subprocess, re
 
 from subprocess import Popen, PIPE, STDOUT
-#from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing.dummy import Pool as ThreadPool
 
 logging.basicConfig()
 
@@ -53,6 +53,17 @@ def init_allseqdb(dbfolder,dbname, dbext, force):
         subprocess.call([Apps["cdbfasta"],dbpath])
 
 
+def run_cdbyank (fileset) :
+    index = fileset[0]
+    outfile = fileset[1]
+    names = fileset[2]
+    p = subprocess.Popen([Apps["cdbyank"],index,
+                          "-o",outfile],stdin=PIPE)
+    # only call this once with the complete list of IDs otherwise 
+    # the process gets closed
+    p.communicate(input=names.encode())
+
+
 def make_unaln_files (search_dir, best_extension, cutoff, 
                       dbidx, outdir, outext, force, threads=2):
     orthologs = {}
@@ -75,25 +86,20 @@ def make_unaln_files (search_dir, best_extension, cutoff,
                         else:
                             orthologs[row[0]] = [ row[1] ]        
 
-#    pool = ThreadPool(threads) 
-#    results = pool.starmap(run_cdbyank, zip(orthologs,filenames))
-    # this could be multithreaded?
-
+    pool = ThreadPool(threads)
+    fileset = []
     for orth in orthologs:
-        print(orth)
-        #namesfile = "%s.%s" % (os.path.join(outdir,orth), "names")
-        outfile   = "%s.%s" % (os.path.join(outdir,orth), outext)
-        instr = "\n".join(orthologs[orth]) + "\n"
+        outfile = "%s.%s" % (os.path.join(outdir,orth),outext)
+        if force or (not os.path.exists(outfile)):        
+            fileset.append( [dbidx, outfile,
+                             "\n".join(orthologs[orth]) + "\n"])
 
-        #with open(namesfile,"w") as ofh:
-        #    ofh.write(instr)
+    results = pool.map(run_cdbyank, fileset)
+    
+    # close the pool and wait for the work to finish 
+    pool.close() 
+    pool.join() 
 
-        if force or (not os.path.exists(outfile)):
-            p = subprocess.Popen([Apps["cdbyank"],dbidx,
-                                  "-o",outfile],stdin=PIPE)
-            # only call this once with the complete list of IDs otherwise 
-            # the process gets closed
-            p.communicate(input=instr.encode())
                 
 # sequences = read_fasta
 def read_fasta (file):

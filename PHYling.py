@@ -194,7 +194,7 @@ elif re.match("aln",subprog):
                              config["BESTHITEXT"],config['HMMSEARCH_CUTOFF'],
                              pep_dbidx,
                              alndir, config["OUTPEPEXT"],
-                             args.cleanaln)
+                             args.cleanaln,int(config["TOTALCPU"]))
 
     # now re-parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog for the coding sequence files
