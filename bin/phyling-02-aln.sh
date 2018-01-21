@@ -73,10 +73,10 @@ elif [ $QUEUEING == "slurm" ]; then
 	--export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT | awk '{print $4}')
     if [ $ALNTOOL == "muscle" ]; then
 	echo "ready to run with $COMBINE_SCRIPT no extra ext"
-     sbatch --dependency=afterok:$submitid $QUEUECMD --export=EXT=aa.denovo.trim $COMBINE_SCRIPT
+     sbatch --dependency=afterok:$submitid $QUEUECMD --export=EXT=aa.denovo.trim,EXPECTED=$EXPECTED $COMBINE_SCRIPT
     else
 	echo "ready to run with $COMBINE_SCRIPT no extra ext"
-     sbatch --dependency=afterok:$submitid $QUEUECMD $COMBINE_SCRIPT
+     sbatch --dependency=afterok:$submitid $QUEUECMD --export=EXPECTED=$EXPECTED $COMBINE_SCRIPT
     fi
 else
  echo "Run in serial"

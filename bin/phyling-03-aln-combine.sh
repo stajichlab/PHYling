@@ -73,5 +73,8 @@ if [ $PARTITIONS ]; then
     ARGS+=" -p $PARTITIONS"
 fi
 
-echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT --expected $EXPECTED $ARGS"
-$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT --expected $EXPECTED $ARGS
+echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT $ARGS"
+if [ $EXPECTED ]; then
+ ARGS+=" --expected $EXPECTED"
+fi
+$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUT $ARGS
