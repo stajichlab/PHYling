@@ -2,9 +2,9 @@
 
 QUERYDBS=pepfile.lst
 LOG_FOLDER=logs
-QUEUEING=parallel
 JOBCPU=2
 TOTALCPU=4
+
 if [ -f config.txt ]; then
  source config.txt
 else
