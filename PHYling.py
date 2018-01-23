@@ -29,7 +29,6 @@ script_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfra
 sys.path.insert(0,script_path)
 
 # some hard coded variables
-CDBYANKEXT = '.cidx'
 
 # set some defaults which can be overridden by config.txt
 # currently assume that input
@@ -180,10 +179,16 @@ elif re.match("aln",subprog):
     if args.queueing is not None:
         config["QUEUEING"] = args.queueing
 
-    pep_dbidx = os.path.join(config["PEPDIR"],config["ALLSEQNAME"] + CDBYANKEXT)
+    outdir = config["PEPDIR"]
+    if "TEMP" in config:
+        outdir = os.path.join(config["TEMP"],config["PREFIX"])        
+        if not os.path.isdir(outdir):
+            os.makedirs(outdir)
 
-    PHYling.init_allseqdb(config["PEPDIR"],config["ALLSEQNAME"],
-                          config["INPEPEXT"],args.force)
+    pep_db= os.path.join(outdir,config["ALLSEQNAME"])
+
+    pep_dbidx = PHYling.init_allseqdb(config["PEPDIR"],pep_db,
+                                      config["INPEPEXT"],args.force)
 
     searchdir = os.path.join(config["HMMSEARCH_OUTDIR"], config["HMM"])
     alndir = os.path.join(config["ALN_OUTDIR"],config["HMM"])
@@ -201,11 +206,16 @@ elif re.match("aln",subprog):
     # assuming there is a CDS folder (skip if not)
 
     if os.path.exists(config["CDSDIR"]):
-        PHYling.init_allseqdb(config["CDSDIR"],config["ALLSEQNAME"],
-                              config["INCDSEXT"],args.force)
+        outdir = config["CDSDIR"]
+        if "TEMP" in config:
+            outdir = os.path.join(config["TEMP"],config["PREFIX"])
+            if not os.path.isdir(outdir):
+                os.makedirs(outdir)
 
-        cds_dbidx = os.path.join(config["CDSDIR"],
-                               config["ALLSEQNAME"] + CDBYANKEXT)
+        cds_db = os.path.join(outdir,"cds_"+config["ALLSEQNAME"])
+        cds_dbidx = PHYling.init_allseqdb(config["CDSDIR"],cds_db,
+        	                      config["INCDSEXT"],args.force)
+
 
         PHYling.make_unaln_files(searchdir,
                                  config["BESTHITEXT"],
