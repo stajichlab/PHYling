@@ -6,6 +6,7 @@ from subprocess import Popen, PIPE, STDOUT
 from multiprocessing.dummy import Pool as ThreadPool
 
 CDBYANKEXT = '.cidx'
+SFETCHEXT  = '.ssi'
 
 logging.basicConfig()
 
@@ -13,11 +14,19 @@ logging.basicConfig()
 # otherwise assuming apps are in the path
 # and if wanted to generalize this where there might be a different file name...
 Apps = { 'cdbfasta': 'cdbfasta',
-         'cdbyank':  'cdbyank'}
+         'cdbyank':  'cdbyank',
+         'sfetch' : 'esl-sfetch',
+}
 
 
-def init_allseqdb(dbfolder,dbpath, dbext, force):
-    dbpathidx = dbpath+CDBYANKEXT
+def init_allseqdb(dbfolder,dbpath,dbext, 
+                  index_type='sfetch',force=False):
+
+    if index_type is 'cdbfasta':
+        dbpathidx = dbpath+CDBYANKEXT
+    elif index_type is 'sfetch':
+        dbpathidx = dbpath+SFETCHEXT
+
     makedb = (force or not os.path.exists(dbpath))
     makeidx = (force or not os.path.exists(dbpathidx))
 
@@ -51,13 +60,26 @@ def init_allseqdb(dbfolder,dbpath, dbext, force):
             makeidx = True
                             
     if makeidx:
-        subprocess.call([Apps["cdbfasta"],dbpath])
+        if index_type is "cdbfasta":
+            subprocess.call([Apps["cdbfasta"],dbpath])
+        elif index_type is "sfetch":
+            subprocess.call([Apps["sfetch"],
+                             "--index",
+                             dbpath])
 
-    return dbpathidx
 
+def run_sfetch(fileset):
+    dbfile = fileset[0]
+    outfile = fileset[1]
+    names = fileset[2]
+    p = subprocess.Popen([Apps["sfetch"],"-f",dbfile,
+                          "-",">",outfile],stdin=PIPE)
+    # only call this once with the complete list of IDs otherwise 
+    # the process gets closed
+    p.communicate(input=names.encode())
 
-def run_cdbyank (fileset) :
-    index = fileset[0]
+def run_cdbyank (fileset):
+    index = fileset[0]+CDBYANKEXT
     outfile = fileset[1]
     names = fileset[2]
     p = subprocess.Popen([Apps["cdbyank"],index,
@@ -68,9 +90,16 @@ def run_cdbyank (fileset) :
 
 
 def make_unaln_files (search_dir, best_extension, cutoff, 
-                      dbidx, outdir, outext, force, threads=2):
+                      dbpath, outdir, outext, force=False, 
+                      index_type="cdbfasta",
+                      threads=2):
     orthologs = {}
-    
+    dbidx = ""
+    if index_type is "cdbfasta":
+        dbidx = dbpath + CDBYANKEXT
+    elif index_type is "sfetch":
+        dbidx = dbpath + SFETCHEXT
+  
     if not os.path.exists(outdir):
         os.makedirs(outdir)
         
@@ -94,11 +123,14 @@ def make_unaln_files (search_dir, best_extension, cutoff,
     for orth in orthologs:
         outfile = "%s.%s" % (os.path.join(outdir,orth),outext)
         if force or (not os.path.exists(outfile)):        
-            fileset.append( [dbidx, outfile,
+            fileset.append( [dbpath, outfile,
                              "\n".join(orthologs[orth]) + "\n"])
 
-    results = pool.map(run_cdbyank, fileset)
-    
+    if index_type is "CDBFASTA":
+        results = pool.map(run_cdbyank, fileset)
+    elif index_type is "SFETCH":
+        results = pool.map(run_sfetch, fileset)
+
     # close the pool and wait for the work to finish 
     pool.close() 
     pool.join() 

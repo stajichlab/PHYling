@@ -69,14 +69,16 @@ elif [ $QUEUEING == "slurm" ]; then
     ALNCT=$(wc -l $ALNFILES | awk '{print $1}')
     PHYLING_DIR=$(dirname $0)
     echo "PHYLING_DIR is $PHYLING_DIR"
-    submitid=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR \
-	--export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT | awk '{print $4}')
+    submitmsg=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR \
+	--export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT) 
+    submitid=$(echo $submitmsg | awk '{print $4}')
+    echo "submitid is $submitid; $submitmsg"
     if [ $ALNTOOL == "muscle" ]; then
 	echo "ready to run with $COMBINE_SCRIPT no extra ext"
-     sbatch --dependency=afterok:$submitid $QUEUECMD --export=EXT=aa.denovo.trim,EXPECTED=$EXPECTED $COMBINE_SCRIPT
+     sbatch --depend=afterany:$submitid $QUEUECMD --export=EXT=aa.denovo.trim,EXPECTED=$EXPECTED $COMBINE_SCRIPT
     else
 	echo "ready to run with $COMBINE_SCRIPT no extra ext"
-     sbatch --dependency=afterok:$submitid $QUEUECMD --export=EXPECTED=$EXPECTED $COMBINE_SCRIPT
+     sbatch --depend=afterany:$submitid $QUEUECMD --export=EXPECTED=$EXPECTED $COMBINE_SCRIPT
     fi
 else
  echo "Run in serial"

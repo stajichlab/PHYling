@@ -47,9 +47,8 @@ config = { 'HMM_FOLDER': 'HMM',
            'ALLSEQNAME': 'allseq',
            'LANGUAGE'  : 'en',
            'PREFIX'    : 'PHY',
-	   'QUEUEING'  : 'parallel'
-	 
-
+	   'QUEUEING'  : 'parallel',
+           'INDEXING'  : 'sfetch',
 }
 
 
@@ -187,8 +186,8 @@ elif re.match("aln",subprog):
 
     pep_db= os.path.join(outdir,config["ALLSEQNAME"])
 
-    pep_dbidx = PHYling.init_allseqdb(config["PEPDIR"],pep_db,
-                                      config["INPEPEXT"],args.force)
+    PHYling.init_allseqdb(config["PEPDIR"],pep_db,config["INPEPEXT"],
+                          config["INDEXING"],args.force)
 
     searchdir = os.path.join(config["HMMSEARCH_OUTDIR"], config["HMM"])
     alndir = os.path.join(config["ALN_OUTDIR"],config["HMM"])
@@ -197,9 +196,11 @@ elif re.match("aln",subprog):
     # to a single file per ortholog  - first do the proteins
     PHYling.make_unaln_files(searchdir,
                              config["BESTHITEXT"],config['HMMSEARCH_CUTOFF'],
-                             pep_dbidx,
+                             pep_db,
                              alndir, config["OUTPEPEXT"],
-                             args.cleanaln,int(config["TOTALCPU"]))
+                             config["INDEXING"],
+                             int(config["TOTALCPU"]),
+                             args.cleanaln)
 
     # now re-parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog for the coding sequence files
@@ -213,15 +214,18 @@ elif re.match("aln",subprog):
                 os.makedirs(outdir)
 
         cds_db = os.path.join(outdir,"cds_"+config["ALLSEQNAME"])
-        cds_dbidx = PHYling.init_allseqdb(config["CDSDIR"],cds_db,
-        	                      config["INCDSEXT"],args.force)
+        PHYling.init_allseqdb(config["CDSDIR"],cds_db,config["INCDSEXT"],
+                              config["INDEXING"],
+                              args.force)
 
 
         PHYling.make_unaln_files(searchdir,
                                  config["BESTHITEXT"],
                                  config['HMMSEARCH_CUTOFF'],
-                                 cds_dbidx,
+                                 cds_db,
                                  alndir, config["OUTCDSEXT"],
+                                 config["INDEXING"],
+                                 int(config["TOTALCPU"]),
                                  args.cleanaln)
 
     # either force or cleanaln flag sufficient to regenerate alignment files
