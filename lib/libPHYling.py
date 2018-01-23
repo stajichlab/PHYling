@@ -1,9 +1,11 @@
- # python3
+# python3
 
 import os, logging, subprocess, re
 
 from subprocess import Popen, PIPE, STDOUT
 from multiprocessing.dummy import Pool as ThreadPool
+
+CDBYANKEXT = '.cidx'
 
 logging.basicConfig()
 
@@ -14,9 +16,8 @@ Apps = { 'cdbfasta': 'cdbfasta',
          'cdbyank':  'cdbyank'}
 
 
-def init_allseqdb(dbfolder,dbname, dbext, force):
-    dbpath = os.path.join(dbfolder,dbname)
-    dbpathidx = dbpath+".cidx"
+def init_allseqdb(dbfolder,dbpath, dbext, force):
+    dbpathidx = dbpath+CDBYANKEXT
     makedb = (force or not os.path.exists(dbpath))
     makeidx = (force or not os.path.exists(dbpathidx))
 
@@ -51,6 +52,8 @@ def init_allseqdb(dbfolder,dbname, dbext, force):
                             
     if makeidx:
         subprocess.call([Apps["cdbfasta"],dbpath])
+
+    return dbpathidx
 
 
 def run_cdbyank (fileset) :
