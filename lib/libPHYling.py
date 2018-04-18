@@ -21,12 +21,16 @@ Apps = { 'cdbfasta': 'cdbfasta',
 
 def init_allseqdb(dbfolder,dbpath,dbext, 
                   index_type='sfetch',force=False):
-
-    if index_type is 'cdbfasta':
+    dbpathidx = ""
+    index_type = index_type.lower()
+    if index_type == 'cdbfasta':
         dbpathidx = dbpath+CDBYANKEXT
-    elif index_type is 'sfetch':
+    elif index_type == 'sfetch':
         dbpathidx = dbpath+SFETCHEXT
-
+    else:
+        print("need an expected index type not %s" % (index_type))
+        exit(-1)
+	
     makedb = (force or not os.path.exists(dbpath))
     makeidx = (force or not os.path.exists(dbpathidx))
 
@@ -60,9 +64,9 @@ def init_allseqdb(dbfolder,dbpath,dbext,
             makeidx = True
                             
     if makeidx:
-        if index_type is "cdbfasta":
+        if index_type == "cdbfasta":
             subprocess.call([Apps["cdbfasta"],dbpath])
-        elif index_type is "sfetch":
+        elif index_type == "sfetch":
             subprocess.call([Apps["sfetch"],
                              "--index",
                              dbpath])
@@ -72,8 +76,8 @@ def run_sfetch(fileset):
     dbfile = fileset[0]
     outfile = fileset[1]
     names = fileset[2]
-    p = subprocess.Popen([Apps["sfetch"],"-f",dbfile,
-                          "-",">",outfile],stdin=PIPE)
+    p = subprocess.Popen([Apps["sfetch"],"-o", outfile,
+                          "-f",dbfile,"-"],stdin=PIPE)
     # only call this once with the complete list of IDs otherwise 
     # the process gets closed
     p.communicate(input=names.encode())
@@ -93,11 +97,13 @@ def make_unaln_files (search_dir, best_extension, cutoff,
                       dbpath, outdir, outext, force=False, 
                       index_type="cdbfasta",
                       threads=2):
+
     orthologs = {}
     dbidx = ""
-    if index_type is "cdbfasta":
+    index_type = index_type.lower()
+    if index_type == "cdbfasta":
         dbidx = dbpath + CDBYANKEXT
-    elif index_type is "sfetch":
+    elif index_type == "sfetch":
         dbidx = dbpath + SFETCHEXT
   
     if not os.path.exists(outdir):
@@ -126,9 +132,9 @@ def make_unaln_files (search_dir, best_extension, cutoff,
             fileset.append( [dbpath, outfile,
                              "\n".join(orthologs[orth]) + "\n"])
 
-    if index_type is "CDBFASTA":
+    if index_type == "cdbfasta":
         results = pool.map(run_cdbyank, fileset)
-    elif index_type is "SFETCH":
+    elif index_type == "sfetch":
         results = pool.map(run_sfetch, fileset)
 
     # close the pool and wait for the work to finish 

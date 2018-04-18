@@ -69,8 +69,7 @@ elif [ $QUEUEING == "slurm" ]; then
     ALNCT=$(wc -l $ALNFILES | awk '{print $1}')
     PHYLING_DIR=$(dirname $0)
     echo "PHYLING_DIR is $PHYLING_DIR"
-    submitmsg=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR \
-	--export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT) 
+    submitmsg=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR --export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT) 
     submitid=$(echo $submitmsg | awk '{print $4}')
     echo "submitid is $submitid; $submitmsg"
     if [ $ALNTOOL == "muscle" ]; then
@@ -84,7 +83,7 @@ else
  echo "Run in serial"
  for file in $( find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT")
  do
-   $SUBJOB_SCRIPT -f $FORCE $file
+   $SUBJOB_SCRIPT -f $FORCE -i $file
  done
  
  # do combine here (how to avoid duplicate code with the parallel stuff above

@@ -184,8 +184,8 @@ elif re.match("aln",subprog):
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
 
-    pep_db= os.path.join(outdir,config["ALLSEQNAME"])
-
+    pep_db = os.path.join(outdir,config["ALLSEQNAME"])
+    
     PHYling.init_allseqdb(config["PEPDIR"],pep_db,config["INPEPEXT"],
                           config["INDEXING"],args.force)
 
@@ -194,14 +194,13 @@ elif re.match("aln",subprog):
 
     # parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog  - first do the proteins
+    #print("make unaln called with",searchdir,pep_db)
     PHYling.make_unaln_files(searchdir,
                              config["BESTHITEXT"],config['HMMSEARCH_CUTOFF'],
-                             pep_db,
-                             alndir, config["OUTPEPEXT"],
+                             pep_db,alndir, config["OUTPEPEXT"],
+                             args.cleanaln,
                              config["INDEXING"],
-                             int(config["TOTALCPU"]),
-                             args.cleanaln)
-
+                             int(config["TOTALCPU"]) )
     # now re-parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog for the coding sequence files
     # assuming there is a CDS folder (skip if not)
@@ -224,14 +223,14 @@ elif re.match("aln",subprog):
                                  config['HMMSEARCH_CUTOFF'],
                                  cds_db,
                                  alndir, config["OUTCDSEXT"],
+                                 args.cleanaln,
                                  config["INDEXING"],
-                                 int(config["TOTALCPU"]),
-                                 args.cleanaln)
+                                 int(config["TOTALCPU"]) )
 
     # either force or cleanaln flag sufficient to regenerate alignment files
     # do we sub-divide by type (muscle,hmmalign here)
     cmd = os.path.join(script_path, 'bin', 'phyling-02-aln.sh')
-    print(cmd)
+    #print(cmd)
     subprocess.call([cmd,
                      "-t",args.type,
                      "-c","%d"%(int(args.cleanaln)),

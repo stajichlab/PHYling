@@ -82,7 +82,7 @@ OUTFILE=$DIR/$marker.aa.msa
 INFILE=$IN
 
 if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    hmmalign --trim --amino $DBDIR/$marker.hmm $INFILE > $OUTFILE
+    hmmalign --trim --amino -o $OUTFILE $DBDIR/$marker.hmm $INFILE 
 fi
 
 INFILE=$OUTFILE # last OUTFILE is new INFILE
@@ -90,9 +90,8 @@ OUTFILE=$DIR/$marker.aa.clnaln
 
 if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
     esl-reformat --replace=x:- --gapsym=- -o $OUTFILE.tmp afa $INFILE
-    esl-reformat --replace=Z:- --gapsym=- -o $OUTFILE.tmp2 afa $OUTFILE.tmp
-    esl-reformat --replace=*:- --gapsym=- -o $OUTFILE afa $OUTFILE.tmp2
-    rm $OUTFILE.tmp2 $OUTFILE.tmp
+    perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' $OUTFILE.tmp > $OUTFILE
+    rm $OUTFILE.tmp
 fi
 
 INFILE=$OUTFILE # last OUTFILE is new INFILE
