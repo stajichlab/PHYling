@@ -8,7 +8,7 @@
 #SBATCH --output=logs/combine.%A.log
 
 if [ $MODULESHOME ]; then
-    module switch python/3
+    module load python/3
 fi
 
 if [ -f config.txt ]; then

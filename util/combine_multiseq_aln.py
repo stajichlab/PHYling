@@ -36,7 +36,7 @@ parser.add_argument('--moltype',default="PROT",
 
 
 parser.add_argument('-p','--partitions',
-                    help='Select a random subset (this many) alignments') 
+                    help='partitions file to save this result into') 
 
 args = parser.parse_args(sys.argv[1:])
 
@@ -110,7 +110,7 @@ for fname in files:
         seqstr = seq[1]
 	
         if len(idstr) == 0:
-            warnings.warn("no idstr for", idstr,fname, seqstr)
+            warnings.warn("no idstr for %s %s %s" % (idstr,fname, seqstr))
             exit()
 
         if len(seqstr) == 0:
