@@ -3,8 +3,7 @@
 QUERYDBS=pepfile.lst
 PEPDIR=pep
 CDSDIR=cds
-PEPEXT=aa.fasta
-CDSEXT=cds.fasta
+INPEPEXT=aa.fasta
 LOG_FOLDER=logs
 EXPECTED=expected_prefixes.lst
 if [ ! -f config.txt ]; then
@@ -26,13 +25,13 @@ if [ ! -d HMM/${HMM}  ]; then
 fi
 
 echo "make expected_prefixes.lst"
-head -q -n1 $PEPDIR/*.$PEPEXT | awk -F\| '{print $1}' | awk '{print $1}' > $EXPECTED
+head -q -n1 $PEPDIR/*.$INPEPEXT | awk -F\| '{print $1}' | awk '{print $1}' > $EXPECTED
 
 if [ ! -f prefix.tab ]; then
     echo "making prefix.tab"
     for file in $PEPDIR/*.${PEPEXT}
     do
-	name=$(basename $file .${PEPEXT} | perl -p -e 's/\.\w+\.v\d+//;')
+	name=$(basename $file .${INPEPEXT} | perl -p -e 's/\.\w+\.v\d+//;')
 	pref=$(head -n1 $file | perl -p -e 's/^>([^\|\s]+).+/$1/')
 	echo -e "$pref\t$name"
     done > prefix.tab
@@ -40,7 +39,7 @@ else
     echo "prefix.tab already exists, not updating"
 fi
 echo "make $QUERYDBS for hmmsearch runs"
-for f in $PEPDIR/*.$PEPEXT
+for f in $PEPDIR/*.$INPEPEXT
 do
     basename $f
 done > $QUERYDBS
