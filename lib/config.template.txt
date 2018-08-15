@@ -1,19 +1,27 @@
+#basic setup needs to be changed
 PHYLING_DIR=__FIXME__
-HMM_FOLDER=HMM
 HMM=__CHANGEME__
-PEPDIR=pep
-PEPEXT=aa.fasta
-LISTFILE=pepfile.lst
-CDSDIR=cds
-CDSEXT=cds.fasta
 OUT=__CHANGEME__
 PREFIX=__CHANGEME__
+HMM_FOLDER=HMM
+PEPDIR=pep
+CDSDIR=cds
+INPEPEXT=aa.fasta
+INCDSEXT=cds.fasta
+ALLSEQNAME=allseq
+OUTPEPEXT=aa.fa
+OUTCDSEXT=cds.fa
+LISTFILE=pepfile.lst
+BESTHITEXT=best
 HMMSEARCH_CUTOFF=1e-30
 HMMSEARCH_OUTDIR=search
 ALN_OUTDIR=aln
+LANGUAGE=en
+#job runs
 JOBCPU=2 # per job CPUs
 TOTALCPU=8 # total CPUs to use
 QUEUEING=parallel
 QUEUE=
+# tree building - not yet integrated into PHYling
 EXTRARAXML=
 EXTRAIQTREE="-nt AUTO -m TESTMERGE -bb 1000 -alrt 1000"
