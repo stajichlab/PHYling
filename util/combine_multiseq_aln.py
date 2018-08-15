@@ -32,7 +32,7 @@ parser.add_argument('--rand',type=int,
                     help='Select a random subset (this many) alignments') 
 
 parser.add_argument('--moltype',default="PROT",
-                    help='Select a random subset (this many) alignments') 
+                    help='Molecule type listing the partition file (DNA or PROT)') 
 
 
 parser.add_argument('-p','--partitions',
