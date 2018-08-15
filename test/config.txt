@@ -1,0 +1,26 @@
+PHYLING_DIR=../
+HMM=JGI_1086
+OUT=Afum
+PREFIX=Test
+HMM_FOLDER=HMM
+PEPDIR=pep
+CDSDIR=cds
+INPEPEXT=aa.fasta
+INCDSEXT=cds.fasta
+ALLSEQNAME=allseq
+OUTPEPEXT=aa.fa
+OUTCDSEXT=cds.fa
+LISTFILE=pepfile.lst
+BESTHITEXT=best
+HMMSEARCH_CUTOFF=1e-30
+HMMSEARCH_OUTDIR=search
+ALN_OUTDIR=aln
+LANGUAGE=en
+#job runs
+JOBCPU=2 # per job CPUs
+TOTALCPU=8 # total CPUs to use
+QUEUEING=parallel
+QUEUE=
+# tree building - not yet integrated into PHYling
+EXTRARAXML=
+EXTRAIQTREE="-nt AUTO -m TESTMERGE -bb 1000 -alrt 1000"
