@@ -19,7 +19,6 @@ RESOVERLAP=0.50
 SEQOVERLAP=60
 TRIMALSCHEME=-automated1
 
-#SCRIPTDIR=$(which PHYling | dirname)
 
 if [ $MODULESHOME ]; then
     module load hmmer/3
@@ -36,7 +35,6 @@ else
  echo "need config file to set HMM variable"
  exit
 fi
-
 #echo "$@"
 while getopts c:f:i: option
 do
@@ -87,6 +85,7 @@ fi
 
 INFILE=$OUTFILE # last OUTFILE is new INFILE
 OUTFILE=$DIR/$marker.aa.clnaln
+AA_ALN_NOTRIM=$OUTFILE
 
 if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
     esl-reformat --replace=x:- --gapsym=- -o $OUTFILE.tmp afa $INFILE
@@ -115,14 +114,20 @@ if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
     trimal $TRIMALSCHEME -fasta -in $INFILE -out $OUTFILE
 fi
 
-
-
-#if [ -f $DIR/$marker.cds.fasta ]; then
-#    if [ ! -f $DIR/$marker.cdsaln.trim ]; then
-#	$SCRIPTDIR/util/bp_mrtrans.pl -if clustalw -of fasta \
-#				      -i $DIR/$marker.aln \
-#				      -s $DIR/$marker.cds.fasta \
-#				      -o $DIR/$marker.cdsaln
-#	java -jar $BMGE -t CODON -i $DIR/$marker.cdsaln -of $DIR/$marker.cdsaln.trim
-#    fi
-#fi
+CDSFASTA=$DIR/$marker.cds.fa
+CDSALN=$DIR/$marker.cdsaln
+CDSTRIM=$DIR/$marker.cdsaln.trim
+if [ -f $CDSFASTA ]; then
+    echo "processing CDS $CDSFASTA"
+    if [ ! -f $CDSALN ]; then
+        $PHYLING_DIR/util/bp_mrtrans.pl -if fasta -of fasta \
+                                -i $AA_ALN_NOTRIM \
+                                -s $CDSFASTA \
+                                -o $CDSALN
+        if [ $BMGE ]; then
+            java -jar $BMGE -t CODON -i $CDSALN -of $CDSTRIM
+        else
+            rsync -a $CDSALN $CDSTRIM
+        fi
+    fi
+fi

@@ -29,7 +29,7 @@ head -q -n1 $PEPDIR/*.$INPEPEXT | awk -F\| '{print $1}' | awk '{print $1}' > $EX
 
 if [ ! -f prefix.tab ]; then
     echo "making prefix.tab"
-    for file in $PEPDIR/*.${PEPEXT}
+    for file in $PEPDIR/*.${INPEPEXT}
     do
 	name=$(basename $file .${INPEPEXT} | perl -p -e 's/\.\w+\.v\d+//;')
 	pref=$(head -n1 $file | perl -p -e 's/^>([^\|\s]+).+/$1/')
