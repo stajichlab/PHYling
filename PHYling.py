@@ -56,6 +56,8 @@ if os.path.exists(Config_file):
     with open(Config_file,"r") as configparse:
         for line in configparse:
             line = line.strip()
+            if line.startswith("#"):
+                continue
             line = re.sub(r"\s*#.+$","",line)
             keyval = line.split("=")
             config[keyval[0]] = keyval[1]
