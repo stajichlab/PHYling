@@ -9,125 +9,122 @@
 #SBATCH --time=2:00:00
 #SBATCH --output=logs/hmmaln.%A_%a.out
 
-LOG_FOLDER=logs
-QUEUEING=parallel
-JOBCPU=1
-TOTALCPU=4
 OUTPEPEXT=aa.fa
-OUTCDSEXT=cds.fa
 RESOVERLAP=0.50
 SEQOVERLAP=60
 TRIMALSCHEME=-automated1
+CONFIG="config.txt"
 
-
-if [ $MODULESHOME ]; then
-    module load hmmer/3
-    module load trimal
-#    module load BMGE # is this too slow?
-fi
-
-ALN_OUTDIR=aln
-HMM_FOLDER=HMM
-
-if [ -f config.txt ]; then
- source config.txt
+if [[ -f "$CONFIG" ]]; then
+    source "$CONFIG"
 else
- echo "need config file to set HMM variable"
- exit
-fi
-#echo "$@"
-while getopts c:f:i: option
-do
- case "${option}"
- in
-  c) CLEAN=${OPTARG};;
-  f) FORCE=${OPTARG};;
-  i) IN=${OPTARG};;
- esac
-done
-
-#echo "FORCE=$FORCE IN=$IN CLEAN=$CLEAN"
-
-if [ ! $ALNFILES ]; then
-    ALNFILES=alnlist.$HMM
-fi
-
-if [ ! -f $ALNFILES ]; then
-    echo "expected an ALNFILES: $ALNFILES to exist"
+    echo "Need a \"$CONFIG\" file"
     exit
 fi
 
-if [ ! $HMM ]; then
- echo "need to a config file to set the HMM folder name"
- exit
+if [[ "$MODULESHOME" ]]; then
+    module load hmmer/3
+    module load trimal
+    # module load BMGE # is this too slow?
 fi
 
-DIR=${ALN_OUTDIR}/$HMM
-DBDIR=${HMM_FOLDER}/${HMM}/HMM3
-
-if [ ${SLURM_ARRAY_TASK_ID} ]; then
-    IN=$(sed -n ${SLURM_ARRAY_TASK_ID}p $ALNFILES)
+if [[ -z "$HMM_FOLDER" ]]; then
+    echo "Need HMM_FOLDER set"
+    exit 
 fi
 
-if [ ${SLURM_CPUS_ON_NODE} ]; then
- CPU=${SLURM_CPUS_ON_NODE}
+if [[ ! -d "$HMM_FOLDER" ]]; then
+    echo "HMM_FOLDER \"$HMM_FOLDER\" does not exist"
+    exit 
 fi
 
-marker=$(basename $IN .$OUTPEPEXT)
-echo "IN=$IN gene=$marker"
+ALN_OUTDIR="aln"
 
-OUTFILE=$DIR/$marker.aa.msa
-INFILE=$IN
+while getopts c:f:i: OPT; do
+    case $OPT in
+      f) FORCE=${OPTARG};;
+      i) IN=${OPTARG};;
+    esac
+done
+
+[[ -z "$ALNFILES" ]] && ALNFILES="alnlist.$HMM"
+
+if [[ ! -f "$ALNFILES" ]]; then
+    echo "ALNFILES \"$ALNFILES\" does not exist"
+    exit 1
+fi
+
+if [[ -z "$HMM" ]]; then
+    echo "Need config file to set the HMM folder name"
+    exit 1
+fi
+
+DIR="$ALN_OUTDIR/$HMM"
+DBDIR="$HMM_FOLDER/$HMM/HMM3"
+
+if [[ ${SLURM_ARRAY_TASK_ID} ]]; then
+    IN=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$ALNFILES")
+fi
+
+MARKER="$(basename "$IN" ".$OUTPEPEXT")"
+echo "IN=$IN gene=$MARKER"
+
+OUTFILE="$DIR/$MARKER.aa.msa"
+INFILE="$IN"
+
+if [[ "$FORCE" == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+    hmmalign --trim --amino -o "$OUTFILE" "$DBDIR/$MARKER.hmm" "$INFILE"
+fi
+
+INFILE="$OUTFILE" # last OUTFILE is new INFILE
+OUTFILE="$DIR/$MARKER.aa.clnaln"
+AA_ALN_NOTRIM="$OUTFILE"
+
+if [[ $FORCE == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+    TMP=$(mktemp)
+    esl-reformat --replace=x:- --gapsym=- -o "$TMP" afa "$INFILE"
+    perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' "$TMP" > "$OUTFILE"
+    rm "$TMP"
+fi
+
+INFILE="$OUTFILE" # last OUTFILE is new INFILE
+OUTFILE="$DIR/$MARKER.aa.filter"
+
+if [[ "$FORCE" == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+    trimal -resoverlap 0.50 -seqoverlap 60 -in "$INFILE" -out "$OUTFILE"
+fi
+
+INFILE="$OUTFILE" # last OUTFILE is new INFILE
+OUTFILE="$DIR/$MARKER.aa.filter"
 
 if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    hmmalign --trim --amino -o $OUTFILE $DBDIR/$marker.hmm $INFILE 
+    trimal -resoverlap "$RESOVERLAP" \
+        -seqoverlap "$SEQOVERLAP" \
+        -in "$INFILE" \
+        -out "$OUTFILE"
 fi
 
-INFILE=$OUTFILE # last OUTFILE is new INFILE
-OUTFILE=$DIR/$marker.aa.clnaln
-AA_ALN_NOTRIM=$OUTFILE
+INFILE="$OUTFILE" # last OUTFILE is new INFILE
+OUTFILE="$DIR/$MARKER.aa.trim"
 
-if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    esl-reformat --replace=x:- --gapsym=- -o $OUTFILE.tmp afa $INFILE
-    perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' $OUTFILE.tmp > $OUTFILE
-    rm $OUTFILE.tmp
+if [[ $FORCE == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+    trimal "$TRIMALSCHEME" -fasta -in "$INFILE" -out "$OUTFILE"
 fi
 
-INFILE=$OUTFILE # last OUTFILE is new INFILE
-OUTFILE=$DIR/$marker.aa.filter
-
-if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    trimal -resoverlap 0.50 -seqoverlap 60 -in $INFILE -out $OUTFILE
-fi
-
-INFILE=$OUTFILE # last OUTFILE is new INFILE
-OUTFILE=$DIR/$marker.aa.filter
-
-if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    trimal -resoverlap $RESOVERLAP -seqoverlap $SEQOVERLAP -in $INFILE -out $OUTFILE
-fi
-
-INFILE=$OUTFILE # last OUTFILE is new INFILE
-OUTFILE=$DIR/$marker.aa.trim
-
-if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    trimal $TRIMALSCHEME -fasta -in $INFILE -out $OUTFILE
-fi
-
-CDSFASTA=$DIR/$marker.cds.fa
-CDSALN=$DIR/$marker.cdsaln
-CDSTRIM=$DIR/$marker.cdsaln.trim
-if [ -f $CDSFASTA ]; then
+CDSFASTA="$DIR/$MARKER.cds.fa"
+CDSALN="$DIR/$MARKER.cdsaln"
+CDSTRIM="$DIR/$MARKER.cdsaln.trim"
+if [[ -f "$CDSFASTA" ]]; then
     echo "processing CDS $CDSFASTA"
-    if [ ! -f $CDSALN ]; then
-        $PHYLING_DIR/util/bp_mrtrans.pl -if fasta -of fasta \
-                                -i $AA_ALN_NOTRIM \
-                                -s $CDSFASTA \
-                                -o $CDSALN
-        if [ $BMGE ]; then
-            java -jar $BMGE -t CODON -i $CDSALN -of $CDSTRIM
+    if [[ ! -f "$CDSALN" ]]; then
+        "$PHYLING_DIR/util/bp_mrtrans.pl" -if fasta -of fasta \
+                                -i "$AA_ALN_NOTRIM" \
+                                -s "$CDSFASTA" \
+                                -o "$CDSALN"
+        if [[ $BMGE ]]; then
+            java -jar "$BMGE" -t "CODON" -i "$CDSALN" -of "$CDSTRIM"
         else
-            rsync -a $CDSALN $CDSTRIM
+            rsync -a "$CDSALN" "$CDSTRIM"
         fi
     fi
 fi

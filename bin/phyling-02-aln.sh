@@ -1,92 +1,105 @@
 #!/usr/bin/env bash
 
 #defaults which are overridden config.txt if set
-LOG_FOLDER=logs
 QUEUEING=parallel
 JOBCPU=1
 TOTALCPU=4
 OUTPEPEXT=aa.fa
-OUTCDSEXT=cds.fa
 ALN_OUTDIR=aln
 ALNTOOL=hmmalign
 EXPECTED=expected_prefixes.lst
+CONFIG="config.txt"
 
-if [ -f config.txt ]; then
- source config.txt
+if [[ -f "$CONFIG" ]]; then
+    source "$CONFIG"
 else
- echo "need config file to set HMM and other variables"
- exit
+    echo "Need a \"$CONFIG\" file"
+    exit
 fi
 
 JOBCPU=1 # force this to 1 since all of these steps are single threaded
 
-if [ ! $HMM ]; then
- echo "need to a config file to set the HMM folder name"
- exit
+if [[ -z "$HMM" ]]; then
+    echo "Need config file to set the HMM folder name"
+    exit 1
 fi
 
-if [ ! $ALNFILES ]; then
-    ALNFILES=alnlist.$HMM
-fi
+[[ -z "$ALNFILES" ]] && ALNFILES="alnlist.$HMM"
 
-#echo "02-aln args are $@"
-while getopts t:c:f:q: option
-do
- case "${option}"
- in
- t) ALNTOOL=${OPTARG};;
- c) CLEAN=${OPTARG};;
- f) FORCE=${OPTARG};;
- q) QUEUEING=${OPTARG};;
- esac
+while getopts t:c:f:q: OPT; do
+    case $OPT in
+         t) ALNTOOL=${OPTARG};;
+         c) CLEAN=${OPTARG};;
+         f) FORCE=${OPTARG};;
+         q) QUEUEING=${OPTARG};;
+    esac
 done
 
-if [[ ! -f $ALNFILES || $CLEAN == "1" || $FORCE == "1" ]]; then
-    find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT" > $ALNFILES
+if [[ ! -f "$ALNFILES" || "$CLEAN" == "1" || "$FORCE" == "1" ]]; then
+    find "$ALN_OUTDIR/$HMM" -name "*.$OUTPEPEXT" > "$ALNFILES"
 fi
 
-SCRIPT_DIR=$(dirname $0)
-SUBJOB_SCRIPT=${SCRIPT_DIR}/phyling-02-aln-$ALNTOOL.sh
-COMBINE_SCRIPT=${SCRIPT_DIR}/phyling-03-aln-combine.sh
+SCRIPT_DIR=$(dirname "$0")
+SUBJOB_SCRIPT="${SCRIPT_DIR}/phyling-02-aln-$ALNTOOL.sh"
+COMBINE_SCRIPT="${SCRIPT_DIR}/phyling-03-aln-combine.sh"
 
-if [ $QUEUEING == "parallel" ]; then
-    JOBPARALLEL=$(expr $TOTALCPU "/" $JOBCPU)
+if [[ $QUEUEING == "parallel" ]]; then
+    JOBPARALLEL=$((TOTALCPU / JOBCPU))
     echo "Run parallel job $ALNTOOL"
     #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
-    parallel -j $JOBPARALLEL $SUBJOB_SCRIPT -f $FORCE -c $CLEAN -i {} < $ALNFILES
+    parallel -j "$JOBPARALLEL" \
+        "$SUBJOB_SCRIPT" \
+        -f "$FORCE" \
+        -c "$CLEAN" \
+        -i {} < "$ALNFILES"
 
-    if [ $ALNTOOL == "muscle" ]; then
-	$COMBINE_SCRIPT -x $EXPECTED --ext aa.denovo.trim
+    if [[ $ALNTOOL == "muscle" ]]; then
+	    "$COMBINE_SCRIPT" -x "$EXPECTED" --ext aa.denovo.trim
     else
-	$COMBINE_SCRIPT -x $EXPECTED 
+	    "$COMBINE_SCRIPT" -x "$EXPECTED"
     fi
 
-elif [ $QUEUEING == "slurm" ]; then
+elif [[ $QUEUEING == "slurm" ]]; then
     QUEUECMD=""
-    if [ $QUEUE ]; then
-	QUEUECMD="-p $QUEUE"
-    fi
-    ALNCT=$(wc -l $ALNFILES | awk '{print $1}')
-    PHYLING_DIR=$(dirname $0)
+    [[ -n $QUEUE ]] && QUEUECMD="-p $QUEUE"
+
+    ALNCT=$(wc -l "$ALNFILES" | awk '{print $1}')
+    PHYLING_DIR=$(dirname "$0")
+
     echo "PHYLING_DIR is $PHYLING_DIR"
-    submitmsg=$(sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=$PHYLING_DIR --export=FORCE=$FORCE --array=1-${ALNCT} $SUBJOB_SCRIPT) 
-    submitid=$(echo $submitmsg | awk '{print $4}')
-    echo "submitid is $submitid; $submitmsg"
-    if [ $ALNTOOL == "muscle" ]; then
-	echo "ready to run with $COMBINE_SCRIPT no extra ext"
-     sbatch --depend=afterany:$submitid $QUEUECMD --export=EXT=aa.denovo.trim,EXPECTED=$EXPECTED $COMBINE_SCRIPT
+    ARRAY=$((1-ALNCT))
+
+    SUBMIT_MSG=$(sbatch --ntasks "$JOBCPU" \
+        --nodes 1 "$QUEUECMD" \
+        --export=PHYLING_DIR="$PHYLING_DIR" \
+        --export=FORCE="$FORCE" \
+        --array="$ARRAY" \
+        "$SUBJOB_SCRIPT") 
+
+    SUBMIT_ID=$(echo "$SUBMITMSG" | awk '{print $4}')
+    echo "SUBMIT_ID is $SUBMIT_ID; $SUBMIT_MSG"
+
+    if [[ $ALNTOOL == "muscle" ]]; then
+	    echo "ready to run with $COMBINE_SCRIPT no extra ext"
+        sbatch --depend=afterany:"$SUBMIT_ID" \
+            $QUEUECMD \
+            --export=EXT=aa.denovo.trim,EXPECTED="$EXPECTED" \
+            "$COMBINE_SCRIPT"
     else
-	echo "ready to run with $COMBINE_SCRIPT no extra ext"
-     sbatch --depend=afterany:$submitid $QUEUECMD --export=EXPECTED=$EXPECTED $COMBINE_SCRIPT
+	    echo "ready to run with $COMBINE_SCRIPT no extra ext"
+        sbatch --depend=afterany:"$SUBMIT_ID" \
+            "$QUEUECMD" \
+            --export=EXPECTED=$EXPECTED \
+            "$COMBINE_SCRIPT"
     fi
 else
- echo "Run in serial"
- for file in $( find $ALN_OUTDIR/$HMM -name "*.$OUTPEPEXT")
- do
-   $SUBJOB_SCRIPT -f $FORCE -i $file
- done
- 
- # do combine here (how to avoid duplicate code with the parallel stuff above
-
+    echo "Run in serial"
+    TMP=$(mktmp)
+    find "$ALN_OUTDIR/$HMM" -name "*.$OUTPEPEXT" > "$TMP"
+    while read -r FILE; do
+        $SUBJOB_SCRIPT -f "$FORCE" -i "$FILE"
+    done < "$TMP"
+    rm "$TMP"
+    # do combine here (how to avoid duplicate code with 
+    # the parallel stuff above
 fi
-

@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# could all this be replaced with snakemake/makefile??
-
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --mem=4G
@@ -9,99 +7,69 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/muscle.%A_%a.out
 
-LOG_FOLDER=logs
-QUEUEING=parallel
-JOBCPU=1
-TOTALCPU=4
 OUTPEPEXT=aa.fa
-OUTCDSEXT=cds.fa
-#SCRIPTDIR=$(which PHYling | dirname)
+CONFIG="config.txt"
 
-if [ $MODULESHOME ]; then
-    module load muscle
-    module load trimal
-#    module load java
-#    module load BMGE # is this too slow?
-fi
-
-ALN_OUTDIR=aln
-HMM_FOLDER=HMM
-
-if [ -f config.txt ]; then
- source config.txt
+if [[ -f "$CONFIG" ]]; then
+    source "$CONFIG"
 else
- echo "need config file to set HMM variable"
- exit
-fi
-
-#echo "$@"
-while getopts c:f:i: option
-do
- case "${option}"
- in
-  c) CLEAN=${OPTARG};;
-  f) FORCE=${OPTARG};;
-  i) IN=${OPTARG};;
- esac
-done
-
-#echo "FORCE=$FORCE IN=$IN CLEAN=$CLEAN"
-
-if [ ! $ALNFILES ]; then
-    ALNFILES=alnlist.$HMM
-fi
-
-if [ ! -f $ALNFILES ]; then
-    echo "expected an ALNFILES: $ALNFILES to exist"
+    echo "Need a \"$CONFIG\" file"
     exit
 fi
 
-if [ ! $HMM ]; then
- echo "need to a config file to set the HMM folder name"
- exit
+if [[ -z "$MODULESHOME" ]]; then
+    module load muscle
+    module load trimal
+    #    module load java
+    #    module load BMGE # is this too slow?
 fi
 
-DIR=${ALN_OUTDIR}/$HMM
-DBDIR=${HMM_FOLDER}/${HMM}/HMM3
+while getopts c:f:i: OPT; do
+    case $OPT in
+          f) FORCE=${OPTARG};;
+          i) IN=${OPTARG};;
+    esac
+done
 
-if [ ${SLURM_ARRAY_TASK_ID} ]; then
-    IN=$(sed -n ${SLURM_ARRAY_TASK_ID}p $ALNFILES)
+[[ -z "$ALNFILES" ]] && ALNFILES="alnlist.$HMM"
+
+if [[ ! -f "$ALNFILES" ]]; then
+    echo "ALNFILES \"$ALNFILES\" does not exist"
+    exit 1
 fi
 
-if [ ${SLURM_CPUS_ON_NODE} ]; then
- CPU=${SLURM_CPUS_ON_NODE}
+if [[ -z "$HMM" ]]; then
+    echo "Need config file to set the HMM folder name"
+    exit 1
 fi
 
-marker=$(basename $IN .$OUTPEPEXT)
-echo "IN=$IN gene=$marker"
+DIR="aln/$HMM"
 
-OUTFILE=$DIR/$marker.aa.denovo.msa
-INFILE=$IN
-if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    muscle -in $IN -out $OUTFILE
+if [[ ${SLURM_ARRAY_TASK_ID} ]]; then
+    IN=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$ALNFILES")
 fi
 
-INFILE=$OUTFILE # last OUTFILE is new INFILE
-OUTFILE=$DIR/$marker.aa.denovo.clean
+MARKER=$(basename "$IN" ".$OUTPEPEXT")
+echo "IN=$IN gene=$MARKER"
 
-if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    esl-reformat --replace=\*:- --gapsym=- fasta $INFILE | esl-reformat --replace=x:- fasta > $OUTFILE
+OUTFILE="$DIR/$MARKER.aa.denovo.msa"
+INFILE="$IN"
+if [[ "$FORCE" == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+    muscle -in "$IN" -out "$OUTFILE"
 fi
 
-INFILE=$OUTFILE # last OUTFILE is new INFILE
-OUTFILE=$DIR/$marker.aa.denovo.trim
+INFILE="$OUTFILE" # last OUTFILE is new INFILE
+OUTFILE="$DIR/$MARKER.aa.denovo.clean"
 
-if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    trimal -resoverlap 0.50 -seqoverlap 60 -in $INFILE -out $OUTFILE
-    trimal -automated1 -fasta -in $INFILE -out $OUTFILE
+if [[ $FORCE == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+    esl-reformat --replace=\*:- --gapsym=- fasta "$INFILE" | \
+        esl-reformat --replace=x:- fasta > "$OUTFILE"
 fi
 
-#if [ -f $DIR/$marker.cds.fasta ]; then
-#    if [ ! -f $DIR/$marker.cdsaln.trim ]; then
-#	$SCRIPTDIR/util/bp_mrtrans.pl -if clustalw -of fasta \
-#				      -i $DIR/$marker.aln \
-#				      -s $DIR/$marker.cds.fasta \
-#				      -o $DIR/$marker.cdsaln
-#	java -jar $BMGE -t CODON -i $DIR/$marker.cdsaln -of $DIR/$marker.cdsaln.trim
-#    fi
-#fi
+INFILE="$OUTFILE" # last OUTFILE is new INFILE
+OUTFILE="$DIR/$MARKER.aa.denovo.trim"
+
+if [[ "$FORCE" == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+    trimal -resoverlap 0.50 -seqoverlap 60 -in "$INFILE" -out "$OUTFILE"
+    trimal -automated1 -fasta -in "$INFILE" -out "$OUTFILE"
+fi
