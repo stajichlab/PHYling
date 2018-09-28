@@ -59,6 +59,8 @@ if [[ $QUEUEING == "parallel" ]]; then
 	    "$COMBINE_SCRIPT" -x "$EXPECTED"
     fi
 
+#    if [[ -f $CDSDIR/$ALLSEQNAME
+
 elif [[ $QUEUEING == "slurm" ]]; then
     QUEUECMD=""
     [[ -n $QUEUE ]] && QUEUECMD="-p $QUEUE"
@@ -85,12 +87,27 @@ elif [[ $QUEUEING == "slurm" ]]; then
             $QUEUECMD \
             --export=EXT=aa.denovo.trim,EXPECTED="$EXPECTED" \
             "$COMBINE_SCRIPT"
+
+	if [ -f $CDSDIR/"cds_" + $ALLSEQNAME ]; then
+            sbatch --depend=afterany:"$SUBMIT_ID" \
+		$QUEUECMD \
+		--export=EXT=cds.denovo.trim,EXPECTED="$EXPECTED" \
+		"$COMBINE_SCRIPT"
+	fi
+
     else
 	    echo "ready to run with $COMBINE_SCRIPT no extra ext"
         sbatch --depend=afterany:"$SUBMIT_ID" \
             "$QUEUECMD" \
             --export=EXPECTED=$EXPECTED \
             "$COMBINE_SCRIPT"
+
+	if [ -f $CDSDIR/"cds_" + $ALLSEQNAME ]; then
+            sbatch --depend=afterany:"$SUBMIT_ID" \
+		"$QUEUECMD" \
+		--export=EXPECTED=$EXPECTED \
+		"$COMBINE_SCRIPT"
+	fi
     fi
 else
     echo "Run in serial"

@@ -7,18 +7,18 @@
 #SBATCH --time=2:00:00
 #SBATCH --output=logs/combine.%A.log
 
-if [ $MODULESHOME ]; then
-    module load python/3
+if [ ! -z "$MODULESHOME" ]; then
+    module load python/3 # UCR python3 enforcement
 fi
 
-if [ -f config.txt ]; then
+if [ -e config.txt ]; then
  source config.txt
 else
  echo "need config file to set HMM and other variables"
  exit
 fi
 
-if [ ! $PHYLING_DIR ]; then
+if [ -z "$PHYLING_DIR" ]; then
     PHYLING_DIR=$(basename $0)../
 fi
 DIR=$ALN_OUTDIR/$HMM
@@ -35,13 +35,14 @@ do
  s) SEED=${OPTARG};;
  e) EXT=$(OPTARG};;
  r) RAND=${OPTARG};;
+ t) TYPE=$(OPTARG};;
  p) PARTITIONS=${OPTARG};;
  x) EXPECTED=${OPTARG};;
  esac
 done
 
 F=$EXPECTED
-if [ ! $F ]; then
+if [ -z "$F" ]; then
     F=$LISTFILE
 fi
 echo "reading $F to get count"
@@ -50,7 +51,7 @@ if [[ ! $COUNT || $COUNT == "0" ]]; then
     echo "NO QUERYDBS variable on config.txt?"
     COUNT="XX"
 fi
-OUTFILE=$PREFIX.${COUNT}_taxa.${HMM}.fasaln
+OUTFILE=$PREFIX.${COUNT}_taxa.${HMM}.${TYPE}.fasaln
 ARGS=""
 if [ $DEBUG ]; then
     ARGS="-v"
@@ -78,8 +79,8 @@ if [ $PARTITIONS ]; then
     ARGS+=" -p $PARTITIONS"
 fi
 
-echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUTFILE $ARGS"
 if [ $EXPECTED ]; then
  ARGS+=" --expected $EXPECTED"
 fi
+echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUTFILE $ARGS"
 $PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUTFILE $ARGS

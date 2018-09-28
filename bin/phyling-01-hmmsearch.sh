@@ -14,7 +14,7 @@ fi
 
 SCRIPT_DIR=$(dirname "$0")
 SUBJOB_SCRIPT="${SCRIPT_DIR}/phyling-01-hmmsearch-run.sh"
-
+PHYLING_DIR=$(dirname $SCRIPT_DIR)
 while getopts :q: OPT; do
     case $OPT in
         q) 
@@ -32,13 +32,13 @@ elif [[ $QUEUEING == "slurm" ]]; then
     [[ $QUEUE ]] && QUEUECMD="-p $QUEUE"
 
     FILECOUNT=$(wc -l "$QUERYDBS" | awk '{print $1}')
-    ARRAY=$((1-FILECOUNT))
-
-    sbatch --ntasks=$JOBCPU \
+    ARRAY="1-$FILECOUNT"
+    
+   sbatch --ntasks=$JOBCPU \
         --nodes=1 \
         $QUEUECMD \
-        --export=PHYLING_DIR="$0" \
-	    --array=$ARRAY \
+        --export=PHYLING_DIR="$PHYLING_DIR" \
+	--array=$ARRAY \
         "$SUBJOB_SCRIPT"
 else
     echo "Run in serial"
