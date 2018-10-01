@@ -69,44 +69,35 @@ elif [[ $QUEUEING == "slurm" ]]; then
     PHYLING_DIR=$(dirname "$0")
 
     echo "PHYLING_DIR is $PHYLING_DIR"
-    ARRAY=$((1-ALNCT))
+    ARRAY="1-$ALNCT"
 
-    SUBMIT_MSG=$(sbatch --ntasks "$JOBCPU" \
-        --nodes 1 "$QUEUECMD" \
-        --export=PHYLING_DIR="$PHYLING_DIR" \
-        --export=FORCE="$FORCE" \
-        --array="$ARRAY" \
-        "$SUBJOB_SCRIPT") 
+    CMD="sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=\"$PHYLING_DIR\" --export=FORCE=$FORCE --array=$ARRAY $SUBJOB_SCRIPT"
 
-    SUBMIT_ID=$(echo "$SUBMITMSG" | awk '{print $4}')
+    SUBMIT_MSG=$(eval $CMD)
+    SUBMIT_ID=$(echo "$SUBMIT_MSG" | awk '{print $4}')
     echo "SUBMIT_ID is $SUBMIT_ID; $SUBMIT_MSG"
 
     if [[ $ALNTOOL == "muscle" ]]; then
-	    echo "ready to run with $COMBINE_SCRIPT no extra ext"
+	echo "ready to run with $COMBINE_SCRIPT no extra ext"
         sbatch --depend=afterany:"$SUBMIT_ID" \
             $QUEUECMD \
-            --export=EXT=aa.denovo.trim,EXPECTED="$EXPECTED" \
-            "$COMBINE_SCRIPT"
-
-	if [ -f $CDSDIR/"cds_" + $ALLSEQNAME ]; then
+            --export=EXT=aa.denovo.trim,EXPECTED=\"$EXPECTED\" \
+            $COMBINE_SCRIPT
+	
+	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
             sbatch --depend=afterany:"$SUBMIT_ID" \
 		$QUEUECMD \
-		--export=EXT=cds.denovo.trim,EXPECTED="$EXPECTED" \
+		--export=EXT=cds.denovo.trim,EXPECTED=\"$EXPECTED\" \
 		"$COMBINE_SCRIPT"
 	fi
-
     else
-	    echo "ready to run with $COMBINE_SCRIPT no extra ext"
-        sbatch --depend=afterany:"$SUBMIT_ID" \
-            "$QUEUECMD" \
-            --export=EXPECTED=$EXPECTED \
-            "$COMBINE_SCRIPT"
+	echo "ready to run with $COMBINE_SCRIPT no extra ext"
+        CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXPECTED=\"$EXPECTED\" $COMBINE_SCRIPT"
+	eval $CMD
 
-	if [ -f $CDSDIR/"cds_" + $ALLSEQNAME ]; then
-            sbatch --depend=afterany:"$SUBMIT_ID" \
-		"$QUEUECMD" \
-		--export=EXPECTED=$EXPECTED \
-		"$COMBINE_SCRIPT"
+	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
+            CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXPECTED=$EXPECTED $COMBINE_SCRIPT"
+	    eval $CMD
 	fi
     fi
 else
