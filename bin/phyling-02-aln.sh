@@ -52,14 +52,21 @@ if [[ $QUEUEING == "parallel" ]]; then
         -f "$FORCE" \
         -c "$CLEAN" \
         -i {} < "$ALNFILES"
+    
+    echo  "$COMBINE_SCRIPT" -x "$EXPECTED" -e cdsaln.trim -t cds
 
     if [[ $ALNTOOL == "muscle" ]]; then
-	    "$COMBINE_SCRIPT" -x "$EXPECTED" --ext aa.denovo.trim
+	"$COMBINE_SCRIPT" -x "$EXPECTED" -e aa.denovo.trim -t aa
+    	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
+	    "$COMBINE_SCRIPT" -x "$EXPECTED" -e cds.denovo.trim -t cds
+	fi
     else
-	    "$COMBINE_SCRIPT" -x "$EXPECTED"
+	"$COMBINE_SCRIPT" -x "$EXPECTED" -e "aa.trim" -t aa
+    	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
+	    "$COMBINE_SCRIPT" -x "$EXPECTED" -e cdsaln.trim -t cds
+	fi
     fi
 
-#    if [[ -f $CDSDIR/$ALLSEQNAME
 
 elif [[ $QUEUEING == "slurm" ]]; then
     QUEUECMD=""
@@ -81,22 +88,22 @@ elif [[ $QUEUEING == "slurm" ]]; then
 	echo "ready to run with $COMBINE_SCRIPT no extra ext"
         sbatch --depend=afterany:"$SUBMIT_ID" \
             $QUEUECMD \
-            --export=EXT=aa.denovo.trim,EXPECTED=\"$EXPECTED\" \
+            --export=EXT=aa.denovo.trim,TYPE=aa,EXPECTED=\"$EXPECTED\" \
             $COMBINE_SCRIPT
 	
 	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
             sbatch --depend=afterany:"$SUBMIT_ID" \
 		$QUEUECMD \
-		--export=EXT=cds.denovo.trim,EXPECTED=\"$EXPECTED\" \
+		--export=EXT=cds.denovo.trim,TYPE=CDS,EXPECTED=\"$EXPECTED\" \
 		"$COMBINE_SCRIPT"
 	fi
     else
 	echo "ready to run with $COMBINE_SCRIPT no extra ext"
-        CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXPECTED=\"$EXPECTED\" $COMBINE_SCRIPT"
+        CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=aa.trim,TYPE=aa,EXPECTED=\"$EXPECTED\" $COMBINE_SCRIPT"
 	eval $CMD
 
 	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
-            CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXPECTED=$EXPECTED $COMBINE_SCRIPT"
+            CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cdsaln.trim,EXPECTED=$EXPECTED,TYPE=CDS $COMBINE_SCRIPT"
 	    eval $CMD
 	fi
     fi
