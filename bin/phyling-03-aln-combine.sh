@@ -24,20 +24,20 @@ fi
 DIR=$ALN_OUTDIR/$HMM
 
 
-while getopts d:o:v:i:s:e:r:p:x: option
+while getopts d:o:v:i:s:e:r:t:p:x: option
 do
  case "${option}"
  in
- d) DIR=${OPTARG};;
- o) OUT=${OPTARG};;
- v) DEBUG=${OPTARG};;
- i) INCLUDE=${OPTARG};;
- s) SEED=${OPTARG};;
- e) EXT=$(OPTARG};;
- r) RAND=${OPTARG};;
- t) TYPE=$(OPTARG};;
- p) PARTITIONS=${OPTARG};;
- x) EXPECTED=${OPTARG};;
+ d) DIR=${OPTARG} ;;
+ o) OUT=${OPTARG} ;;
+ v) DEBUG=${OPTARG} ;;
+ i) INCLUDE=${OPTARG} ;;
+ s) SEED=${OPTARG} ;;
+ e) EXT=${OPTARG} ;;
+ r) RAND=${OPTARG} ;;
+ t) TYPE=${OPTARG} ;;
+ p) PARTITIONS=${OPTARG} ;;
+ x) EXPECTED=${OPTARG} ;;
  esac
 done
 
