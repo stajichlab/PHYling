@@ -19,6 +19,7 @@ fi
 
 JOBCPU=1 # force this to 1 since all of these steps are single threaded
 
+echo "args are $OPTARG"
 if [[ -z "$HMM" ]]; then
     echo "Need config file to set the HMM folder name"
     exit 1

@@ -15,11 +15,11 @@ fi
 SCRIPT_DIR=$(dirname "$0")
 SUBJOB_SCRIPT="${SCRIPT_DIR}/phyling-01-hmmsearch-run.sh"
 PHYLING_DIR=$(dirname $SCRIPT_DIR)
-while getopts :q: OPT; do
+
+while getopts f:q: OPT; do
     case $OPT in
-        q) 
-            QUEUEING=${OPTARG}
-            ;;
+	f) FORCE=${OPTARG};;
+        q) QUEUEING=${OPTARG};;
     esac
 done
 
