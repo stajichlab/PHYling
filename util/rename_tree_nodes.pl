@@ -22,11 +22,21 @@ while(<$fh>) {
 while( my $tree = $in->next_tree ) {
     for my $node ( grep { $_->is_Leaf } $tree->get_nodes ) {
 	my $id = $node->id;
-	if( my $lookup = $map{$id} ) {
-	    $node->id($lookup);
+	if ( $id =~ /\|/ ) {
+	    my ($sp,$gn) = split(/\|/,$id);
+	    
+	    if( my $lookup = $map{$sp} ) {
+	    	$node->id($lookup. " $id");
+	    } else {
+	    	warn("no $sp in prefix table\n");
+	    }
 	} else {
-	    warn("no $id in prefix table\n");
-	}
+	    if( my $lookup = $map{$id} ) {              
+		$node->id($lookup);
+            } else {
+                warn("no $id in prefix table\n");
+            }
+	} 
     }
     Bio::TreeIO->new(-format => 'newick')->write_tree($tree);
 }
