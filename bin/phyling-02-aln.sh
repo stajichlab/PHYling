@@ -54,16 +54,16 @@ if [[ $QUEUEING == "parallel" ]]; then
         -c "$CLEAN" \
         -i {} < "$ALNFILES"
     
-    echo  "$COMBINE_SCRIPT" -x "$EXPECTED" -e cdsaln.trim -t cds
+#    echo  "$COMBINE_SCRIPT" -x "$EXPECTED" -e cdsaln.trim -t cds
 
     if [[ $ALNTOOL == "muscle" ]]; then
 	"$COMBINE_SCRIPT" -x "$EXPECTED" -e aa.denovo.trim -t aa
-    	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
+    	if [ -d $CDSDIR ]; then
 	    "$COMBINE_SCRIPT" -x "$EXPECTED" -e cds.denovo.trim -t cds
 	fi
     else
 	"$COMBINE_SCRIPT" -x "$EXPECTED" -e "aa.trim" -t aa
-    	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
+    	if [ -d $CDSDIR ]; then
 	    "$COMBINE_SCRIPT" -x "$EXPECTED" -e cdsaln.trim -t cds
 	fi
     fi
@@ -92,7 +92,7 @@ elif [[ $QUEUEING == "slurm" ]]; then
             --export=EXT=aa.denovo.trim,TYPE=aa,EXPECTED=\"$EXPECTED\" \
             $COMBINE_SCRIPT
 	
-	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
+	if [ -d $CDSDIR ]; then
             sbatch --depend=afterany:"$SUBMIT_ID" \
 		$QUEUECMD \
 		--export=EXT=cds.denovo.trim,TYPE=CDS,EXPECTED=\"$EXPECTED\" \
@@ -103,7 +103,7 @@ elif [[ $QUEUEING == "slurm" ]]; then
         CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=aa.trim,TYPE=aa,EXPECTED=\"$EXPECTED\" $COMBINE_SCRIPT"
 	eval $CMD
 
-	if [ -f $CDSDIR/"cds_$ALLSEQNAME" ]; then
+	if [ -d $CDSDIR ]; then
             CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cdsaln.trim,EXPECTED=$EXPECTED,TYPE=CDS $COMBINE_SCRIPT"
 	    eval $CMD
 	fi

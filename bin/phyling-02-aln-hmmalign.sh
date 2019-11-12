@@ -121,10 +121,10 @@ if [[ -f "$CDSFASTA" ]]; then
                                 -i "$AA_ALN_NOTRIM" \
                                 -s "$CDSFASTA" \
                                 -o "$CDSALN"
-        if [[ $BMGE ]]; then
-            java -jar "$BMGE" -t "CODON" -i "$CDSALN" -of "$CDSTRIM"
-        else
-            rsync -a "$CDSALN" "$CDSTRIM"
-        fi
+#        if [[ $BMGE ]]; then
+#            java -jar "$BMGE" -t "CODON" -i "$CDSALN" -of "$CDSTRIM"
+	#        else
+       rsync -a "$CDSALN" "$CDSTRIM"
+#        fi
     fi
 fi
