@@ -21,7 +21,7 @@ logging.basicConfig()
 # user specific config file - the nane of this should be overrideable
 Config_file = 'config.txt'
 
-version = '0.2'  #phyling release version
+version = '0.2.4'  #phyling release version
 
 # sys.argv parsing should occur to get/set an alternative config file name
 
@@ -268,13 +268,34 @@ elif subprog == "phylo":
     args = parser.parse_args(arguments)
 
 elif re.match(r"genetree", subprog):
-    help = Messages['commands']['genetrees'] % (sys.argv[1], version)
+    help = Messages['commands']['genetree'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(
         description=help,
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    # hmmer or muscle for multiple alignment?
+    # iqtree or raxml
+    parser.add_argument(
+        '-q', '--queueing', help="Queueing parallel, serial, or slurm")
+
+    parser.add_argument(default="fasttree",
+        '-m', '--method', help="Tree Building method")
+
+    parser.add_argument(default="gene_trees",
+        '-o', '--outputdir', help="Output Gene Tree Folder")
+
     args = parser.parse_args(arguments)
+    cmd = os.path.join(script_path, 'bin', 'phyling-05-genetree.sh')
+    print(cmd)
+    subprocess.call([
+        cmd,
+        "-m",
+        args.method,
+        "-o",
+        args.outputdir,
+        "-q",
+        "%s" % (config["QUEUEING"]),
+    ])
+
 elif re.match(r"coal", subprog) or subprog == "astral":
     help = Messages['commands']['coalesce'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(
