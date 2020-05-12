@@ -51,13 +51,13 @@ fi
 
 IN=$(basename "$IN")
 NM=$(basename "$IN" .$PEPEXT)
-echo "g=$IN NM=$NM"
+echo "g=$IN NM=$NM OUT=$OUTFILE1"
 
 INFILE="$PEPDIR/$IN"
 OUTFILE1="$OUT/$NM.domtbl"
 OUTFILE2="$OUT/$NM.log"
 
-if [[ $FORCE == "1" || ! -f $OUTFILE1 || $INFILE -nt $OUTFILE1  ]]; then
+if [[ $FORCE == "1" || ! -s $OUTFILE1 || $INFILE -nt $OUTFILE1  ]]; then
     hmmsearch --cpu "$CPU" \
         -E "$HMMSEARCH_CUTOFF" \
         --domtblout "$OUTFILE1" \
