@@ -18,9 +18,9 @@ with open(args.lengths,"r") as fh:
     for line in fh:
         (id,n,sd,mean) = line.strip().split("\t")
         if id in cutoffs:
-            cutoffs[id]["length"] = [int(n),float(sd),int(mean)]
+            cutoffs[id]["length"] = [int(n),float(sd),float(mean)]
         else:
-            cutoffs[id] = {"length": [int(n),float(sd),int(mean)]}
+            cutoffs[id] = {"length": [int(n),float(sd),float(mean)]}
 
 with open(args.scores,"r") as fh:
     for line in fh:
