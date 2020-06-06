@@ -7,7 +7,7 @@ parser.add_argument('-s','--scores',required=True,
 parser.add_argument('-l','--lengths',required=True,
                     help="HMM lengths file cutoff (BUSCO lengths_cutoff)")
 parser.add_argument('-i','--input',required=True,help="Input domtbl file")
-parser.add_argument('-o','--output',required=False,help="Out Best report file")
+parser.add_argument('-o','--output',required=False,help="Output multihit best report file")
 args = parser.parse_args(sys.argv[1:])
 
 #print(args)
@@ -44,12 +44,12 @@ with open(args.input,"r") as fh:
             q = row[3]
             evalue = row[6]
             score  = row[7]
-            if (float(score) > cutoffs[q]["score"]):
+            # we should add a component to check length
+            if ( float(score) >= cutoffs[q]["score"] ):
                 if q not in seenbest:
                     seenbest[q] = {t: ",".join([t,tlen, score, evalue])}
                 elif t not in seenbest[q]:
-                        seenbest[q][t] = ",".join([t,tlen, score, evalue])
-
+                    seenbest[q][t] = ",".join([t,tlen, score, evalue])
 
     for s in seenbest:
         row = [s]
