@@ -274,14 +274,13 @@ elif re.match(r"genetree", subprog):
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     # iqtree or raxml
-    parser.add_argument(
-        '-q', '--queueing', help="Queueing parallel, serial, or slurm")
+    parser.add_argument('-q', '--queueing', help="Queueing parallel, serial, or slurm")
 
-    parser.add_argument(default="fasttree",
-        '-m', '--method', help="Tree Building method")
+    parser.add_argument('-m', '--method', default="fasttree",
+                        help="Tree Building method")
 
-    parser.add_argument(default="gene_trees",
-        '-o', '--outputdir', help="Output Gene Tree Folder")
+    parser.add_argument('-o', '--outputdir', default="gene_trees",
+                        help="Output Gene Tree Folder")
 
     args = parser.parse_args(arguments)
     cmd = os.path.join(script_path, 'bin', 'phyling-05-genetree.sh')
