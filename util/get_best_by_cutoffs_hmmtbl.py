@@ -7,7 +7,8 @@ parser.add_argument('-s','--scores',required=True,
 parser.add_argument('-l','--lengths',required=True,
                     help="HMM lengths file cutoff (BUSCO lengths_cutoff)")
 parser.add_argument('-i','--input',required=True,help="Input domtbl file")
-parser.add_argument('-o','--output',required=False,help="Output multihit best report file")
+parser.add_argument('-o','--output',type=argparse.FileType('w'),default=sys.stdout,
+                    help="Output multihit best report file")
 args = parser.parse_args(sys.argv[1:])
 
 #print(args)
@@ -33,7 +34,7 @@ with open(args.scores,"r") as fh:
 
 
 with open(args.input,"r") as fh:
-    rowwriter = csv.writer(sys.stdout,delimiter="\t")
+    rowwriter = csv.writer(args.output,delimiter="\t")
     seenbest = {}
     for line in fh:
         if line[0] != "#":
