@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys, os, subprocess, inspect, tarfile, shutil, argparse
-import urllib.request, configparser, re
+import urllib.request, configparser, re, distutils.util
 import json, logging
 import zipfile
 
@@ -42,8 +42,9 @@ config = {
     'CDSDIR': 'cds',
     'INCDSEXT': 'cds.fasta',  # input data
     'OUTCDSEXT': 'cds.fa',  # output alignment files
-    'BESTHITEXT': 'best',
-    'HMMSEARCH_CUTOFF': 1e-30,
+    'BESTHITEXT': 'best_multi',
+    'INCLUDE_MULTI': 'False',
+    'HMMSEARCH_CUTOFF': 1e-20,
     'HMMSEARCH_OUTDIR': 'search',
     'ALN_OUTDIR': 'aln',
     'ALLSEQNAME': 'allseq',
@@ -185,13 +186,16 @@ elif re.match("aln", subprog):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?
     parser.add_argument(
-        '-t', '--type', action='store_true', default="hmmalign")
+        '-t', '--type', action='store_true', default="hmmalign",help="What aligner - hmmsearch or muscle")
 
     # force clean DB and align
-    parser.add_argument('-f', '--force', action='store_true')
+    parser.add_argument('-f', '--force', action='store_true', help="Force re-running of steps even if output file exists")
+    parser.add_argument('-m', '--multi', action='store_true',
+                        default=distutils.util.strtobool(config["INCLUDE_MULTI"]),
+                        help="Keep multi-hits?")
 
     # clean align folder (remake starting files)
-    parser.add_argument('-c', '--cleanaln', action='store_true')
+    parser.add_argument('-c', '--cleanaln', action='store_true',help="Clean alignments before running")
     # override queue option from config file
     parser.add_argument(
         '-q', '--queueing', help="Queueing parallel, serial, or slurm")
@@ -202,6 +206,7 @@ elif re.match("aln", subprog):
         config["QUEUEING"] = args.queueing
 
     outdir = config["PEPDIR"]
+
     if "TEMP" in config:
         outdir = os.path.join(config["TEMP"], config["PREFIX"])
         if not os.path.isdir(outdir):
@@ -217,15 +222,15 @@ elif re.match("aln", subprog):
 
     # parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog  - first do the proteins
-    #print("make unaln called with",searchdir,pep_db)
+    print("make unaln called with",searchdir,pep_db,args.multi)
     PHYling.make_unaln_files(
         searchdir, config["BESTHITEXT"], config['HMMSEARCH_CUTOFF'], pep_db,
         alndir, config["OUTPEPEXT"], args.cleanaln, config["INDEXING"],
-        int(config["TOTALCPU"]))
+        int(config["TOTALCPU"]),args.multi)
     # now re-parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog for the coding sequence files
     # assuming there is a CDS folder (skip if not)
-
+    
     if os.path.exists(config["CDSDIR"]):
         outdir = config["CDSDIR"]
         if "TEMP" in config:
@@ -240,12 +245,13 @@ elif re.match("aln", subprog):
         PHYling.make_unaln_files(searchdir, config["BESTHITEXT"],
                                  config['HMMSEARCH_CUTOFF'], cds_db, alndir,
                                  config["OUTCDSEXT"], args.cleanaln,
-                                 config["INDEXING"], int(config["TOTALCPU"]))
+                                 config["INDEXING"], int(config["TOTALCPU"],
+                                 args.multi))
 
     # either force or cleanaln flag sufficient to regenerate alignment files
     # do we sub-divide by type (muscle,hmmalign here)
     cmd = os.path.join(script_path, 'bin', 'phyling-02-aln.sh')
-    #print(cmd)
+    print(cmd)
     subprocess.call([
         cmd,
         "-t",

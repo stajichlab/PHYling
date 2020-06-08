@@ -57,7 +57,7 @@ INFILE="$PEPDIR/$IN"
 OUTFILE1="$OUT/$NM.domtbl"
 OUTFILE2="$OUT/$NM.log"
 
-if [[ $FORCE == "1" || ! -f $OUTFILE1 || $INFILE -nt $OUTFILE1  ]]; then
+if [[ $FORCE == "1" || ! -s $OUTFILE1 || $INFILE -nt $OUTFILE1  ]]; then
     hmmsearch --cpu "$CPU" \
         -E "$HMMSEARCH_CUTOFF" \
         --domtblout "$OUTFILE1" \
@@ -79,5 +79,5 @@ OUTFILEBESTMULTI="$OUT/$NM.best_multi"
 if [[ "$FORCE" == "1" || ! -f "$OUTFILEBESTMULTI" || "$OUTFILE1" -nt "$OUTFILEBESTMULTI" ]]; then
     "${PHYLING_DIR}/util/get_best_by_cutoffs_hmmtbl.py" \
         -s $HMM_FOLDER/$HMM/scores_cutoff -l $HMM_FOLDER/$HMM/lengths_cutoff \
-        --input "$OUTFILE1" > "$OUTFILEBESTMULTI"
+        --input "$OUTFILE1" --output "$OUTFILEBESTMULTI"
 fi

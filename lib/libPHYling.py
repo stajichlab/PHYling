@@ -19,7 +19,7 @@ Apps = { 'cdbfasta': 'cdbfasta',
 }
 
 
-def init_allseqdb(dbfolder,dbpath,dbext, 
+def init_allseqdb(dbfolder,dbpath,dbext,
                   index_type='sfetch',force=False):
     dbpathidx = ""
     index_type = index_type.lower()
@@ -30,13 +30,13 @@ def init_allseqdb(dbfolder,dbpath,dbext,
     else:
         print("need an expected index type not %s" % (index_type))
         exit(-1)
-	
+
     makedb = (force or not os.path.exists(dbpath))
     makeidx = (force or not os.path.exists(dbpathidx))
 
     # check and see if we need to make the db file if any of the seqfiles is newer
     if not makedb:
-        dbtime = os.path.getmtime(dbpath)    
+        dbtime = os.path.getmtime(dbpath)
         for file in os.listdir(dbfolder):
             if file.endswith(dbext):
                 ftime = os.path.getmtime(os.path.join(dbfolder,file))
@@ -62,7 +62,7 @@ def init_allseqdb(dbfolder,dbpath,dbext,
             logging.info("Remaking Index for %s, index is older than dbfile" % (dbpath))
             print("Remaking Index for %s" % (dbpath))
             makeidx = True
-                            
+
     if makeidx:
         if index_type == "cdbfasta":
             subprocess.call([Apps["cdbfasta"],dbpath])
@@ -78,7 +78,7 @@ def run_sfetch(fileset):
     names = fileset[2]
     p = subprocess.Popen([Apps["sfetch"],"-o", outfile,
                           "-f",dbfile,"-"],stdin=PIPE)
-    # only call this once with the complete list of IDs otherwise 
+    # only call this once with the complete list of IDs otherwise
     # the process gets closed
     p.communicate(input=names.encode())
 
@@ -88,15 +88,15 @@ def run_cdbyank (fileset):
     names = fileset[2]
     p = subprocess.Popen([Apps["cdbyank"],index,
                           "-o",outfile],stdin=PIPE)
-    # only call this once with the complete list of IDs otherwise 
+    # only call this once with the complete list of IDs otherwise
     # the process gets closed
     p.communicate(input=names.encode())
 
 
-def make_unaln_files (search_dir, best_extension, cutoff, 
-                      dbpath, outdir, outext, force=False, 
+def make_unaln_files (search_dir, best_extension, cutoff,
+                      dbpath, outdir, outext, force=False,
                       index_type="cdbfasta",
-                      threads=2):
+                      threads=2,multi=False):
 
     orthologs = {}
     dbidx = ""
@@ -105,30 +105,47 @@ def make_unaln_files (search_dir, best_extension, cutoff,
         dbidx = dbpath + CDBYANKEXT
     elif index_type == "sfetch":
         dbidx = dbpath + SFETCHEXT
-  
+
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-        
+
     if not os.path.exists(dbidx):
         print("No dbidx %s exists for reading" % (dbidx))
         return -1
-    
+
     for file in os.listdir(search_dir):
         if file.endswith("."+best_extension):
             with open(os.path.join(search_dir,file),"r") as fh:
                 for line in fh:
                     row = line.strip().split("\t")
-                    if float(row[2]) <= float(cutoff):
-                        if row[0] in orthologs:
-                            orthologs[row[0]].append(row[1])
-                        else:
-                            orthologs[row[0]] = [ row[1] ]        
+                    HMMname = row.pop(0) # take first col as HMM name
+
+                    if best_extension == "best":
+                        if float(row[1]) <= float(cutoff):
+                            if HMMname in orthologs:
+                                orthologs[HMMname].append(row[0])
+                            else:
+                                orthologs[HMMname] = [ row[0] ]
+                    elif best_extension == "best_multi":
+                        if len(row) > 1:
+                            print("gene %s has multihits"%(HMMname))
+
+                        if not multi:
+                            row = [ row[0] ]
+
+                        for hit in row:
+                            hit_dat = hit.split(",")
+
+                            if HMMname in orthologs:
+                                orthologs[HMMname].append(hit_dat[0])
+                            else:
+                                orthologs[HMMname] = [ hit_dat[0] ]                            
 
     pool = ThreadPool(threads)
     fileset = []
     for orth in orthologs:
         outfile = "%s.%s" % (os.path.join(outdir,orth),outext)
-        if force or (not os.path.exists(outfile)):        
+        if force or (not os.path.exists(outfile)):
             fileset.append( [dbpath, outfile,
                              "\n".join(orthologs[orth]) + "\n"])
 
@@ -137,11 +154,11 @@ def make_unaln_files (search_dir, best_extension, cutoff,
     elif index_type == "sfetch":
         results = pool.map(run_sfetch, fileset)
 
-    # close the pool and wait for the work to finish 
-    pool.close() 
-    pool.join() 
+    # close the pool and wait for the work to finish
+    pool.close()
+    pool.join()
 
-                
+
 # sequences = read_fasta
 def read_fasta (file):
     seq = ""

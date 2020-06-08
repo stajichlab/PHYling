@@ -10,8 +10,8 @@
 #SBATCH --output=logs/hmmaln.%A_%a.out
 
 OUTPEPEXT=aa.fa
-RESOVERLAP=0.50
-SEQOVERLAP=60
+RESOVERLAP=0.70
+SEQOVERLAP=80
 TRIMALSCHEME=-automated1
 CONFIG="config.txt"
 
@@ -85,13 +85,6 @@ if [[ $FORCE == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
     esl-reformat --replace=x:- --gapsym=- -o "$TMP" afa "$INFILE"
     perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' "$TMP" > "$OUTFILE"
     rm "$TMP"
-fi
-
-INFILE="$OUTFILE" # last OUTFILE is new INFILE
-OUTFILE="$DIR/$MARKER.aa.filter"
-
-if [[ "$FORCE" == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
-    trimal -resoverlap 0.50 -seqoverlap 60 -in "$INFILE" -out "$OUTFILE"
 fi
 
 INFILE="$OUTFILE" # last OUTFILE is new INFILE
