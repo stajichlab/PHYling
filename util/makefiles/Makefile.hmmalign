@@ -4,6 +4,7 @@ OUTPEPEXT  ?= aa.fa
 HMMALIGN   ?= hmmalign
 REFORMAT   ?= esl-reformat
 TRIMAL     ?= trimal
+CLIPKIT	   ?= clipkit
 RESOVERLAP ?= 0.70
 SEQOVERLAP ?= 75
 TRIMALSCHEME ?=-automated1
@@ -25,7 +26,7 @@ all: $(msa) $(clean) $(filter) $(trim)
 .PHONY: clean all
 
 clean:
-	rm -f *.msa *.clnaln *.filter *.trim
+	rm -f *.msa *.clnaln *.filter *.trim *.clipkit
 
 empty   :=
 trailAA := .aa.fa
@@ -47,3 +48,6 @@ trailCDS:= .cds.fa
 
 %.trim : %.filter
 	trimal ${TRIMALSCHEME} -fasta -in $< -out $@
+
+%.clipkit : %.filter
+	clipkit $<
