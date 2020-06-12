@@ -25,17 +25,18 @@ fi
 if [[ "$MODULESHOME" ]]; then
     module load hmmer/3
     module load trimal
+    module load clipkit
     # module load BMGE # is this too slow?
 fi
 
 if [[ -z "$HMM_FOLDER" ]]; then
     echo "Need HMM_FOLDER set"
-    exit 
+    exit
 fi
 
 if [[ ! -d "$HMM_FOLDER" ]]; then
     echo "HMM_FOLDER \"$HMM_FOLDER\" does not exist"
-    exit 
+    exit
 fi
 
 ALN_OUTDIR="aln"
@@ -68,6 +69,10 @@ fi
 
 MARKER="$(basename "$IN" ".$OUTPEPEXT")"
 echo "IN=$IN gene=$MARKER"
+
+make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign $DIR/$MARKER.clipkit
+
+exit
 
 OUTFILE="$DIR/$MARKER.aa.msa"
 INFILE="$IN"

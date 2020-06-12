@@ -230,7 +230,7 @@ elif re.match("aln", subprog):
     # now re-parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog for the coding sequence files
     # assuming there is a CDS folder (skip if not)
-    
+
     if os.path.exists(config["CDSDIR"]):
         outdir = config["CDSDIR"]
         if "TEMP" in config:

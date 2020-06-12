@@ -127,9 +127,6 @@ def make_unaln_files (search_dir, best_extension, cutoff,
                             else:
                                 orthologs[HMMname] = [ row[0] ]
                     elif best_extension == "best_multi":
-                        if len(row) > 1:
-                            print("gene %s has multihits"%(HMMname))
-
                         if not multi:
                             row = [ row[0] ]
 
@@ -139,7 +136,7 @@ def make_unaln_files (search_dir, best_extension, cutoff,
                             if HMMname in orthologs:
                                 orthologs[HMMname].append(hit_dat[0])
                             else:
-                                orthologs[HMMname] = [ hit_dat[0] ]                            
+                                orthologs[HMMname] = [ hit_dat[0] ]
 
     pool = ThreadPool(threads)
     fileset = []
