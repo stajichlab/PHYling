@@ -50,4 +50,4 @@ trailCDS:= .cds.fa
 	trimal ${TRIMALSCHEME} -fasta -in $< -out $@
 
 %.clipkit : %.filter
-	clipkit $<
+	clipkit -o $@ $<
