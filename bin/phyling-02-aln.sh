@@ -61,7 +61,7 @@ if [[ $QUEUEING == "parallel" ]]; then
 	    "$COMBINE_SCRIPT" -x "$EXPECTED" -e cds.denovo.trim -t cds
 	fi
     else
-	"$COMBINE_SCRIPT" -x "$EXPECTED" -e "aa.trim" -t aa
+	"$COMBINE_SCRIPT" -x "$EXPECTED" -e "aa.clipkit" -t aa
     	if [ -d $CDSDIR ]; then
 	    "$COMBINE_SCRIPT" -x "$EXPECTED" -e cdsaln.trim -t cds
 	fi
@@ -99,11 +99,11 @@ elif [[ $QUEUEING == "slurm" ]]; then
 	fi
     else
 	echo "ready to run with $COMBINE_SCRIPT no extra ext"
-        CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=aa.trim,TYPE=aa,EXPECTED=\"$EXPECTED\" $COMBINE_SCRIPT"
+        CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=aa.clipkit,TYPE=aa,EXPECTED=\"$EXPECTED\" $COMBINE_SCRIPT"
 	eval $CMD
 
 	if [ -d $CDSDIR ]; then
-            CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cdsaln.trim,EXPECTED=$EXPECTED,TYPE=CDS $COMBINE_SCRIPT"
+            CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cdsaln.clipkit,EXPECTED=$EXPECTED,TYPE=CDS $COMBINE_SCRIPT"
 	    eval $CMD
 	fi
     fi

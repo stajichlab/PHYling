@@ -70,59 +70,59 @@ fi
 MARKER="$(basename "$IN" ".$OUTPEPEXT")"
 echo "IN=$IN gene=$MARKER"
 
-make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign $DIR/$MARKER.clipkit
+make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP $DIR/$MARKER.aa.clipkit
 
 exit
 
-OUTFILE="$DIR/$MARKER.aa.msa"
-INFILE="$IN"
+#OUTFILE="$DIR/$MARKER.aa.msa"
+#INFILE="$IN"
 
-if [[ "$FORCE" == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
-    hmmalign --trim --amino -o "$OUTFILE" "$DBDIR/$MARKER.hmm" "$INFILE"
-fi
+#if [[ "$FORCE" == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+#    hmmalign --trim --amino -o "$OUTFILE" "$DBDIR/$MARKER.hmm" "$INFILE"
+#fi
 
-INFILE="$OUTFILE" # last OUTFILE is new INFILE
-OUTFILE="$DIR/$MARKER.aa.clnaln"
-AA_ALN_NOTRIM="$OUTFILE"
+#INFILE="$OUTFILE" # last OUTFILE is new INFILE
+#OUTFILE="$DIR/$MARKER.aa.clnaln"
+#AA_ALN_NOTRIM="$OUTFILE"
 
-if [[ $FORCE == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
-    TMP=$(mktemp)
-    esl-reformat --replace=x:- --gapsym=- -o "$TMP" afa "$INFILE"
-    perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' "$TMP" > "$OUTFILE"
-    rm "$TMP"
-fi
+#if [[ $FORCE == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+#    TMP=$(mktemp)
+#    esl-reformat --replace=x:- --gapsym=- -o "$TMP" afa "$INFILE"
+#    perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' "$TMP" > "$OUTFILE"
+#    rm "$TMP"
+#fi
 
-INFILE="$OUTFILE" # last OUTFILE is new INFILE
-OUTFILE="$DIR/$MARKER.aa.filter"
+#INFILE="$OUTFILE" # last OUTFILE is new INFILE
+#OUTFILE="$DIR/$MARKER.aa.filter"
 
-if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
-    trimal -resoverlap "$RESOVERLAP" \
-        -seqoverlap "$SEQOVERLAP" \
-        -in "$INFILE" \
-        -out "$OUTFILE"
-fi
+#if [[ $FORCE == "1" || ! -f $OUTFILE || $IN -nt $OUTFILE  ]]; then
+#    trimal -resoverlap "$RESOVERLAP" \
+#        -seqoverlap "$SEQOVERLAP" \
+#        -in "$INFILE" \
+#        -out "$OUTFILE"
+#fi
 
-INFILE="$OUTFILE" # last OUTFILE is new INFILE
-OUTFILE="$DIR/$MARKER.aa.trim"
+#INFILE="$OUTFILE" # last OUTFILE is new INFILE
+#OUTFILE="$DIR/$MARKER.aa.trim"
 
-if [[ $FORCE == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
-    trimal "$TRIMALSCHEME" -fasta -in "$INFILE" -out "$OUTFILE"
-fi
+#if [[ $FORCE == "1" || ! -f "$OUTFILE" || "$IN" -nt "$OUTFILE" ]]; then
+#    trimal "$TRIMALSCHEME" -fasta -in "$INFILE" -out "$OUTFILE"
+#fi
 
-CDSFASTA="$DIR/$MARKER.cds.fa"
-CDSALN="$DIR/$MARKER.cdsaln"
-CDSTRIM="$DIR/$MARKER.cdsaln.trim"
-if [[ -f "$CDSFASTA" ]]; then
-    echo "processing CDS $CDSFASTA"
-    if [[ ! -f "$CDSALN" ]]; then
-        "$PHYLING_DIR/util/bp_mrtrans.pl" -if fasta -of fasta \
-                                -i "$AA_ALN_NOTRIM" \
-                                -s "$CDSFASTA" \
-                                -o "$CDSALN"
+#CDSFASTA="$DIR/$MARKER.cds.fa"
+#CDSALN="$DIR/$MARKER.cdsaln"
+#CDSTRIM="$DIR/$MARKER.cdsaln.trim"
+#if [[ -f "$CDSFASTA" ]]; then
+#    echo "processing CDS $CDSFASTA"
+#    if [[ ! -f "$CDSALN" ]]; then
+#        "$PHYLING_DIR/util/bp_mrtrans.pl" -if fasta -of fasta \
+#                                -i "$AA_ALN_NOTRIM" \
+#                                -s "$CDSFASTA" \
+#                                -o "$CDSALN"
 #        if [[ $BMGE ]]; then
 #            java -jar "$BMGE" -t "CODON" -i "$CDSALN" -of "$CDSTRIM"
 	#        else
-       rsync -a "$CDSALN" "$CDSTRIM"
+#       rsync -a "$CDSALN" "$CDSTRIM"
 #        fi
-    fi
-fi
+#    fi
+#fi

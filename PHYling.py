@@ -222,7 +222,7 @@ elif re.match("aln", subprog):
 
     # parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog  - first do the proteins
-    print("make unaln called with",searchdir,pep_db,args.multi)
+    #print("make unaln called with",searchdir,pep_db,args.multi)
     PHYling.make_unaln_files(
         searchdir, config["BESTHITEXT"], config['HMMSEARCH_CUTOFF'], pep_db,
         alndir, config["OUTPEPEXT"], args.cleanaln, config["INDEXING"],

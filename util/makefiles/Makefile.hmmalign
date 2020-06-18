@@ -6,7 +6,7 @@ REFORMAT   ?= esl-reformat
 TRIMAL     ?= trimal
 CLIPKIT	   ?= clipkit
 RESOVERLAP ?= 0.70
-SEQOVERLAP ?= 75
+SEQOVERLAP ?= 80
 TRIMALSCHEME ?=-automated1
 MRTRANS    ?= bp_mrtrans.pl
 HMMFOLDER  ?= $(realpath HMM/${HMM}/HMM3)
@@ -20,8 +20,9 @@ msa     = $(seqs:.fa=.msa)
 clean   = $(seqs:.fa=.clnaln)
 filter  = $(seqs:.fa=.filter)
 trim    = $(seqs:.fa=.trim)
+clipkit = $(seqs:.fa=.clipkit)
 
-all: $(msa) $(clean) $(filter) $(trim)
+all: $(clipkit)
 
 .PHONY: clean all
 
