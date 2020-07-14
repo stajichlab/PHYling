@@ -42,7 +42,7 @@ OUT="$HMMSEARCH_OUT/$HMM"
 if [[ -n "$SLURM_ARRAY_TASK_ID" ]]; then
     IN=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$QUERYDBS")
 elif [[ ! $IN ]]; then
-    # can pass which file to process on cmdline too, 
+    # can pass which file to process on cmdline too,
     # eg bash jobs/01_hmmsearch.sh 1
     IN=$1
 fi
@@ -73,4 +73,11 @@ if [[ "$FORCE" == "1" || ! -f "$OUTFILEBEST" || "$OUTFILE1" -nt "$OUTFILEBEST" ]
     "${PHYLING_DIR}/util/get_best_hmmtbl.py" \
         -c $HMMSEARCH_CUTOFF \
         --input "$OUTFILE1" > "$OUTFILEBEST"
+fi
+
+OUTFILEBESTMULTI="$OUT/$NM.best_multi"
+if [[ "$FORCE" == "1" || ! -f "$OUTFILEBESTMULTI" || "$OUTFILE1" -nt "$OUTFILEBESTMULTI" ]]; then
+    "${PHYLING_DIR}/util/get_best_by_cutoffs_hmmtbl.py" \
+        -s $HMM_FOLDER/$HMM/scores_cutoff -l $HMM_FOLDER/$HMM/lengths_cutoff \
+        --input "$OUTFILE1" --output "$OUTFILEBESTMULTI"
 fi

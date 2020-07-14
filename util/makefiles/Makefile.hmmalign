@@ -1,0 +1,54 @@
+
+HMM        ?=fungi_odb10
+OUTPEPEXT  ?= aa.fa
+HMMALIGN   ?= hmmalign
+REFORMAT   ?= esl-reformat
+TRIMAL     ?= trimal
+CLIPKIT	   ?= clipkit
+RESOVERLAP ?= 0.70
+SEQOVERLAP ?= 80
+TRIMALSCHEME ?=-automated1
+MRTRANS    ?= bp_mrtrans.pl
+HMMFOLDER  ?= $(realpath HMM/${HMM}/HMM3)
+ALNDIR     ?= $(realpath aln/${HMM})
+
+#$(info "${HMMFOLDER} is HMMFOLDER")
+#CWD := $(shell pwd)
+
+seqs    = $(wildcard ${ALNDIR}/*.$(OUTPEPEXT))
+msa     = $(seqs:.fa=.msa)
+clean   = $(seqs:.fa=.clnaln)
+filter  = $(seqs:.fa=.filter)
+trim    = $(seqs:.fa=.trim)
+clipkit = $(seqs:.fa=.clipkit)
+
+all: $(clipkit)
+
+.PHONY: clean all
+
+clean:
+	rm -f *.msa *.clnaln *.filter *.trim *.clipkit
+
+empty   :=
+trailAA := .aa.fa
+trailCDS:= .cds.fa
+
+%.aa.msa : %.aa.fa
+	$(eval marker=$(subst $(trailAA),$(empty),$(notdir $<)))
+	${HMMALIGN} --trim --amino -o $@ ${HMMFOLDER}/${marker}.hmm $<
+
+%.cds.msa : %.cds.fa
+	$(eval ALN=$(subst $(trailCDS),$(tailAA),$<))
+	${MRTRANS} -if fasta -of fasta -i $ALN -s $< -o $@
+
+%.clnaln : %.msa
+	esl-reformat --replace=x:- --gapsym=- afa $< | perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' > $@
+
+%.filter : %.clnaln
+	trimal -resoverlap ${RESOVERLAP} -seqoverlap ${SEQOVERLAP} -in $< -out $@
+
+%.trim : %.filter
+	trimal ${TRIMALSCHEME} -fasta -in $< -out $@
+
+%.clipkit : %.filter
+	clipkit -o $@ $<

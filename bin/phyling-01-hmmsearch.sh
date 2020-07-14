@@ -33,12 +33,12 @@ elif [[ $QUEUEING == "slurm" ]]; then
 
     FILECOUNT=$(wc -l "$QUERYDBS" | awk '{print $1}')
     ARRAY="1-$FILECOUNT"
-    
-   sbatch --ntasks=$JOBCPU \
+    echo "sbatch --ntasks=$JOBCPU --nodes=1 $QUEUECMD --export=PHYLING_DIR="$PHYLING_DIR" --array=$ARRAY $SUBJOB_SCRIPT"
+    sbatch --ntasks=$JOBCPU \
         --nodes=1 \
         $QUEUECMD \
         --export=PHYLING_DIR="$PHYLING_DIR" \
-	--array=$ARRAY \
+	       --array=$ARRAY \
         "$SUBJOB_SCRIPT"
 else
     echo "Run in serial"
