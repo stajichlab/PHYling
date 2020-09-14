@@ -21,6 +21,7 @@ JOBCPU=2 # per job CPUs
 TOTALCPU=8 # total CPUs to use
 QUEUEING=parallel
 QUEUE=
+TEMP=/tmp
 # tree building - not yet integrated into PHYling
 OUTGROUP=__CHANGEME__
 EXTRARAXML=
