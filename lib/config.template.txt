@@ -1,7 +1,6 @@
 #basic setup needs to be changed
 PHYLING_DIR=__FIXME__
 HMM=__CHANGEME__
-OUT=__CHANGEME__
 PREFIX=__CHANGEME__
 HMM_FOLDER=HMM
 PEPDIR=pep
@@ -23,5 +22,6 @@ TOTALCPU=8 # total CPUs to use
 QUEUEING=parallel
 QUEUE=
 # tree building - not yet integrated into PHYling
+OUTGROUP=__CHANGEME__
 EXTRARAXML=
 EXTRAIQTREE="-nt AUTO -m TESTMERGE -bb 1000 -alrt 1000"
