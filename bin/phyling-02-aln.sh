@@ -52,7 +52,7 @@ if [[ $QUEUEING == "parallel" ]]; then
         -f "$FORCE" \
         -c "$CLEAN" \
         -i {} < "$ALNFILES"
-    
+
 #    echo  "$COMBINE_SCRIPT" -x "$EXPECTED" -e cdsaln.trim -t cds
 
     if [[ $ALNTOOL == "muscle" ]]; then
@@ -90,7 +90,7 @@ elif [[ $QUEUEING == "slurm" ]]; then
             $QUEUECMD \
             --export=EXT=aa.denovo.trim,TYPE=aa,EXPECTED=\"$EXPECTED\" \
             $COMBINE_SCRIPT
-	
+
 	if [ -d $CDSDIR ]; then
             sbatch --depend=afterany:"$SUBMIT_ID" \
 		$QUEUECMD \
@@ -103,7 +103,7 @@ elif [[ $QUEUEING == "slurm" ]]; then
 	eval $CMD
 
 	if [ -d $CDSDIR ]; then
-            CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cdsaln.clipkit,EXPECTED=$EXPECTED,TYPE=CDS $COMBINE_SCRIPT"
+            CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cds.clipkit,EXPECTED=$EXPECTED,TYPE=CDS $COMBINE_SCRIPT"
 	    eval $CMD
 	fi
     fi
@@ -115,6 +115,6 @@ else
         $SUBJOB_SCRIPT -f "$FORCE" -i "$FILE"
     done < "$TMP"
     rm "$TMP"
-    # do combine here (how to avoid duplicate code with 
+    # do combine here (how to avoid duplicate code with
     # the parallel stuff above
 fi
