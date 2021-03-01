@@ -95,7 +95,7 @@ def run_cdbyank (fileset):
 
 def make_unaln_files (search_dir, best_extension, cutoff,
                       dbpath, outdir, outext, force=False,
-                      index_type="cdbfasta",
+                      index_type="sfetch",
                       threads=2,multi=False):
 
     orthologs = {}
