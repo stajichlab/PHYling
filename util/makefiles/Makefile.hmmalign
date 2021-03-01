@@ -29,17 +29,17 @@ all: $(clipkit)
 clean:
 	rm -f *.msa *.clnaln *.filter *.trim *.clipkit
 
-empty   :=
-trailAA := .aa.fa
-trailCDS:= .cds.fa
+empty    :=
+trailAA  := .aa.fa
+trailCDS := .cds.fa
 
 %.aa.msa : %.aa.fa
 	$(eval marker=$(subst $(trailAA),$(empty),$(notdir $<)))
 	${HMMALIGN} --trim --amino -o $@ ${HMMFOLDER}/${marker}.hmm $<
 
 %.cds.msa : %.cds.fa
-	$(eval ALN=$(subst $(trailCDS),$(tailAA),$<))
-	${MRTRANS} -if fasta -of fasta -i $ALN -s $< -o $@
+	$(eval ALN=$(subst $(trailCDS),$(trailAA),$<))
+	${MRTRANS} -if fasta -of fasta -i ${ALN} -s $< -o $@
 
 %.clnaln : %.msa
 	esl-reformat --replace=x:- --gapsym=- afa $< | perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' > $@
