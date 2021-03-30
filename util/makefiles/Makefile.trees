@@ -1,0 +1,45 @@
+
+HMM        ?=fungi_odb10
+OUTEXT     ?= clipkit
+ALNDIR     ?= $(realpath aln/${HMM})
+IQTREE     ?= iqtree2
+FASTTREE   ?= FastTreeMP
+
+trailCDS  := .cds.clipkit
+trailAA   := .aa.clipkit
+
+#$(info "${HMMFOLDER} is HMMFOLDER")
+#CWD := $(shell pwd)
+
+alns      = $(wildcard ${ALNDIR}/*.$(OUTEXT))
+cdsaln    = $(wildcard ${ALNDIR}/*.cds.clipkit)
+pepaln    = $(wildcard ${ALNDIR}/*.aa.clipkit)
+
+alnssp         = $(alns:.clipkit=.clipkit.spname)
+iqtrees      = $(alnssp:.clipkit.spname=.treefile)
+AAFTtrees    = $(pepaln:.clipkit.spname=.FT.tre)
+CDSFTtrees   = $(cdsaln:.clipkit.spname=.FT.tre)
+
+all: $(iqtrees) $(AAFTtrees) $(CDSFTtrees)
+
+.PHONY: clean all
+
+clean:
+	rm -f *.FT.tre *.treefile
+
+empty    :=
+
+%.clipkit.spname : %.clipkit
+	perl -p -e 's/\|/ /' $< > $@
+
+%.treefile : %.spname
+	$(info "args are" $@ " and " $< " and " $@.treefile)
+	${IQTREE} -nt AUTO -s $< -nt AUTO -bb 1000 -alrt 1000
+
+%.aa.clipkit.FT.tre : %.aa.clipkit.spname
+		$(info "args are" $@ " and " $<)
+		${FASTTREE} -lg $< > $@
+
+%.cds.clipkit.FT.tre : %.cds.clipkit.spname
+		$(info "args are" $@ " and " $<)
+		${FASTTREE} -gtr -nt $< > $@
