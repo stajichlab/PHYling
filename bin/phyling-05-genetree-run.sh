@@ -22,7 +22,7 @@ fi
 if [[ -z "$MODULESHOME" ]]; then
     module load RAxML/8.2.12
     module load fasttree/2.1.11
-    module load IQ-TREE/1.6.12
+    module load IQ-TREE/2.1.1
 fi
 
 if [[ ! -d "$HMM_FOLDER" ]]; then
@@ -65,6 +65,5 @@ echo "IN=$IN gene=$MARKER"
 INFILE="$DIR/$MARKER.aa.$TRIMALNEXT"
 OUTFILE="$MARKER"
 
-if [[ "$FORCE" == "1" || ! -f "$OUTFILE" || "$INFILE" -nt "$OUTFILE" ]]; then
-    trimal -resoverlap 0.50 -seqoverlap 60 -in "$INFILE" -out "$OUTFILE"
-fi
+make -f $PHYLING_DIR/util/makefiles/Makefile.trees $DIR/$MARKER.aa.clipkit.FT.tre
+make -f $PHYLING_DIR/util/makefiles/Makefile.trees $DIR/$MARKER.cds.clipkit.FT.tre
