@@ -20,7 +20,8 @@ LANGUAGE=en
 JOBCPU=2 # per job CPUs
 TOTALCPU=8 # total CPUs to use
 QUEUEING=parallel
-QUEUE=
+QUEUE= # if slurm runs, what queue to use
+ALNCHUNK=1 # chunk size for PHYling arrayjob runs
 TEMP=/tmp
 # tree building - not yet integrated into PHYling
 OUTGROUP=__CHANGEME__
