@@ -9,26 +9,22 @@ trailCDS  := .cds.clipkit
 trailAA   := .aa.clipkit
 
 #$(info "${HMMFOLDER} is HMMFOLDER")
-#CWD := $(shell pwd)
 
-alns      = $(wildcard ${ALNDIR}/*.$(OUTEXT))
-cdsaln    = $(wildcard ${ALNDIR}/*.cds.clipkit)
-pepaln    = $(wildcard ${ALNDIR}/*.aa.clipkit)
+CDSiqtrees  := $(patsubst %.clipkit,%.clipkit.treefile,$(wildcard ${ALNDIR}/*.cds.clipkit))
+AAiqtrees   := $(patsubst %.clipkit,%.clipkit.treefile,$(wildcard ${ALNDIR}/*.aa.clipkit))
+CDSFTtrees  := $(patsubst %.clipkit,%.clipkit.FT.tre,$(wildcard ${ALNDIR}/*.cds.clipkit))
+AAFTtrees   := $(patsubst %.clipkit,%.clipkit.FT.tre,$(wildcard ${ALNDIR}/*.aa.clipkit))
 
-alnssp         = $(alns:.clipkit=.clipkit.spname)
-iqtrees      = $(alnssp:.clipkit.spname=.treefile)
-AAFTtrees    = $(pepaln:.clipkit.spname=.FT.tre)
-CDSFTtrees   = $(cdsaln:.clipkit.spname=.FT.tre)
-
+#$(info $(CDSFTtrees))
+#$(info $(AAFTtrees))
+#$(info $(AAiqtrees))
+#$(info $(CDSiqtrees))
 # $(iqtrees)
-
+all: $(AAFTtrees) $(CDSFTtrees)
 CDS: $(CDSFTtrees)
-pep: $(AAFTtrees)
+PEP: $(AAFTtrees)
 
 IQ: $(iqtrees)
-
-all: CDS PEP IQ
-
 .PHONY: clean all
 
 clean:
