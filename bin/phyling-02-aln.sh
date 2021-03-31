@@ -75,7 +75,7 @@ elif [[ $QUEUEING == "slurm" ]]; then
   [[ -n $QUEUE ]] && QUEUECMD="-p $QUEUE"
 
   ALNCT=$(wc -l "$ALNFILES" | awk '{print $1}')
-  ALNCTDIV=$(expr $ALNCT / $ALNCHUNK)
+  ALNCTDIV=$(python -c "print(int($ALNCT / $ALNCHUNK) + 1)")
   PHYLING_DIR=$(dirname "$0")
   #echo "DEBUG: ALNCT is $ALNCT ALNCTDIV is $ALNCTDIV and ALNFILES was $ALNFILES"
   echo "DEBUG: PHYLING_DIR is $PHYLING_DIR"

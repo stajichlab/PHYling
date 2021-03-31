@@ -70,9 +70,8 @@ MARKERS=()
 if [[ ${SLURM_ARRAY_TASK_ID} ]]; then
   # start when we have chunk ranges to run
   START=$(python -c "print( ((${SLURM_ARRAY_TASK_ID} - 1) * $ALNCHUNK) + 1)")
-  END  =$(python -c "print( ${SLURM_ARRAY_TASK_ID} * $ALNCHUNK )")
-  IN=$(sed -n "$START,$ENDp" "$ALNFILES")
-  sed -n "$START,$ENDp" "$ALNFILES" | while read NM
+  END=$(python -c "print( ${SLURM_ARRAY_TASK_ID} * $ALNCHUNK )")
+  sed -n "${START},${END}p" "$ALNFILES" | while read NM
   do
     MARKERS+=( $(basename "$IN" ".$OUTPEPEXT" ) )
   done
