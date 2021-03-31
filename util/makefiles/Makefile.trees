@@ -20,7 +20,14 @@ iqtrees      = $(alnssp:.clipkit.spname=.treefile)
 AAFTtrees    = $(pepaln:.clipkit.spname=.FT.tre)
 CDSFTtrees   = $(cdsaln:.clipkit.spname=.FT.tre)
 
-all: $(iqtrees) $(AAFTtrees) $(CDSFTtrees)
+# $(iqtrees)
+
+CDS: $(CDSFTtrees)
+pep: $(AAFTtrees)
+
+IQ: $(iqtrees)
+
+all: CDS PEP IQ
 
 .PHONY: clean all
 
@@ -34,7 +41,7 @@ empty    :=
 
 %.treefile : %.spname
 	$(info "args are" $@ " and " $< " and " $@.treefile)
-	${IQTREE} -nt AUTO -s $< -nt AUTO -bb 1000 -alrt 1000
+	${IQTREE} -s $< -nt AUTO -bb 1000 -alrt 1000
 
 %.aa.clipkit.FT.tre : %.aa.clipkit.spname
 		$(info "args are" $@ " and " $<)
