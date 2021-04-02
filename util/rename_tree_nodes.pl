@@ -39,4 +39,5 @@ while( my $tree = $in->next_tree ) {
 	} 
     }
     Bio::TreeIO->new(-format => 'newick')->write_tree($tree);
+    print("\n");
 }
