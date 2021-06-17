@@ -70,7 +70,7 @@ fi
 MARKER="$(basename "$IN" ".$OUTPEPEXT")"
 echo "IN=$IN gene=$MARKER"
 
-make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP $DIR/$MARKER.aa.clipkit
+make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${HMM_FOLDER} $DIR/$MARKER.aa.clipkit 
 
 exit
 
