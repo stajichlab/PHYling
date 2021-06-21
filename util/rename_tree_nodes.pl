@@ -28,7 +28,7 @@ while( my $tree = $in->next_tree ) {
 	    if( my $lookup = $map{$sp} ) {
 	    	$node->id($lookup. " $id");
 	    } else {
-	    	warn("no $sp in prefix table\n");
+	    	warn("no \"$sp\" ($id) in prefix table\n");
 	    }
 	} else {
 	    if( my $lookup = $map{$id} ) {              
@@ -39,4 +39,5 @@ while( my $tree = $in->next_tree ) {
 	} 
     }
     Bio::TreeIO->new(-format => 'newick')->write_tree($tree);
+    print("\n");
 }

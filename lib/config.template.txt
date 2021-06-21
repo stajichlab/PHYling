@@ -1,7 +1,6 @@
 #basic setup needs to be changed
 PHYLING_DIR=__FIXME__
 HMM=__CHANGEME__
-OUT=__CHANGEME__
 PREFIX=__CHANGEME__
 HMM_FOLDER=HMM
 PEPDIR=pep
@@ -21,7 +20,10 @@ LANGUAGE=en
 JOBCPU=2 # per job CPUs
 TOTALCPU=8 # total CPUs to use
 QUEUEING=parallel
-QUEUE=
+QUEUE= # if slurm runs, what queue to use
+ALNCHUNK=1 # chunk size for PHYling arrayjob runs
+TEMP=/tmp
 # tree building - not yet integrated into PHYling
+OUTGROUP=__CHANGEME__
 EXTRARAXML=
 EXTRAIQTREE="-nt AUTO -m TESTMERGE -bb 1000 -alrt 1000"

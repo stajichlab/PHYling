@@ -7,6 +7,7 @@ from multiprocessing.dummy import Pool as ThreadPool
 
 CDBYANKEXT = '.cidx'
 SFETCHEXT  = '.ssi'
+Min_taxa   = 3
 
 logging.basicConfig()
 
@@ -95,7 +96,7 @@ def run_cdbyank (fileset):
 
 def make_unaln_files (search_dir, best_extension, cutoff,
                       dbpath, outdir, outext, force=False,
-                      index_type="cdbfasta",
+                      index_type="sfetch",
                       threads=2,multi=False):
 
     orthologs = {}
@@ -143,8 +144,8 @@ def make_unaln_files (search_dir, best_extension, cutoff,
     for orth in orthologs:
         outfile = "%s.%s" % (os.path.join(outdir,orth),outext)
         if force or (not os.path.exists(outfile)):
-            fileset.append( [dbpath, outfile,
-                             "\n".join(orthologs[orth]) + "\n"])
+            if len(orthologs[orth]) > Min_taxa:
+                fileset.append( [dbpath, outfile,"\n".join(orthologs[orth]) + "\n"])
 
     if index_type == "cdbfasta":
         results = pool.map(run_cdbyank, fileset)
