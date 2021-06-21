@@ -105,7 +105,7 @@ elif [[ $QUEUEING == "slurm" ]]; then
     eval $CMD
 
     if [ -d $CDSDIR ]; then
-      CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cds.clipkit,EXPECTED=$EXPECTED,TYPE=CDS $COMBINE_SCRIPT"
+      CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cds.clipkit,EXPECTED=\"$EXPECTED\",TYPE=CDS $COMBINE_SCRIPT"
       eval $CMD
     fi
   fi
