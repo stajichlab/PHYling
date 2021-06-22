@@ -7,9 +7,10 @@
 #SBATCH --time=2:00:00
 #SBATCH --output=logs/combine.%A.log
 
-#if [ ! -z "$MODULESHOME" ]; then
-#    module load python/3 # UCR python3 enforcement
-#fi
+if [ ! -z "$MODULESHOME" ]; then
+    module unload miniconda2
+    module load miniconda3 # UCR python3 enforcement
+fi
 
 if [ -e config.txt ]; then
  source config.txt
