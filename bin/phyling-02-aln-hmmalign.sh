@@ -82,4 +82,14 @@ fi
 MARKER="$(basename "$IN" ".$OUTPEPEXT")"
 echo "IN=$IN gene=$MARKER"
 
-make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.aa.clipkit 
+
+
+for MARKER in "${MARKERS[@]}"
+do
+    echo "gene=$MARKER"
+    echo " make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMM=$HMM $DIR/$MARKER.aa.clipkit"
+    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.aa.clipkit 
+    if [ -f $DIR/$MARKER.$CDSEXT ]; then
+	    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.cds.clipkit
+    fi
+done
