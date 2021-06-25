@@ -91,6 +91,6 @@ do
     echo " make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMM=$HMM $DIR/$MARKER.aa.clipkit"
     make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.aa.clipkit 
     if [ -f $DIR/$MARKER.$OUTCDSEXT ]; then
-	    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.cds.clipkit
+	    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.cds.msa
     fi
 done
