@@ -65,7 +65,7 @@ if [[ $QUEUEING == "parallel" ]]; then
   else
     "$COMBINE_SCRIPT" -x "$EXPECTED" -e "aa.clipkit" -t aa
     if [ -d $CDSDIR ]; then
-      "$COMBINE_SCRIPT" -x "$EXPECTED" -e "cds.clipkit" -t cds
+      "$COMBINE_SCRIPT" -x "$EXPECTED" -e "cds.msa" -t cds
     fi
   fi
 
