@@ -23,9 +23,9 @@ clean   = $(seqs:.fa=.clnaln)
 filter  = $(seqs:.fa=.filter)
 trim    = $(seqs:.fa=.trim)
 clipkit = $(seqs:.fa=.clipkit)
-cdsclipkit = $(cdsseqs:.fa=.clipkit)
+cdsaln = $(cdsseqs:.fa=.cds.msa)
 
-all: $(clipkit) $(cdsclipkit)
+all: $(clipkit) $(cdsaln)
 
 .PHONY: clean all
 
@@ -35,14 +35,23 @@ clean:
 empty    :=
 trailAA  := .aa.fa
 trailCDS := .cds.fa
+trailAAALN := .aa.msa
+trailAACLN := .aa.mfa
 
 %.aa.msa : %.aa.fa
 	$(eval marker=$(subst $(trailAA),$(empty),$(notdir $<)))
 	${HMMALIGN} --trim --amino -o $@ ${HMMFOLDER}/${marker}.hmm $<
 
 %.cds.msa : %.cds.fa
-	$(eval ALN=$(subst $(trailCDS),$(trailAA),$<))
-	${MRTRANS} -if fasta -of fasta -i ${ALN} -s $< -o $@
+	$(eval marker=$(subst $(trailCDS),$(empty),$(notdir $<)))
+	$(eval AAFILE=$(subst $(trailCDS),$(trailAA),$<))
+	$(eval ALN=$(subst $(trailAA),$(trailAAALN),${AAFILE}))
+	$(eval ALNCLN=$(subst $(trailAA),$(trailAACLN),${AAFILE}))
+
+	${HMMALIGN} --trim --amino -o ${ALN} ${HMMFOLDER}/${marker}.hmm ${AAFILE}
+	esl-reformat --replace=x:- --gapsym=- afa ${ALN} | perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' > ${ALNCLN}
+
+	${MRTRANS} -if fasta -of fasta -i ${ALNCLN} -s $< -o $@
 
 %.clnaln : %.msa
 	esl-reformat --replace=x:- --gapsym=- afa $< | perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' > $@
