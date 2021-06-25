@@ -11,6 +11,7 @@
 
 ALNCHUNK=1
 OUTPEPEXT=aa.fa
+OUTCDSEXT=cds.fa
 RESOVERLAP=0.70
 SEQOVERLAP=80
 TRIMALSCHEME=-automated1
@@ -89,7 +90,7 @@ do
     echo "gene=$MARKER"
     echo " make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMM=$HMM $DIR/$MARKER.aa.clipkit"
     make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.aa.clipkit 
-    if [ -f $DIR/$MARKER.$CDSEXT ]; then
+    if [ -f $DIR/$MARKER.$OUTCDSEXT ]; then
 	    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.cds.clipkit
     fi
 done

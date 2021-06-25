@@ -1,6 +1,7 @@
 
 HMM        ?=fungi_odb10
 OUTPEPEXT  ?= aa.fa
+OUTCDSEXT  ?= cds.fa
 HMMALIGN   ?= hmmalign
 REFORMAT   ?= esl-reformat
 TRIMAL     ?= trimal
@@ -16,13 +17,15 @@ ALNDIR     ?= $(realpath aln/${HMM})
 #CWD := $(shell pwd)
 
 seqs    = $(wildcard ${ALNDIR}/*.$(OUTPEPEXT))
+cdsseqs = $(wildcard ${ALNDIR}/*.$(OUTCDSEXT))
 msa     = $(seqs:.fa=.msa)
 clean   = $(seqs:.fa=.clnaln)
 filter  = $(seqs:.fa=.filter)
 trim    = $(seqs:.fa=.trim)
 clipkit = $(seqs:.fa=.clipkit)
+cdsclipkit = $(cdsseqs:.fa=.clipkit)
 
-all: $(clipkit)
+all: $(clipkit) $(cdsclipkit)
 
 .PHONY: clean all
 
