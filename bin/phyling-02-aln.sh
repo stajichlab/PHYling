@@ -27,17 +27,16 @@ fi
 
 [[ -z "$ALNFILES" ]] && ALNFILES="alnlist.$HMM"
 
-while getopts t:c:f:s:q: OPT; do
+while getopts t:c:s:q: OPT; do
   case $OPT in
     t) ALNTOOL=${OPTARG} ;;
     c) CLEAN=${OPTARG} ;;
-    f) FORCE=${OPTARG} ;;
     s) ALNCHUNK=${OPTARG} ;;
     q) QUEUEING=${OPTARG} ;;
   esac
 done
 
-if [[ ! -f "$ALNFILES" || "$CLEAN" == "1" || "$FORCE" == "1" ]]; then
+if [[ ! -f "$ALNFILES" || "$CLEAN" == "1" ]]; then
   find "$ALN_OUTDIR/$HMM" -name "*.$OUTPEPEXT" > "$ALNFILES"
 fi
 
@@ -47,11 +46,10 @@ COMBINE_SCRIPT="${SCRIPT_DIR}/phyling-03-aln-combine.sh"
 
 if [[ $QUEUEING == "parallel" ]]; then
   JOBPARALLEL=$((TOTALCPU / JOBCPU))
-  echo "Run parallel job $ALNTOOL"
+  echo "Run parallel job $ALNTOOL on $SUBJOB_SCRIPT ($ALNFILES)"
   #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
   parallel -j "$JOBPARALLEL" \
     "$SUBJOB_SCRIPT" \
-    -f "$FORCE" \
     -c "$CLEAN" \
     -i {} < "$ALNFILES"
 
@@ -65,7 +63,7 @@ if [[ $QUEUEING == "parallel" ]]; then
   else
     "$COMBINE_SCRIPT" -x "$EXPECTED" -e "aa.clipkit" -t aa
     if [ -d $CDSDIR ]; then
-      "$COMBINE_SCRIPT" -x "$EXPECTED" -e "cds.msa" -t cds
+      "$COMBINE_SCRIPT" -x "$EXPECTED" -e "cds.clipkit" -t cds
     fi
   fi
 
@@ -80,7 +78,7 @@ elif [[ $QUEUEING == "slurm" ]]; then
   #echo "DEBUG: ALNCT is $ALNCT ALNCTDIV is $ALNCTDIV and ALNFILES was $ALNFILES"
   echo "DEBUG: PHYLING_DIR is $PHYLING_DIR"
   ARRAY="1-$ALNCTDIV"
-  CMD="sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=\"$PHYLING_DIR\" --export=FORCE=$FORCE --array=$ARRAY $SUBJOB_SCRIPT"
+  CMD="sbatch --ntasks $JOBCPU --nodes 1 $QUEUECMD --export=PHYLING_DIR=\"$PHYLING_DIR\" --array=$ARRAY $SUBJOB_SCRIPT"
   echo "DEBUG: $CMD"
   SUBMIT_MSG=$(eval $CMD)
   SUBMIT_ID=$(echo "$SUBMIT_MSG" | awk '{print $4}')
@@ -114,7 +112,7 @@ else
   TMP=$(mktmp)
   find "$ALN_OUTDIR/$HMM" -name "*.$OUTPEPEXT" > "$TMP"
   while read -r FILE; do
-    $SUBJOB_SCRIPT -f "$FORCE" -i "$FILE" -c "$CLEAN"
+    $SUBJOB_SCRIPT -i "$FILE" -c "$CLEAN"
   done < "$TMP"
   rm "$TMP"
   # do combine here (how to avoid duplicate code with

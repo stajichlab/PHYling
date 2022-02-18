@@ -21,7 +21,7 @@ logging.basicConfig()
 # user specific config file - the nane of this should be overrideable
 Config_file = 'config.txt'
 
-version = '0.2.4'  #phyling release version
+version = '0.2.6'  #phyling release version
 
 # sys.argv parsing should occur to get/set an alternative config file name
 
@@ -101,6 +101,7 @@ if subprog == 'init' or subprog == 'initialize' or subprog == 'setup':
         description=help,
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-v', '--verbose', action='store_true', description="Extra debugging")
     # parse the rest of the argument
     args = parser.parse_args(arguments)
     cmd = os.path.join(script_path, 'bin', 'phyling-00-initialize.sh')
@@ -111,7 +112,7 @@ elif subprog == 'download':
         description=help,
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-
+    parser.add_argument('-v', '--verbose', action='store_true', description="Extra debugging")
     parser.add_argument('-t', '--type', default='fungi')
     args = parser.parse_args(arguments)
     url = ""
@@ -150,6 +151,7 @@ elif re.match("(hmm|search)", subprog):
         description=help,
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-v', '--verbose', action='store_true', help="Extra debugging")
     parser.add_argument(
         '-f',
         '--force',
@@ -185,6 +187,7 @@ elif re.match("aln", subprog):
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?
+    parser.add_argument('-v', '--verbose', action='store_true',help="Extra debugging")
     parser.add_argument(
         '-t', '--type', action='store_true', default="hmmalign",help="What aligner - hmmsearch or muscle")
 
@@ -223,6 +226,7 @@ elif re.match("aln", subprog):
     # parse the best hit files, make ortholog table and write out genes
     # to a single file per ortholog  - first do the proteins
     #print("make unaln called with",searchdir,pep_db,args.multi)
+
     PHYling.make_unaln_files(
         searchdir, config["BESTHITEXT"], config['HMMSEARCH_CUTOFF'], pep_db,
         alndir, config["OUTPEPEXT"], args.cleanaln, config["INDEXING"],
@@ -250,16 +254,16 @@ elif re.match("aln", subprog):
 
     # either force or cleanaln flag sufficient to regenerate alignment files
     # do we sub-divide by type (muscle,hmmalign here)
+
     cmd = os.path.join(script_path, 'bin', 'phyling-02-aln.sh')
-    print(cmd)
+    print("calling aln step: {} -t {} -c {} -q {}".format(cmd,args.type,int(args.cleanaln),config["QUEUEING"]))
+
     subprocess.call([
         cmd,
         "-t",
         args.type,
         "-c",
         "%d" % (int(args.cleanaln)),
-        "-f",
-        "%d" % (int(args.force)),
         "-q",
         "%s" % (config["QUEUEING"]),
     ])
@@ -267,7 +271,7 @@ elif re.match("aln", subprog):
 elif subprog == "phylo":
     help = Messages['commands']['phylo'] % (sys.argv[1], version)
     parser = argparse.ArgumentParser(
-        description=hqelp,
+        description=help,
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     # hmmer or muscle for multiple alignment?

@@ -43,15 +43,16 @@ fi
 
 ALN_OUTDIR="aln"
 
-while getopts c:f:i:s:H: OPT; do
+while getopts c:i:s:H: OPT; do
   case $OPT in
-    f) FORCE=${OPTARG} ;;
+    c) CLEAN=${OPTARG} ;;
     i) IN=${OPTARG} ;;
     s) ALNCHUNK=${OPTARG} ;;
     H) HMM=${OPTARG} ;;
   esac
 done
 
+echo "I'm here"
 [[ -z "$ALNFILES" ]] && ALNFILES="alnlist.$HMM"
 
 if [[ ! -f "$ALNFILES" ]]; then
@@ -83,14 +84,15 @@ fi
 MARKER="$(basename "$IN" ".$OUTPEPEXT")"
 echo "IN=$IN gene=$MARKER"
 
-
-
 for MARKER in "${MARKERS[@]}"
 do
     echo "gene=$MARKER"
-    echo " make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMM=$HMM $DIR/$MARKER.aa.clipkit"
-    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.aa.clipkit 
+    if [[ ! -z $CLEAN || $CLEAN == 1 ]]; then
+      rm -f $DIR/$MARKER.aa.clipkit $DIR/$MARKER.aa.msa
+    fi
+#    echo "make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMM=$HMM $DIR/$MARKER.aa.clipkit"
+    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.aa.clipkit
     if [ -f $DIR/$MARKER.$OUTCDSEXT ]; then
-	    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM $DIR/$MARKER.cds.msa
+	    make -f $PHYLING_DIR/util/makefiles/Makefile.hmmalign SEQOVERLAP=$SEQOVERLAP RESOVERLAP=$RESOVERLAP HMMFOLDER=${DBDIR} HMM=$HMM MRTRANS=$PHYLING_DIR/util/bp_mrtrans_filt.pl $DIR/$MARKER.cds.clipkit
     fi
 done

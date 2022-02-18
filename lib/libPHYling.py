@@ -98,7 +98,6 @@ def make_unaln_files (search_dir, best_extension, cutoff,
                       dbpath, outdir, outext, force=False,
                       index_type="sfetch",
                       threads=2,multi=False):
-
     orthologs = {}
     dbidx = ""
     index_type = index_type.lower()
@@ -115,6 +114,7 @@ def make_unaln_files (search_dir, best_extension, cutoff,
         return -1
 
     for file in os.listdir(search_dir):
+
         if file.endswith("."+best_extension):
             with open(os.path.join(search_dir,file),"r") as fh:
                 for line in fh:
@@ -144,7 +144,7 @@ def make_unaln_files (search_dir, best_extension, cutoff,
     for orth in orthologs:
         outfile = "%s.%s" % (os.path.join(outdir,orth),outext)
         if force or (not os.path.exists(outfile)):
-            if len(orthologs[orth]) > Min_taxa:
+            if len(orthologs[orth]) >= Min_taxa:
                 fileset.append( [dbpath, outfile,"\n".join(orthologs[orth]) + "\n"])
 
     if index_type == "cdbfasta":

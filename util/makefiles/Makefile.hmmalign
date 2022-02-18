@@ -1,5 +1,8 @@
 
-HMM        ?=fungi_odb10
+# this assumes something about the PHYling
+MDIR       := $(shell dirname $(realpath $(MAKEFILE_LIST)))
+UTILDIR    := $(shell dirname ${MDIR})
+HMM        ?= fungi_odb10
 OUTPEPEXT  ?= aa.fa
 OUTCDSEXT  ?= cds.fa
 HMMALIGN   ?= hmmalign
@@ -9,22 +12,28 @@ CLIPKIT	   ?= clipkit
 RESOVERLAP ?= 0.70
 SEQOVERLAP ?= 80
 TRIMALSCHEME ?=-automated1
-MRTRANS    ?= bp_mrtrans.pl
-HMMFOLDER  ?= $(realpath HMM/${HMM}/HMM3)
-ALNDIR     ?= $(realpath aln/${HMM})
+MRTRANS     ?= ${UTILDIR}/bp_mrtrans_filt.pl
+#HMMFOLDER  ?= $(realpath HMM/$(HMM)/HMM3)
+#ALNDIR     ?= $(realpath aln/$(HMM))
 
+HMMFOLDER  ?= HMM/$(HMM)/HMM3
+ALNDIR     ?= aln/$(HMM)
+
+#$(info "${MRTRANS} is MRTRANS")
 #$(info "${HMMFOLDER} is HMMFOLDER")
-#CWD := $(shell pwd)
 
 seqs    = $(wildcard ${ALNDIR}/*.$(OUTPEPEXT))
 cdsseqs = $(wildcard ${ALNDIR}/*.$(OUTCDSEXT))
 msa     = $(seqs:.fa=.msa)
-clean   = $(seqs:.fa=.clnaln)
-filter  = $(seqs:.fa=.filter)
-trim    = $(seqs:.fa=.trim)
-clipkit = $(seqs:.fa=.clipkit)
-cdsaln = $(cdsseqs:.fa=.cds.msa)
 
+#clean   = $(seqs:.fa=.clnaln)
+#filter  = $(seqs:.fa=.filter)
+#trim    = $(seqs:.fa=.trim)
+aaaln    = $(seqs:.fa=.clipkit)
+cdsaln  = $(cdsseqs:.fa=.clipkit)
+
+#$(info "$(cdsaln) is cdsaln")
+#$(info "$(aaaln) is aaaln")
 all: $(clipkit) $(cdsaln)
 
 .PHONY: clean all
@@ -35,32 +44,15 @@ clean:
 empty    :=
 trailAA  := .aa.fa
 trailCDS := .cds.fa
-trailAAALN := .aa.msa
-trailAACLN := .aa.mfa
+AAALN := .aa.msa
+AACLN := .aa.mfa
 
-%.aa.msa : %.aa.fa
+%.aa.clipkit : %.aa.fa
 	$(eval marker=$(subst $(trailAA),$(empty),$(notdir $<)))
-	${HMMALIGN} --trim --amino -o $@ ${HMMFOLDER}/${marker}.hmm $<
+	${HMMALIGN} --amino -o ${ALNDIR}/${marker}.aa.msa ${HMMFOLDER}/${marker}.hmm $<
+	esl-reformat --replace=x:- --gapsym=- afa ${ALNDIR}/${marker}.aa.msa | perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' > ${ALNDIR}/${marker}.aa.clnaln
+	clipkit --log -m gappy -o $@ ${ALNDIR}/${marker}.aa.clnaln
 
-%.cds.msa : %.cds.fa
+%.cds.clipkit : %.cds.fa
 	$(eval marker=$(subst $(trailCDS),$(empty),$(notdir $<)))
-	$(eval AAFILE=$(subst $(trailCDS),$(trailAA),$<))
-	$(eval ALN=$(subst $(trailAA),$(trailAAALN),${AAFILE}))
-	$(eval ALNCLN=$(subst $(trailAA),$(trailAACLN),${AAFILE}))
-
-	${HMMALIGN} --trim --amino -o ${ALN} ${HMMFOLDER}/${marker}.hmm ${AAFILE}
-	esl-reformat --replace=x:- --gapsym=- afa ${ALN} | perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' > ${ALNCLN}
-
-	${MRTRANS} -if fasta -of fasta -i ${ALNCLN} -s $< -o $@
-
-%.clnaln : %.msa
-	esl-reformat --replace=x:- --gapsym=- afa $< | perl -p -e 'if (! /^>/) { s/[ZBzbXx\*]/-/g }' > $@
-
-%.filter : %.clnaln
-	trimal -resoverlap ${RESOVERLAP} -seqoverlap ${SEQOVERLAP} -in $< -out $@
-
-%.trim : %.filter
-	trimal ${TRIMALSCHEME} -fasta -in $< -out $@
-
-%.clipkit : %.clnaln
-	clipkit -o $@ $<
+	${MRTRANS} -if fasta -of fasta -i ${ALNDIR}/${marker}.aa.clnaln -s $< -o $@ --filter ${ALNDIR}/${marker}.aa.clipkit.log
