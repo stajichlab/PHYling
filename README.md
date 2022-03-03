@@ -13,11 +13,11 @@ The marker sets developed for this approach in fungi are available as part of th
 Usage
 =====
 
+You need in your path:
+- `hmmsearch`, `hmmbuild` from hmmer version 3.x
+- python3
+- to run multithreaded then install the parallel unix tool `-q slurm` or if you are on a slurm supporting HPC can use the `-q slurm`
 ```
-module load hmmer/3
-module unload miniconda
-module load miniconda3
-
 DIR=HMM
 MARKER=fungi_odb10
 URL=https://busco-data.ezlab.org/v4/data/lineages/fungi_odb10.2020-09-10.tar.gz
@@ -45,11 +45,13 @@ done
 
 # edit config.txt to indicate the prefix for this project and HMM marker set folder (eg fungi_odb10)
 # set the PHYLING_DIR folder for now until we get this installable as a package
+# set the number of processors for jobs and any job queue requirements for slurm in config.txt
+
 curl -L -O ${BASEURL}/test/config.txt
 
 PHYling init
-PHYling search
-PHYling aln
+PHYling search -q parallel [or -q slurm]
+PHYling aln -q parallel [or -q slurm]
 
 ```
 
