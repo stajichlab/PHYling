@@ -101,7 +101,7 @@ if subprog == 'init' or subprog == 'initialize' or subprog == 'setup':
         description=help,
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-v', '--verbose', action='store_true', description="Extra debugging")
+    parser.add_argument('-v', '--verbose', action='store_true', help="Extra debugging")
     # parse the rest of the argument
     args = parser.parse_args(arguments)
     cmd = os.path.join(script_path, 'bin', 'phyling-00-initialize.sh')
@@ -112,7 +112,7 @@ elif subprog == 'download':
         description=help,
         add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-v', '--verbose', action='store_true', description="Extra debugging")
+    parser.add_argument('-v', '--verbose', action='store_true', help="Extra debugging")
     parser.add_argument('-t', '--type', default='fungi')
     args = parser.parse_args(arguments)
     url = ""
