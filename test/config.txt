@@ -20,7 +20,7 @@ LANGUAGE=en
 JOBCPU=2 # per job CPUs
 TOTALCPU=8 # total CPUs to use
 QUEUEING=parallel
-QUEUE=
+QUEUE=short
 # tree building - not yet integrated into PHYling
 EXTRARAXML=
 EXTRAIQTREE="-nt AUTO -m TESTMERGE -bb 1000 -alrt 1000"
