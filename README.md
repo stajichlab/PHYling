@@ -14,9 +14,10 @@ Usage
 =====
 
 You need in your path:
-- `hmmsearch`, `hmmbuild` from hmmer version 3.x
+- `hmmsearch`, `hmmbuild` from [hmmer](http://hmmer.org/) version 3.x and the easel-tools part of the package (`esl-sfetch`)
+- [clipkit](https://jlsteenwyk.com/ClipKIT/)
 - python3
-- to run multithreaded then install the parallel unix tool `-q slurm` or if you are on a slurm supporting HPC can use the `-q slurm`
+- to run multithreaded then install the [parallel](https://www.gnu.org/software/parallel/) unix tool `-q slurm` or if you are on a slurm supporting HPC can use the `-q slurm`
 ```
 DIR=HMM
 MARKER=fungi_odb10
@@ -42,13 +43,14 @@ for SP in Afum Rant Zymps1 Scer Spom
 do
   curl -L -O ${BASEURL}/test/pep/${SP}.aa.fasta
 done
-
+cd ..
+curl -L -O ${BASEURL}/test/config.txt
 # edit config.txt to indicate the prefix for this project and HMM marker set folder (eg fungi_odb10)
 # set the PHYLING_DIR folder for now until we get this installable as a package
 # set the number of processors for jobs and any job queue requirements for slurm in config.txt
 
-curl -L -O ${BASEURL}/test/config.txt
-
+# use the path to the installed PHYling or run this out of the checked-out folder - the folder where PHYling is installed
+# needs to be specify as relative or absolute path in the config.txt
 PHYling init
 PHYling search -q parallel [or -q slurm]
 PHYling aln -q parallel [or -q slurm]
@@ -60,6 +62,20 @@ Requirements
 1. [HMMer](http://hmmer.org/) v3 - hmmsearch, hmmalign, esl-sfetch 
 1. python v3
 1. Perl (v5 with [BioPerl](http://bioperl.org) for tree rewriting if desired)
+1. [clipkit](https://jlsteenwyk.com/ClipKIT/) for trimming
 1. slurm for job queuing based job submission; [parallel](https://www.gnu.org/software/parallel/) for parallel analysis. Lacking these will simply run analysis in serial fashion and not able to take advantages of multiple cores/CPUs
 1. [FastTree](http://www.microbesonline.org/fasttree/)/[IQTREE](http://www.iqtree.org/)/[RAxML](https://sco.h-its.org/exelixis/software.html) for downstream phylogenetic analyses
 1. [muscle](https://www.drive5.com/muscle/) (optional) for de-novo multiple alignment instead of HMM guided hmmalign
+
+Notes
+==== 
+1. You need to format your protein files with a prefix separated by a '|' e.g. -> see the test downloads above for working files
+```
+>Scer|YAL001W
+```
+1. the gene tree + ASTRAL coalescent is not integrated into the system yet, we run this separately - see this [example](https://github.com/stajichlab/Fusarium_Phylogenomics/blob/main/pipeline/06_pep_gene_trees.sh) which uses the Makefile approach to generate trees and this approach to [run ASTRAL](https://github.com/stajichlab/Fusarium_Phylogenomics/blob/main/pipeline/07_ASTRAL.sh)
+2. the current strategy uses makefiles to solve dependency around pipeline steps
+3. still need to add options to support additional parameters to the aligners and allow subset-filtering of markers for final concatenated file
+3. The partitions file likely needs small changes for IQ-TREE or RAxML so it may not work directly depending on protein vs DNA trees
+3. If you have coding sequences in the `cds` folder these will automatically be used to generate a back translated CDS alignment. The IDs in the protein file and CDS files have to be identical
+4. training your own marker set is also possible but most busco sets are good starting place
