@@ -46,16 +46,13 @@ COMBINE_SCRIPT="${SCRIPT_DIR}/phyling-03-aln-combine.sh"
 
 if [[ $QUEUEING == "parallel" ]]; then
   JOBPARALLEL=$((TOTALCPU / JOBCPU))
-  echo "Run parallel job $ALNTOOL on $SUBJOB_SCRIPT ($ALNFILES)"
-  #echo "$JOBPARALLEL $SUBJOB_SCRIPT"
-  parallel -j "$JOBPARALLEL" \
+  cat $ALNFILES | parallel -j "$JOBPARALLEL" \
     "$SUBJOB_SCRIPT" \
     -c "$CLEAN" \
-    -i {} < "$ALNFILES"
-
-  #    echo  "$COMBINE_SCRIPT" -x "$EXPECTED" -e cdsaln.trim -t cds
+    -i {} 
 
   if [[ $ALNTOOL == "muscle" ]]; then
+	  echo "This may not be well supported - most testing has focused on HMMALIGN"
     "$COMBINE_SCRIPT" -x "$EXPECTED" -e aa.denovo.trim -t aa
     if [ -d $CDSDIR ]; then
       "$COMBINE_SCRIPT" -x "$EXPECTED" -e cds.denovo.trim -t cds
@@ -63,7 +60,7 @@ if [[ $QUEUEING == "parallel" ]]; then
   else
     "$COMBINE_SCRIPT" -x "$EXPECTED" -e "aa.clipkit" -t aa
     if [ -d $CDSDIR ]; then
-      "$COMBINE_SCRIPT" -x "$EXPECTED" -e "cds.clipkit" -t cds
+      "$COMBINE_SCRIPT" -x "$EXPECTED" -e "cds.clipkit" -m "DNA" -t cds
     fi
   fi
 
@@ -88,13 +85,13 @@ elif [[ $QUEUEING == "slurm" ]]; then
     echo "DEBUG: eady to run with $COMBINE_SCRIPT no extra ext"
     sbatch --depend=afterany:"$SUBMIT_ID" \
       $QUEUECMD \
-      --export=EXT=aa.denovo.trim,TYPE=aa,EXPECTED=\"$EXPECTED\" \
+      --export=EXT=aa.denovo.clipkit,TYPE=aa,EXPECTED=\"$EXPECTED\" \
       $COMBINE_SCRIPT
 
     if [ -d $CDSDIR ]; then
       sbatch --depend=afterany:"$SUBMIT_ID" \
         $QUEUECMD \
-        --export=EXT=cds.denovo.trim,TYPE=CDS,EXPECTED=\"$EXPECTED\" \
+        --export=EXT=cds.denovo.clipkit,TYPE=CDS,EXPECTED=\"$EXPECTED\" \
         "$COMBINE_SCRIPT"
     fi
   else
@@ -103,7 +100,7 @@ elif [[ $QUEUEING == "slurm" ]]; then
     eval $CMD
 
     if [ -d $CDSDIR ]; then
-      CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cds.clipkit,EXPECTED=\"$EXPECTED\",TYPE=CDS $COMBINE_SCRIPT"
+      CMD="sbatch --depend=afterany:$SUBMIT_ID $QUEUECMD --export=EXT=cds.clipkit,MOLTYPE=DNA,EXPECTED=\"$EXPECTED\",TYPE=CDS $COMBINE_SCRIPT"
       eval $CMD
     fi
   fi
@@ -115,8 +112,6 @@ else
     $SUBJOB_SCRIPT -i "$FILE" -c "$CLEAN"
   done < "$TMP"
   rm "$TMP"
-  # do combine here (how to avoid duplicate code with
-  # the parallel stuff above
-  "$COMBINE_SCRIPT" -x "$EXPECTED" -e "cds.clipkit" -t cds
   "$COMBINE_SCRIPT" -x "$EXPECTED" -e "aa.clipkit" -t aa
+  "$COMBINE_SCRIPT" -x "$EXPECTED" -e "cds.clipkit" -m DNA -t cds
 fi

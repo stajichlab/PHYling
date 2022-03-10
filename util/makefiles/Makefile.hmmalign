@@ -13,8 +13,6 @@ RESOVERLAP ?= 0.70
 SEQOVERLAP ?= 80
 TRIMALSCHEME ?=-automated1
 MRTRANS     ?= ${UTILDIR}/bp_mrtrans_filt.pl
-#HMMFOLDER  ?= $(realpath HMM/$(HMM)/HMM3)
-#ALNDIR     ?= $(realpath aln/$(HMM))
 
 HMMFOLDER  ?= HMM/$(HMM)/HMM3
 ALNDIR     ?= aln/$(HMM)
@@ -23,14 +21,8 @@ seqs    = $(wildcard ${ALNDIR}/*.$(OUTPEPEXT))
 cdsseqs = $(wildcard ${ALNDIR}/*.$(OUTCDSEXT))
 msa     = $(seqs:.fa=.msa)
 
-#clean   = $(seqs:.fa=.clnaln)
-#filter  = $(seqs:.fa=.filter)
-#trim    = $(seqs:.fa=.trim)
 aaaln    = $(seqs:.fa=.clipkit)
 cdsaln   = $(cdsseqs:.fa=.clipkit)
-
-#$(info "$(cdsaln) is cdsaln")
-#$(info "$(aaaln) is aaaln")
 
 all: $(clipkit) $(cdsaln)
 

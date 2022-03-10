@@ -25,7 +25,7 @@ fi
 DIR=$ALN_OUTDIR/$HMM
 
 
-while getopts d:o:v:i:s:e:r:t:p:x: option
+while getopts d:o:v:i:s:e:r:t:p:x:m: option
 do
  case "${option}"
  in
@@ -39,6 +39,7 @@ do
  t) TYPE=${OPTARG} ;;
  p) PARTITIONS=${OPTARG} ;;
  x) EXPECTED=${OPTARG} ;;
+ m) MOLTYPE=${OPTARG} ;;
  esac
 done
 
@@ -57,30 +58,34 @@ if [ $DEBUG ]; then
     ARGS="-v"
 fi
 
-if [ $INCLUDE ]; then
+if [ ! -z $INCLUDE ]; then
     ARGS+=" --include $INCLUDE"
 fi
 
 #MAYBE THSE SHOULD BE SET BY config.txt
 
-if [ $SEED ]; then
+if [ ! -z $SEED ]; then
     ARGS+=" --seed $SEED"
 fi
 
-if [ $RAND ]; then
+if [ ! -z $RAND ]; then
     ARGS+=" --rand $RAND"
 fi
 
-if [ $EXT ]; then
+if [ ! -z $EXT ]; then
     ARGS+=" --ext $EXT"
 fi
 
-if [ $PARTITIONS ]; then
+if [ ! -z $PARTITIONS ]; then
     ARGS+=" -p $PARTITIONS"
 fi
 
-if [ $EXPECTED ]; then
+if [ ! -z $EXPECTED ]; then
  ARGS+=" --expected $EXPECTED"
 fi
-#echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUTFILE $ARGS"
+
+if [ ! -z $MOLTYPE ]; then
+ ARGS+=" --moltype $MOLTYPE"
+fi
+
 $PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUTFILE $ARGS
