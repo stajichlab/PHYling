@@ -46,7 +46,6 @@ F=$EXPECTED
 if [ -z "$F" ]; then
     F=$LISTFILE
 fi
-echo "reading $F to get count"
 COUNT=$(wc -l $F | awk '{print $1}')
 if [[ ! $COUNT || $COUNT == "0" ]]; then
     echo "NO QUERYDBS variable on config.txt?"
@@ -83,5 +82,5 @@ fi
 if [ $EXPECTED ]; then
  ARGS+=" --expected $EXPECTED"
 fi
-echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUTFILE $ARGS"
+#echo "$PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUTFILE $ARGS"
 $PHYLING_DIR/util/combine_multiseq_aln.py -d $DIR -o $OUTFILE $ARGS

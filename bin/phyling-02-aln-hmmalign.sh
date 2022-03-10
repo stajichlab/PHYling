@@ -52,7 +52,6 @@ while getopts c:i:s:H: OPT; do
   esac
 done
 
-echo "I'm here"
 [[ -z "$ALNFILES" ]] && ALNFILES="alnlist.$HMM"
 
 if [[ ! -f "$ALNFILES" ]]; then
