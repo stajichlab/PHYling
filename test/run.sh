@@ -1,8 +1,8 @@
 #!/bin/bash
-
+#SBATCH -p short -N 1 -n 8 --mem 16gb 
 module load hmmer/3
-module unload miniconda
-module load miniconda3
+module unload miniconda3
+module load clipkit
 
 DIR=HMM
 MARKER=fungi_odb10
@@ -23,5 +23,5 @@ if [ ! -d $DIR/fungi_odb10 ]; then
 fi
 
 ../PHYling init
-../PHYling search
-../PHYling aln
+../PHYling search -q parallel
+../PHYling aln -q parallel
