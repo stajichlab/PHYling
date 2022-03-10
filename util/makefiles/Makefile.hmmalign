@@ -1,5 +1,5 @@
+# this assumes something about the PHYling setup
 
-# this assumes something about the PHYling
 MDIR       := $(shell dirname $(realpath $(MAKEFILE_LIST)))
 UTILDIR    := $(shell dirname ${MDIR})
 HMM        ?= fungi_odb10
@@ -19,9 +19,6 @@ MRTRANS     ?= ${UTILDIR}/bp_mrtrans_filt.pl
 HMMFOLDER  ?= HMM/$(HMM)/HMM3
 ALNDIR     ?= aln/$(HMM)
 
-#$(info "${MRTRANS} is MRTRANS")
-#$(info "${HMMFOLDER} is HMMFOLDER")
-
 seqs    = $(wildcard ${ALNDIR}/*.$(OUTPEPEXT))
 cdsseqs = $(wildcard ${ALNDIR}/*.$(OUTCDSEXT))
 msa     = $(seqs:.fa=.msa)
@@ -30,10 +27,11 @@ msa     = $(seqs:.fa=.msa)
 #filter  = $(seqs:.fa=.filter)
 #trim    = $(seqs:.fa=.trim)
 aaaln    = $(seqs:.fa=.clipkit)
-cdsaln  = $(cdsseqs:.fa=.clipkit)
+cdsaln   = $(cdsseqs:.fa=.clipkit)
 
 #$(info "$(cdsaln) is cdsaln")
 #$(info "$(aaaln) is aaaln")
+
 all: $(clipkit) $(cdsaln)
 
 .PHONY: clean all
@@ -44,8 +42,8 @@ clean:
 empty    :=
 trailAA  := .aa.fa
 trailCDS := .cds.fa
-AAALN := .aa.msa
-AACLN := .aa.mfa
+AAALN    := .aa.msa
+AACLN    := .aa.mfa
 
 %.aa.clipkit : %.aa.fa
 	$(eval marker=$(subst $(trailAA),$(empty),$(notdir $<)))
