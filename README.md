@@ -6,7 +6,22 @@ gene or protein info from genomic and transcriptomic datasets in order to constr
 
 The aligned markers can be extracted from protein sequences for phylogenetic analyses and also projected into coding sequence alignments for codon-based analyses for better resolution of recently diverged species. 
 
-The assumptions in this approach are that the markers are generally single copy in genomes and taking best hit is sufficient first approximation for identifying orthologs. 
+The assumptions in this approach are that the markers are generally single copy in genomes and taking best hit is sufficient first approximation for identifying orthologs. A separate file is parsed and file best_multihits which lists all the hits above the cutoff threshold for a given marker which can be used to assess duplication or attempt to incorporate paralogs into the analysis down the road. This approach can also be used for a quick-and-dirty quality check of your data by running a `wc -l search/*/*.best` and seeing a simple report of number of recovered markers.
+
+Pay attention to how files are named and formatted in the pep folder. Currently expects a prefix embedded in the sequence ID e.g.
+```
+>Scer|YAL001C
+```
+If this prefix is missing the system cannot determine which taxon a sequence comes from when pulling data out of all the results in one go and to link these together for the concatenated result file. Check the `prefix.tab` file after running `PHYling init` to make sure it looks sensible with the prefix (not a whole gene name) assigned to each of the datafiles.
+
+For example `prefix.tab` for the files in the [test directory](https://github.com/stajichlab/PHYling_unified/tree/main/test/pep) looks like (col1 is the prefix col2 is the species name gleaned from the filenanes, you can edit this file with full species names (includeing spaces if you want) to be used later in the phylogeny mapping from short prefixes back to full species names in the tree file:
+```
+Afum	Afum
+B0A48	Rant
+Scer	Scer
+Spom	Spombe
+Zymps1	Zymps1
+```
 
 The marker sets developed for this approach in fungi are available as part of the [1KFG Phylogenomics_HMMs](https://github.com/1KFG/Phylogenomics_HMMs) project resource and preferred use of the [BUSCO marker sets](https://busco-data.ezlab.org/v4/data/lineages/).
 
