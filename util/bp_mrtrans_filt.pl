@@ -49,14 +49,15 @@ use warnings;
 use Bio::AlignIO;
 use Bio::SeqIO;
 use Getopt::Long;
+my %STOP_CODONS = ( 'TAA' => 1, 'TAG' => 1, 'TGA' => 1 );
 
 use constant CODONSIZE => 3;
 our $GAP       = '-';
 our $CODONGAP  = $GAP x CODONSIZE;
 
 # add our own version of aa_to_dna_aln to support filter
+# use Bio::Align::Utilities qw(aa_to_dna_aln);
 
-#use Bio::Align::Utilities qw(aa_to_dna_aln);
 sub aa_to_dna_aln {
     my ( $aln, $dnaseqs, $filtercols ) = @_;
     unless ( defined $aln
@@ -75,18 +76,18 @@ sub aa_to_dna_aln {
         for ( my $i = 0 ; $i < $alnlen ; $i++ ) {
           my $char = substr( $aa_seqstr, $i, 1 );
           if ( $char eq '*') {
-            print("stop codon found at $i\n");
+            warn("stop codon found at $i\n");
             $filtercols->[$i] = 1
           }
         }
         push @pepseqs, [$seq->display_id,$aa_seqstr];
-      }
+    }
     foreach my $s ( @pepseqs) {
         my ($pepid,$pepseq) = @$s;
-        my $dnaseq = $dnaseqs->{$pepid} || $aln->throw( "cannot find $pepid");
-        $dnaseq = $dnaseq->seq();
+        my $dnaseq = $dnaseqs->{$pepid} || die "cannot find $pepid\n";
+        $dnaseq    = uc $dnaseq->seq();
         my $dnalen = $dnaseqs->{$pepid}->length;
-        my $dnaid = $dnaseqs->{$pepid}->display_id || $pepid; # try to use DNAseq obj ID (issue #137)
+        my $dnaid  = $dnaseqs->{$pepid}->display_id || $pepid; # try to use DNAseq obj ID (issue #137)
         my $nt_seqstr;
         my $j = 0; # this is the CDS sequence counter
         # this is 0-based in the alignment space
@@ -102,7 +103,10 @@ sub aa_to_dna_aln {
             } else {
               # if filtercols was not given OR this is NOT listed as a filtered column then add the gap
                 if( ! $filtercols || ! $filtercols->[$i] ) {
-                  $nt_seqstr .= substr( $dnaseq, $j, CODONSIZE );
+		    my $codon = substr( $dnaseq, $j, CODONSIZE );
+		    if ( ! exists $STOP_CODONS{$codon}) {
+			$nt_seqstr .= $codon;
+		    }
                 }
                 # always advance the CDS counter since we are skipping this codon
                 $j += CODONSIZE;
