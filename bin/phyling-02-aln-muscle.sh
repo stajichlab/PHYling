@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash -l
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

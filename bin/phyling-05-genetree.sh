@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash -l
 
 #defaults which are overridden config.txt if set
 QUEUEING=parallel

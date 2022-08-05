@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash -l
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=2
@@ -20,9 +20,9 @@ else
 fi
 
 if [[ -z "$MODULESHOME" ]]; then
-    module load RAxML/8.2.12
-    module load fasttree/2.1.11
-    module load IQ-TREE/2.1.1
+    module load raxml
+    module load fasttree
+    module load iqtree
 fi
 
 if [[ ! -d "$HMM_FOLDER" ]]; then

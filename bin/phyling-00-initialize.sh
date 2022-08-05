@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash -l
 
 #SBATCH --time 2:00:00 --out=init.log -J init
 

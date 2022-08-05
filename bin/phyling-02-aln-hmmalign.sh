@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# could all this be replaced with snakemake/makefile??
+#!/usr/bin/bash -l
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

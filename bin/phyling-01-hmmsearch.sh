@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash -l
 
 QUERYDBS=pepfile.lst
 JOBCPU=2
