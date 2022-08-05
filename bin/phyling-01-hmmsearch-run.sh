@@ -7,7 +7,10 @@
 #SBATCH --time=2:00:00
 #SBATCH --output=logs/hmmsearch.%A_%a.out
 
-[[ $MODULESHOME ]] && module load hmmer/3
+if [[ $MODULESHOME ]]; then
+	module load hmmer/3
+	module load paralllel
+fi
 
 QUERYDBS=pepfile.lst
 PEPDIR=pep

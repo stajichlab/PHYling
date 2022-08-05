@@ -26,7 +26,7 @@ if [[ "$MODULESHOME" ]]; then
   module load hmmer/3
   module load trimal
   module load clipkit
-  # module load BMGE # is this too slow?
+  module load parallel
 fi
 
 if [[ -z "$HMM_FOLDER" ]]; then

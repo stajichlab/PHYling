@@ -20,8 +20,7 @@ fi
 if [[ -z "$MODULESHOME" ]]; then
     module load muscle
     module load trimal
-    #    module load java
-    #    module load BMGE # is this too slow?
+    module load parallel
 fi
 
 while getopts c:f:i: OPT; do

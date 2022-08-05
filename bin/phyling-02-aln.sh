@@ -17,7 +17,9 @@ else
   echo "Need a \"$CONFIG\" file"
   exit
 fi
-
+if [[ "$MODULESHOME" ]]; then
+	module load parallel
+fi
 JOBCPU=1 # force this to 1 since all of these steps are single threaded
 
 if [[ -z "$HMM" ]]; then
