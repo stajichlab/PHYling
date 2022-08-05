@@ -199,19 +199,27 @@ elif re.match("aln", subprog):
 
     # clean align folder (remake starting files)
     parser.add_argument('-c', '--cleanaln', action='store_true',help="Clean alignments before running")
+
+    # set the temp folder for DB creation and cleanup override in config.txt
+    parser.add_argument('--temp', help="Set temp directory")
+
     # override queue option from config file
     parser.add_argument(
         '-q', '--queueing', help="Queueing parallel, serial, or slurm")
 
     args = parser.parse_args(arguments)
 
+    if args.temp is None:
+        if "TEMP" in config:
+            args.temp = config["TEMP"]
+
+
     if args.queueing is not None:
         config["QUEUEING"] = args.queueing
 
     outdir = config["PEPDIR"]
-
-    if "TEMP" in config:
-        outdir = os.path.join(config["TEMP"], config["PREFIX"])
+    if args.temp is not None:
+        outdir = os.path.join(args.temp, config["PREFIX"])
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
 
@@ -237,8 +245,8 @@ elif re.match("aln", subprog):
 
     if os.path.exists(config["CDSDIR"]):
         outdir = config["CDSDIR"]
-        if "TEMP" in config:
-            outdir = os.path.join(config["TEMP"], config["PREFIX"])
+        if args.temp is not None:
+            outdir = os.path.join(args.temp, config["PREFIX"])
             if not os.path.isdir(outdir):
                 os.makedirs(outdir)
 
