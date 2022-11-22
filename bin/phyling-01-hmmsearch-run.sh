@@ -9,7 +9,7 @@
 
 if [[ $MODULESHOME ]]; then
 	module load hmmer/3
-	module load paralllel
+	module load parallel
 fi
 
 QUERYDBS=pepfile.lst
