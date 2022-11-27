@@ -39,13 +39,13 @@ empty    :=
 	perl -p -e 's/\|/ /' $< > $@
 
 %.treefile : %.spname
-	$(info "args are" $@ " and " $< " and " $@.treefile)
-	${IQTREE} -s $< -nt ${IQCPU} -bb 1000 -alrt 1000
+#	$(info "args are" $@ " and " $< " and " $@.treefile)
+	${IQTREE} -s $< -nt ${IQCPU} -B 1000 -alrt 1000
 
 %.aa.clipkit.FT.tre : %.aa.clipkit.spname
-		$(info "args are" $@ " and " $<)
+#		$(info "args are" $@ " and " $<)
 		${FASTTREE} -lg $< > $@
 
 %.cds.clipkit.FT.tre : %.cds.clipkit.spname
-		$(info "args are" $@ " and " $<)
+#		$(info "args are" $@ " and " $<)
 		${FASTTREE} -gtr -nt $< > $@
