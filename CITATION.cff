@@ -1,0 +1,46 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: PHYling for Phylogenomic reconstruction from genomes
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Jason
+    family-names: Stajich
+    name-particle: E
+    email: jason.stajich@ucr.edu
+    affiliation: University of California-Riverside
+    orcid: 'https://orcid.org/0000-0002-7591-0020'
+repository-code: 'https://github.com/stajichlab/PHYling_unified'
+url: 'https://lab.stajich.org/tools/'
+abstract: >-
+  The unified PHYling pipeline for phylogenomic data
+  collection from annotated genomes.
+
+
+  This is latest iteration of tool for using
+  phylogenetically conserved markers to pull out informative
+  gene or protein info from genomic and transcriptomic
+  datasets in order to construct gene trees and species
+  phylogenies.
+
+
+  The aligned markers can be extracted from protein
+  sequences for phylogenetic analyses and also projected
+  into coding sequence alignments for codon-based analyses
+  for better resolution of recently diverged species.  This
+  approach can also utilize BUSCO generated marker sets to
+  obtain markers from unannotated genomes.
+
+
+  The assumptions in this approach are that the markers are
+  generally single copy in genomes and taking best hit is
+  sufficient first approximation for identifying orthologs. 
+keywords:
+  - phylogenomics
+license: MIT
+version: '1.1'
+date-released: '2023-04-27'
