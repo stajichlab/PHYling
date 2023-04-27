@@ -94,3 +94,9 @@ Notes
 3. The partitions file likely needs small changes for IQ-TREE or RAxML so it may not work directly depending on protein vs DNA trees
 3. If you have coding sequences in the `cds` folder these will automatically be used to generate a back translated CDS alignment. The IDs in the protein file and CDS files have to be identical
 4. training your own marker set is also possible but most busco sets are good starting place
+
+
+CITATION
+=========
+* Stajich, J. (2023). PHYling for Phylogenomic reconstruction from genomes (v1.1). Zenodo. doi: [10.5281/ZENODO.1257001](https://doi.org/10.5281/ZENODO.1257001)
+
