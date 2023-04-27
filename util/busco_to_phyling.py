@@ -60,7 +60,7 @@ def get_CDS_with_exonerate(lineage, genomedb, proteinfile, tmpfolder="tmp", exon
 
     exonerate_command = "{} -m p2g --bestn 1 --ryo '>%ti %tcb_%tce\n%tcs' --showalignment false --showvulgar false --refine full -q {} -t {}".format(
         exonerateapp, proteinfile, chromfile)
-    # print(exonerate_command)
+    #print(exonerate_command)
     log_exonerate = ""
     with subprocess.Popen(exonerate_command, shell=True, stdout=subprocess.PIPE) as exonerateproc:
         inseq = 0
@@ -237,7 +237,7 @@ for spdir in dirsToRun:
                     if orthologname not in orthologs:
                         orthologs[orthologname] = {BUSCO_lineage: {}}
                     orthologfile = os.path.join(seqFolder, orthseqfile)
-#                    print("{} -> {}".format(genome_file,orthologfile))
+                    print("{} -> {}".format(genome_file,orthologfile))
                     run_CDS_pep_gather.append(
                         [BUSCO_lineage, genome_file, orthologfile, args.temp, args.exonerate])
 
@@ -254,12 +254,14 @@ for spdir in dirsToRun:
         buscolineage = res["lineage"]
         species = res["species"]
 
+        buscolineage = res["lineage"]
         if 'CDS' not in res:
             print("No CDS returned for {} {}".format(name, species))
             continue
 
         species_seqs[species]["CDS"].append(
             SeqRecord(res["CDS"].seq, id=name, description=res["CDS"].description))
+
         species_seqs[species]["pep"].append(
             SeqRecord(res["pep"].seq, id=name, description=res["pep"].description))
 
@@ -278,29 +280,21 @@ if os.path.exists(args.prefixfile):
                 row = line.split("\t")
                 prefixes[row[0]] = row[1]
                 prefixes_rev[row[1]] = row[0]
+else:
+    for sp in sp_folders:
+        prefix = ""
+        longname = sp
+        longname = re.sub(r'_$', '', longname)
+        spmod = re.sub(r'(cf|sp)\._', '', longname)
+        name = spmod.split("_", 2)
 
-for sp in sp_folders:
-    #       print("spname is {}".format(sp))
-    prefix = ""
-    longname = sp
-    longname = re.sub(r'_$', '', longname)
-    spmod = re.sub(r'(cf|sp)\._', '', longname)
-    name = spmod.split("_", 2)
-    name = spmod.split("_", 2)
-    if len(name) == 1:
-        prefix = name[0]
-    elif len(name) ==2 or len(name[2]) == 0:
-        prefix = name[0][0] + name[0][1] + name[1][0:4]
-    elif len(name) > 2:
-        prefix =  name[0][0] + name[0][1] + name[1][0:4] + name[2]
-    else:
-        prefix = spmod
-    prefix = re.sub(r'-','_',prefix)
-    print(prefix,longname)
-    if prefix not in prefixes:
+        if len(name) == 2 or len(name[2]) == 0:
+            prefix = name[0][0] + name[1][0:3]
+        else:
+            prefix = name[2]
+        # print(prefix,longname)
         prefixes[prefix] = sp
         prefixes_rev[sp] = prefix
-
     with open(args.prefixfile, "wt") as ofh:
         for p in sorted(prefixes):
             ofh.write("\t".join([p, prefixes[p]]) + "\n")
@@ -320,3 +314,23 @@ for sp in species_seqs:
             prefixes_rev[sp], seqrec.id), description=seqrec.description))
 
     SeqIO.write(seqsrename, cdsdb, "fasta")
+#
+# for orth in orthologs:
+#     print(orth)
+#     for lineage in orthologs[orth]:
+#         pepseqs = []
+#         cdsseqs = []
+#
+#         alnoutdir = os.path.join(args.aln,lineage)
+#         if not os.path.exists(alnoutdir):
+#             os.mkdir(alnoutdir)
+#         for sp in orthologs[orth][lineage]:
+#             if sp not in prefixes_rev:
+#                 print("cannot find {} in prefixes_rev".format(sp))
+#             cdsseq = orthologs[orth][lineage][sp]["cds"]
+#             pepseq = orthologs[orth][lineage][sp]["pep"]
+#             pepseqs.append(SeqRecord(pepseq.seq,id=prefixes_rev[sp],description=pepseq.id))
+#             cdsseqs.append(SeqRecord(cdsseq.seq,id=prefixes_rev[sp],description=pepseq.id))
+#             #print("\t".join([lineage,sp]))
+#         SeqIO.write(pepseqs,os.path.join(alnoutdir,"{}.{}}".format(orth,args.pepextension)),"fasta")
+#         SeqIO.write(cdsseqs,os.path.join(alnoutdir,"{}.{}}".format(orth,args.cdsextension)),"fasta")
