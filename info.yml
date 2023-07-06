@@ -1,0 +1,19 @@
+program: 
+  PHYling
+version:
+  "%(prog)s 0.3"
+usage:
+  "%(prog)s <command> <arguments>"
+description:
+  "
+  Description:  %(prog)s is a package of scripts to extract phylogenomic markers\n
+  Dependencies: HMMER3 MUSCLE RAxML\n
+  "
+epilog:
+  "
+  Written by Jason Stajich (2014-2017)\n
+  jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com\n
+  Rewritten by Cheng-Hung Tsai chenghung.tsai[at]email.ucr.edu\n\n
+  Initially written https://github.com/1KFG/Phylogenomics and\n
+  https://github.com/stajichlab/phyling\n\n
+  "
