@@ -11,11 +11,12 @@ import yaml
 from types import SimpleNamespace
 # from lib.misc import RecursiveRemoveNone
 from download import download
+from search import search
 
 
 def main():
 
-    logging.basicConfig(format='%(asctime)s PHYling %(levelname)s %(message)s', level='INFO')
+    logging.basicConfig(format="%(asctime)s PHYling %(levelname)s %(message)s", level='INFO')
     logger = logging.getLogger()
 
     # Create namespace object conf
@@ -24,7 +25,7 @@ def main():
     args['script_path'] = Path(__file__).resolve().parent
     args['pep_exts'] = ['.aa.fa', '.aa.fasta', '.faa']
     args['cds_exts'] = ['.cds.fasta', '.fna']
-    args['database'] = 'https://busco-data.ezlab.org/v5/data'
+    args['database'] = "https://busco-data.ezlab.org/v5/data"
     args['cfg_dir'] = Path.home() / ".phyling"
     args = SimpleNamespace(**args)
 
@@ -33,11 +34,11 @@ def main():
 
     # Load info to namespace object
     try:
-        with open(f'{args.script_path}/info.yml', 'r') as fh:
+        with open(f"{args.script_path}/info.yml", 'r') as fh:
             info = yaml.safe_load(fh)
         info = SimpleNamespace(**info)
     except:
-        logging.error('info.yml not found')
+        logging.error("info.yml not found")
         sys.exit(1)
 
     # Implement shared arguments between sub-menu, reference from https://stackoverflow.com/questions/33645859/how-to-add-common-arguments-to-argparse-subcommands
@@ -77,13 +78,12 @@ def main():
         'search', parents=[parent_parser],
         help='Run HMMsearch of markers against proteomes',
         description=f'Search HMM set against the proteomes. Currently supported peptide fasta extentions: {args.pep_exts}')
-    p_search.add_argument('-i', '--input', type=Path, required=True, help='Query pepetide fasta directory')
-    p_search.add_argument('-m', '--marker', type=Path, required=True,
-                          help='HMM marker (markers_3.hmmb) created by PHYling download')
+    p_search.add_argument('-i', '--input', nargs='+', required=True, help='Query pepetide fasta directory')
+    p_search.add_argument('-m', '--markerset', type=Path, required=True, help='Name of the HMM markerset')
     p_search.add_argument('-t', '--threads', type=int, default=1, help='Threads for each task (default=1)')
     p_search.add_argument('-E', '--evalue', type=float, default=1e-10, help='HMM reporting threshold (default=1e-10)')
     p_search.add_argument('-o', '--output', type=Path, required=True, help='Output diretory of the search results')
-    # p_search.set_defaults(func=search)
+    p_search.set_defaults(func=search)
 
     p_aln = subparsers.add_parser(
         'aln', parents=[parent_parser],
@@ -102,8 +102,8 @@ def main():
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    if args.parallel == 'slurm' and not args.config_file:
-        parser.error('config.yml is required when paralleling by slurm!')
+    if args.parallel == "slurm" and not args.config_file:
+        parser.error("config.yml is required when paralleling by slurm!")
 
     # Parse args from config file
     # if args.config_file:
