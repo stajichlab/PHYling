@@ -1,106 +1,150 @@
-import logging
 import pickle
+import hashlib
+import logging
 import shutil
 import sys
-import hashlib
 import tarfile
+from abc import ABC, abstractmethod
 from pathlib import Path
-from urllib.request import urlopen
 from urllib.error import HTTPError
+from urllib.request import urlopen
 
 
-class metadata_updater():
-    """
-    A metadata_updater. Will check the metadata pickle file and download the metadata if it is absent/outdated.
+class Data_updater(ABC):
+    def __init__(self, database_url, **kwargs):
+        self._database_url = database_url
 
-    Attributes
-    ----------
-    database : str
-        The root url of the BUSCO database.
-    metadata_pickle : str
-        The path of the pickle file. (Default: "file_versions.pickle")
+    @property
+    @abstractmethod
+    def _get_local_md5(self):
+        pass
+    
+    @property
+    @abstractmethod
+    def _get_remote_md5(self):
+        pass
+    
+    def _load_data(self):
+        pass
+    
+    @abstractmethod
+    def _save_data(self, data):
+        pass
 
-    Methods
-    -------
-    check_metadata()
-        Check the metadata pickle file to see if download/update is needed.
-    """
-    def __init__(self, cfg_dir: Path, database: str, metadata_pickle="file_versions.pickle"):
-        self.__database = database
-        self.__metadata_md5_url = f'{database}/file_versions.tsv.hash'
-        self.__metadata_pickle = cfg_dir / metadata_pickle
-
-    def check_metadata(self) -> dict:
+    def fetch_url(self, url) -> bytes:
         """
-        Check the metadata pickle file to see if download/update is needed.
-        
+        Download the content from the url.
+
+        Attributes
+        ----------
+        url : str
+            The url source.
+
         Return
         ------
-        dict: {"markerset"}
+        bytes
         """
-        logging.debug("Check matadata pickle file exist or not ...")
-        if self.__metadata_pickle.is_file():
-            logging.debug("Metadata pickle file exist.")
-            with open(self.__metadata_pickle, 'rb') as f:
-                metadata = pickle.load(f)
-            
-            logging.debug("Compare md5 checksum between online version and the md5 recorded in the pickle file...")
-            if fetch_url(self.__metadata_md5_url).decode().strip('\n') == metadata['md5']:
+        try:
+            logging.debug(f"Download from {url} ...")
+            with urlopen(url) as response:
+                content = response.read()
+        except HTTPError:
+            logging.error("URL not found or currently unavailble")
+            sys.exit(1)
+        return content
+
+    def updater(self) -> dict:
+        logging.debug(f"Check {self._filetype} exist or not ...")
+        if self._data.is_file():
+            logging.debug(f"{self._filetype} exist ({self._data})")
+            logging.debug(f"Compare md5 checksums between the online latest record and the local {self._filetype}")
+            if self._get_local_md5 == self._get_remote_md5:
                 logging.debug("md5 is the same. No need to update metadata")
-                return metadata['markerset']
+                return self._load_data()
             else:
-                logging.info("The local file md5 is different from the online version")
+                logging.info(f"The local {self._filetype} md5 is different from the online latest record. Update {self._filetype}")
         else:
-            logging.info("Metadata not found")
-        logging.info("Update metadata")
-        metadata = self.__build_metadata()
-        with open(self.__metadata_pickle, 'wb') as f:
-            pickle.dump(metadata, f)
-        return metadata['markerset']
+            logging.info(f"{self._filetype} not found")
+        logging.info(f"Download {self._filetype}")
+        data = self.fetch_url(self._data_url)
+        logging.debug(f"Write {self._filetype} to {self._data}")
+        self._save_data(data)
+        return self._load_data()
 
-    def __build_metadata(self) -> dict:
-        """
-        Download the metadata (file_versions.tsv) from BUSCO and build a dictionary which contains the md5 checksum of the 
-        metadata itself and a dictionary with available BUSCO markersets. The dictionary is also saved as a pickle file
-        which provides a quick check for the next execution.
+class Metadata_updater(Data_updater):
+    def __init__(self, database_url, cfg_dir):
+        super().__init__(database_url)
+        self._filetype = "metadata"
+        self._data = cfg_dir / "metadata.pickle"
+        self._data_url = f"{database_url}/file_versions.tsv"
+        self._metadata_md5_url = f"{database_url}/file_versions.tsv.hash"
 
-        Return
-        ------
-        dict: {"md5", "markerset"}
-        """
-        metadata = fetch_url(f'{self.__database}/file_versions.tsv')
-        md5 = hashlib.md5(metadata).hexdigest()
-        logging.debug(f'Generating markerset dictionary ...')
+    @property
+    def get_metadata_path(self):
+        return self._data
+
+    @property
+    def _get_local_md5(self):
+        with open(self._data, 'rb') as f:
+            _, md5 = pickle.load(f)
+        return md5
+    
+    @property
+    def _get_remote_md5(self):
+        return self.fetch_url(self._metadata_md5_url).decode().strip('\n')
+    
+    def _load_data(self):
+        with open(self._data, 'rb') as f:
+            data, _ = pickle.load(f)
+        return data
+    
+    def _save_data(self, data):
         markerset = {}
-        for line in metadata.decode().split('\n'):
+        for line in data.decode().split('\n'):
             line = line.split('\t')
-            if line[-1] == 'lineages':
-                markerset[line[0]] = {"url": f'{self.__database}/lineages/{".".join([line[0], line[1], "tar.gz"])}',
-                                      "md5": line[2]}
-        return {"md5": md5, "markerset": markerset}
+            if line[-1] == "lineages":
+                markerset[line[0]] = {
+                    "url": f"{self._database_url}/lineages/{line[0]}.{line[1]}.tar.gz",
+                    "md5": line[2]
+                }
+        with open(self._data, 'wb') as f:
+            pickle.dump((markerset, hashlib.md5(data).hexdigest()), f)
 
-def fetch_url(url) -> bytes:
-    """
-    Download the content from the url.
+class HMM_markerset_updater(Data_updater):
+    def __init__(self, database_url, output_dir, metadata: dict, name: str):
+        super().__init__(database_url)
+        self._filetype = "HMM markerset"
+        self._database_url = "/".join([self._database_url, "lineages"])
+        self._markerset = metadata[name]
+        self._data = output_dir / name / "md5sum"  # Using md5sum file to represent the database.
+        self._data_url = self._markerset['url']
 
-    Attributes
-    ----------
-    url : str
-        The url source.
+    @property
+    def _get_local_md5(self):
+        with open(self._data, 'r') as f:
+            md5 = f.read().strip('\n')
+        return md5
+    
+    @property
+    def _get_remote_md5(self):  # Actually is the md5sum recorded in markerset_dict
+        return self._markerset['md5']
+    
+    def _save_data(self, data):
+        output = self._data.parent
+        logging.debug(f"Save to {output}.tar.gz")
+        with open(f"{output}.tar.gz", 'wb') as f:
+            f.write(data)
+        logging.debug(f"Gunzip the {self._filetype} to {output}")
+        with tarfile.open(f"{output}.tar.gz", 'r:gz') as f:
+            f.extractall(output.parent)
 
-    Return
-    ------
-    bytes
-    """
-    try:
-        logging.debug(f'Download {url} ...')
-        with urlopen(url) as response:
-            content = response.read()
-    except HTTPError:
-        logging.error("URL not found or currently unavailble")
-        sys.exit(1)
-    return content
-
+        md5 = hashlib.md5(open(f"{output}.tar.gz", 'rb').read()).hexdigest()
+        logging.debug(f"Write the md5 checksum to {output}/md5sum")
+        print(md5, file=open(self._data, 'w'))
+        logging.debug(f"Remove {output}.tar.gz")
+        Path(f"{output}.tar.gz").unlink()
+        
+    
 # def md5(file):
 #     with open(file, 'rb') as f:
 #         hasher = hashlib.md5()
@@ -113,14 +157,14 @@ def fetch_url(url) -> bytes:
 def download(args) -> None:
     # Check whether the file_version.pickle is exist. A missing/outdated file will trigger downloading of the file_version.tsv
     # and convert to a pickle file with a md5 checksum. Will return a dictionary with database and its md5 checksum at the end.
-    obj_metadata_updater = metadata_updater(cfg_dir=args.cfg_dir, database=args.database)
-    markerset_dict = obj_metadata_updater.check_metadata()
+    metadata_updater = Metadata_updater(database_url=args.database, cfg_dir=args.cfg_dir)
+    markerset_dict = metadata_updater.updater()
 
     if args.markerset == 'list':
         # Get the dictionary with database as key and convert it into a list
         url_list = [hmm_markerset for hmm_markerset in markerset_dict.keys()]
         url_list.sort()
-        print('Available datasets:\n')
+        print("Available datasets:\n")
 
         # Adjust databases display according to the terminal size
         width, _ = shutil.get_terminal_size((80, 24))
@@ -132,32 +176,9 @@ def download(args) -> None:
             print(" ".join(word.ljust(col_width) for word in row))
         
     else:
-        logging.debug("Check hmm markerset exist or not ...")
-        output = args.output / args.markerset
-        output.mkdir(parents=True, exist_ok=True)
-        if Path(f'{output}/md5sum').is_file():
-            logging.debug("Hmm markerset exist")
-            with open(f'{output}/md5sum', 'r') as f:
-                md5 = f.read().strip('\n')
-            if md5 == markerset_dict[args.markerset]['md5']:
-                logging.info("md5 is the same. No need to update hmm markerset")
-                sys.exit(0)
-            else:
-                logging.info("The local file md5 is different from the online version")
-                logging.info("Remove the local file")
-                shutil.rmtree(f'{output}')
-
-        logging.info("Update hmm markerset")
-        markerset_content = fetch_url(markerset_dict[args.markerset]['url'])
-        logging.debug(f'Write to {output}.tar.gz')
-        with open(f'{output}.tar.gz', 'wb') as f:
-            f.write(markerset_content)
-        logging.debug(f'Gunzip the hmm markerset to {output}')
-        with tarfile.open(f'{output}.tar.gz', 'r:gz') as f:
-            f.extractall()
-
-        md5 = hashlib.md5(open(f'{output}.tar.gz', 'rb').read()).hexdigest()
-        logging.debug(f'Write the md5 checksum to {output}/md5sum')
-        print(md5, file=open(f'{output}/md5sum', 'w'))
-        Path(f'{output}.tar.gz').unlink()
-        logging.info(f'Hmm markerset is saved in {output}')
+        hmm_markerset_updater = HMM_markerset_updater(
+            database_url=args.database,
+            output_dir=args.output,
+            metadata=markerset_dict,
+            name=args.markerset)
+        hmm_markerset_updater.updater()
