@@ -154,13 +154,13 @@ class HMM_markerset_updater(Data_updater):
 #         chunk = f.read(8195)
 #     return hasher.hexdigest()
 
-def download(args) -> None:
+def download(database, cfg_dir, markerset, output, **kwargs) -> None:
     # Check whether the file_version.pickle is exist. A missing/outdated file will trigger downloading of the file_version.tsv
     # and convert to a pickle file with a md5 checksum. Will return a dictionary with database and its md5 checksum at the end.
-    metadata_updater = Metadata_updater(database_url=args.database, cfg_dir=args.cfg_dir)
+    metadata_updater = Metadata_updater(database_url=database, cfg_dir=cfg_dir)
     markerset_dict = metadata_updater.updater()
 
-    if args.markerset == 'list':
+    if markerset == "list":
         # Get the dictionary with database as key and convert it into a list
         url_list = [hmm_markerset for hmm_markerset in markerset_dict.keys()]
         url_list.sort()
@@ -177,8 +177,8 @@ def download(args) -> None:
         
     else:
         hmm_markerset_updater = HMM_markerset_updater(
-            database_url=args.database,
-            output_dir=args.output,
+            database_url=database,
+            output_dir=output,
             metadata=markerset_dict,
-            name=args.markerset)
+            name=markerset)
         hmm_markerset_updater.updater()
