@@ -11,6 +11,7 @@ from itertools import chain
 from pathlib import Path
 
 import pyhmmer
+from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
@@ -63,112 +64,150 @@ def concat_Bytes_streams(files: list) -> (BytesIO, list):
     concat_stream.seek(0)   # Change the stream position to the start of the stream
     return concat_stream, seq_count
 
-def search(
-    inputs: list, markerset: Path, seq_file: pyhmmer.easel.SequenceFile, seq_count: list, evalue: float
-    ) -> (dict, pyhmmer.easel.KeyHash):
-    all_hmms = list(markerset.iterdir())
-    logging.info(f"Found {len(all_hmms)} hmm markers")
-    
-    orthologs = {}
-    kh = pyhmmer.easel.KeyHash()
-    for idx, count in enumerate(seq_count):
-        sequences = seq_file.read_block(count)
-        # Use a KeyHash to store seq.name/index pairs which can be used to retreive
-        # ortholog sequences by SequenceObject[kh[seq.name]]
-        _ = [kh.add(seq.name) for seq in sequences[:]]
-        with HMMFiles(*all_hmms) as hmm_file:
-            for hits in pyhmmer.hmmsearch(hmm_file, sequences, E=evalue):
-                cog = hits.query_name.decode()
-                for hit in hits:
-                    if hit.included:
-                        if cog in orthologs:
-                            orthologs[cog].add(hit.name)
-                        else:
-                            orthologs[cog] = set([hit.name])
-                        break   # The first hit in hits is the best hit
-        logging.info(f"Hmmsearch on {inputs[idx]} done")
+class msa_generator():
+    def __init__(self):
+        pass
 
-        count = 0
-        keys_to_remove = []
-        for hmm, hits in orthologs.items():
-            if len(hits) < 3:
-                continue
-            count += 1
-    logging.info(f"Found {count} orthologs shared among at least 3 samples")
+    def read_seqs(self, inputs: list) -> None:
+        self._inputs = inputs
+        self._concat_stream, self._seq_count = concat_Bytes_streams(inputs)
+        self._seq_file = pyhmmer.easel.SequenceFile(self._concat_stream, digital=True)
+        # Use the concatnated fasta in order to retrieve sequences by index later
+        self._sequences = self._seq_file.read_block()
+
+    def search(self, markerset: Path, evalue: float) -> None:
+        self._markerset = markerset
+        all_hmms = list(self._markerset.iterdir())
+        logging.info(f"Found {len(all_hmms)} hmm markers")
         
-    return orthologs, kh
+        self.orthologs = {}
+        self._kh = pyhmmer.easel.KeyHash()
+        seq_start_idx = 0
+        for idx, sample in enumerate(self._inputs):
+            # Select the sequences of each sample
+            seq_end_idx = seq_start_idx + self._seq_count[idx]
+            logging.debug(f"Sequences start idx: {seq_start_idx}; end idx: {seq_end_idx}")
+            sub_sequences = self._sequences[seq_start_idx: seq_end_idx]
+            for seq in sub_sequences:
+                # Replace description to taxon name
+                seq.description = sample.name.encode()
+                # Use a KeyHash to store seq.name/index pairs which can be used to retreive
+                # ortholog sequences by SequenceObject[kh[seq.name]]
+                self._kh.add(seq.name)
+            with HMMFiles(*all_hmms) as hmm_file:
+                for hits in pyhmmer.hmmsearch(hmm_file, sub_sequences, E=evalue):
+                    cog = hits.query_name.decode()
+                    for hit in hits:
+                        if hit.included:
+                            if cog in self.orthologs:
+                                self.orthologs[cog].add(hit.name)
+                            else:
+                                self.orthologs[cog] = set([hit.name])
+                            break   # The first hit in hits is the best hit
+            seq_start_idx = seq_end_idx
+            logging.info(f"Hmmsearch on {sample.name} done")
 
-def align(
-    orthologs: dict,
-    markerset: Path,
-    seq_file: pyhmmer.easel.SequenceFile,
-    kh: pyhmmer.easel.KeyHash,
-    output: Path,
-    non_trim: bool
-    ) -> None:
-    if non_trim:
-        logging.info("Output non-clipkit-trimmed multiple sequence alignment results")
-    else:
-        logging.debug("Multiple sequence alignment results will be trimmed by clipkit")
-    
-    # Set the seq_file position to the very beginning
-    seq_file.rewind()
-    sequences = seq_file.read_block()
-    
-    with open(os.devnull, "w") as temp_out, contextlib.redirect_stdout(temp_out):
-        for hmm, hits in orthologs.items():
+    @property
+    def show_orthologs(self):
+        count = 0
+        try:
+            for hits in self.orthologs.values():
+                if len(hits) >= 3:
+                    count += 1
+        except AttributeError:
+            logging.error(f"No orthologs dictionary found. Please make sure the search function was run successfully")
+        logging.info(f"Found {count} orthologs shared among at least 3 samples")
 
-            if len(hits) < 3:
-                continue
+    def align(self, output: Path, non_trim: bool, non_concat: bool) -> None:
+        if non_trim:
+            logging.info("Output non-clipkit-trimmed multiple sequence alignment results")
+        else:
+            logging.debug("Multiple sequence alignment results will be trimmed by clipkit")
+        
+        concat_alignments = {sample.name: "" for sample in self._inputs}
 
-            # Create an empty SequenceBlock object to store the sequences of the orthologs
-            seqs = pyhmmer.easel.DigitalSequenceBlock(pyhmmer.easel.Alphabet.amino())
-            for hit in hits:
-                seqs.append(sequences[kh[hit]])
+        concat_alignments = MultipleSeqAlignment([])
+        for sample in self._inputs:
+            concat_alignments.append(SeqRecord(Seq(""), id=sample.name, description=""))
+        concat_alignments.sort()
 
-            # HMMalign the ortholog sequences to the corresponding HMM markers
-            with HMMFile(markerset / f"{hmm}.hmm") as hmm_file:
-                hmm_profile = hmm_file.read()
-                MSA = pyhmmer.hmmalign(hmm_profile, seqs)
+        with open(os.devnull, "w") as temp_out, contextlib.redirect_stdout(temp_out):
+            for hmm, hits in self.orthologs.items():
 
-            # Create an empty MultipleSeqAlignment object to store the alignment results
-            alignment = MultipleSeqAlignment([])
-            for name, aligned_seq, seq_info in zip(MSA.names, MSA.alignment, MSA.sequences):
-                alignment.append(
-                    SeqRecord(Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
-                    id=name.decode(),
-                    description=seq_info.description.decode())
-                    )
+                if len(hits) < 3:
+                    continue
 
-            output_aa = output / f"{hmm}.faa"
-            # Output the MSA fasta without clipkit trimming
-            if non_trim:
-                with open(output_aa, 'w') as f:
-                    SeqIO.write(MSA, f, format="fasta")
-            else:
-                # Use clipkit to trim MSA alignment
-                clipkit_start_time = time.time()
+                # Create an empty SequenceBlock object to store the sequences of the orthologs
+                seqs = pyhmmer.easel.DigitalSequenceBlock(pyhmmer.easel.Alphabet.amino())
+                for hit in hits:
+                    seqs.append(self._sequences[self._kh[hit]])
+
+                # HMMalign the ortholog sequences to the corresponding HMM markers
+                with HMMFile(self._markerset / f"{hmm}.hmm") as hmm_file:
+                    hmm_profile = hmm_file.read()
+                    MSA = pyhmmer.hmmalign(hmm_profile, seqs)
+
+                # Create an empty MultipleSeqAlignment object to store the alignment results
+                alignment = MultipleSeqAlignment([])
+                for name, aligned_seq, seq_info in zip(MSA.names, MSA.alignment, MSA.sequences):
+                    alignment.append(
+                        SeqRecord(Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
+                            id=seq_info.description.decode(),
+                            name=name.decode(),
+                            description=seq_info.description.decode())
+                        )
                 
-                keepD, trimD = clipkit.keep_trim_and_log(
-                    alignment,
-                    gaps=0.9,
-                    mode=clipkit.TrimmingMode("gappy"),
-                    use_log=False,
-                    outFile=output_aa,
-                    complement=False,
-                    char=clipkit.SeqType("aa")
-                    )
+                # Fill sequence with "-" for missing samples
+                missing = set([seq.id for seq in concat_alignments]) - set([seq.id for seq in alignment])
+                for sample in missing:
+                    alignment.append(
+                        SeqRecord(Seq("-" * alignment.get_alignment_length()),
+                            id=sample,
+                            description=sample)
+                        )
+
+                output_aa = output / f"{hmm}.faa"
+                # Output the alingment fasta without clipkit trimming
+                if not non_trim:
+                    # Use clipkit to trim MSA alignment
+                    clipkit_start_time = time.time()
+
+                    keepD, trimD = clipkit.keep_trim_and_log(
+                        alignment,
+                        gaps=0.9,
+                        mode=clipkit.TrimmingMode("gappy"),
+                        use_log=False,
+                        outFile=output_aa,
+                        complement=False,
+                        char=clipkit.SeqType("aa")
+                        )
+                    
+                    clipkit.check_if_all_sites_were_trimmed(keepD)
+                    
+                    seqList = []
+                    for seq in keepD.keys():
+                        seqList.append(SeqRecord(Seq(str(keepD[seq])), id=str(seq), description=""))
+                    alignment = MultipleSeqAlignment(seqList)
                 
-                clipkit.check_if_all_sites_were_trimmed(keepD)
-                clipkit.check_if_entry_contains_only_gaps(keepD)
-                clipkit.write_keepD(keepD, output_aa, clipkit.FileFormat("fasta"))
+                alignment.sort()
+                if non_concat:
+                    with open(output_aa, 'w') as f:
+                        SeqIO.write(alignment, f, format="fasta")
+                else:
+                    concat_alignments += alignment
+        if not non_concat:
+            output_concat = output / f"concat_alignments.faa"
+            with open(output_concat, 'w') as f:
+                SeqIO.write(concat_alignments, f, format="fasta")
 
-    seq_file.close()
+        self._seq_file.close()
 
-def main(inputs, input_dir, output, markerset, evalue, non_trim, **kwargs):
+def main(inputs, input_dir, output, markerset, evalue, non_trim, non_concat, **kwargs):
     # If args.input_dir is used to instead of args.inputs
     if input_dir:
         inputs = list(Path(input_dir).iterdir())
+    else:
+        inputs = [Path(sample) for sample in inputs]
     # Check input files, terminate if less than 3 files
     if len(inputs) < 3:
         logging.error("Should have at least 3 input files")
@@ -181,8 +220,8 @@ def main(inputs, input_dir, output, markerset, evalue, non_trim, **kwargs):
         sys.exit(1)
     markerset = Path(markerset)
 
-    # Concatnate all fasta together (in order to retrieve sequences by index later)
-    concat_fasta, seq_count = concat_Bytes_streams(inputs)
-    seq_file = pyhmmer.easel.SequenceFile(concat_fasta, digital=True)
-    orthologs, kh = search(inputs, markerset, seq_file, seq_count, evalue)
-    align(orthologs, markerset, seq_file, kh, output, non_trim)
+    msa = msa_generator()
+    msa.read_seqs(inputs)
+    msa.search(markerset, evalue=evalue)
+    msa.show_orthologs
+    msa.align(output, non_trim=non_trim, non_concat=non_concat)

@@ -93,6 +93,7 @@ optional arguments:
   -E EVALUE, --evalue EVALUE
                         Hmmsearch reporting threshold (default=1e-10)
   -n, --non_trim        Report non-clipkit-trimmed alignment results
+  -c, --non_concat      Report non-concat alignment results
   -t THREADS, --threads THREADS
                         Threads for hmmsearch (default=1)
 ```

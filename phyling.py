@@ -77,6 +77,7 @@ def main():
     p_aln.add_argument('-m', '--markerset', type=Path, required=True, help="Name of the HMM markerset")
     p_aln.add_argument('-E', '--evalue', type=float, default=1e-10, help="Hmmsearch reporting threshold (default=1e-10)")
     p_aln.add_argument('-n', '--non_trim', action='store_true', help="Report non-clipkit-trimmed alignment results")
+    p_aln.add_argument('-c', '--non_concat', action='store_true', help="Report non-concat alignment results")
     p_aln.add_argument('-t', '--threads', type=int, default=1, help="Threads for hmmsearch (default=1)")
     p_aln.set_defaults(func=search_align)
 
