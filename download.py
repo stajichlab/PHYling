@@ -65,7 +65,8 @@ class Data_updater(ABC):
                 return self._load_data()
             else:
                 logging.info(
-                    f"The local {self._filetype} md5 is different from the online latest record. Update {self._filetype}"
+                    f"The local {self._filetype} md5 is different from the online latest record. "
+                    f"Update {self._filetype}"
                 )
         else:
             logging.info(f"{self._filetype} not found")
@@ -164,8 +165,17 @@ class HMM_markerset_updater(Data_updater):
 
 
 def download(database, cfg_dir, markerset, output, **kwargs) -> None:
-    # Check whether the file_version.pickle is exist. A missing/outdated file will trigger downloading of the file_version.tsv
-    # and convert to a pickle file with a md5 checksum. Will return a dictionary with database and its md5 checksum at the end.
+    """
+    The download module helps to download/update BUSCO markerset. Current using
+    BUSCO v5 database.
+
+    First it check whether the ~/.phyling/metadata.pickle is exist. A missing or
+    outdated file will trigger the module to update the metadata.
+
+    Passing "list" to markerset argument will list all the available markersets.
+    Passing a valid name to the markerset argument will download the markerset to
+    the given output path.
+    """
     metadata_updater = Metadata_updater(database_url=database, cfg_dir=cfg_dir)
     markerset_dict = metadata_updater.updater()
 

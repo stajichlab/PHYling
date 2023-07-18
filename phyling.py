@@ -5,70 +5,24 @@ import logging
 import sys
 import textwrap
 from pathlib import Path
-
-import yaml
-
 from types import SimpleNamespace
+
 from download import download
 from libphyling import main as search_align
 from phylotree import phylotree
 
 
-def main():
-    logging.basicConfig(
-        format="%(asctime)s PHYling %(levelname)s %(message)s", level="INFO"
-    )
-    logger = logging.getLogger()
-
-    # Create namespace object conf
-    args = dict()
-
-    args["script_path"] = Path(__file__).resolve().parent
-    args["database"] = "https://busco-data.ezlab.org/v5/data"
-    args["cfg_dir"] = Path.home() / ".phyling"
-    args = SimpleNamespace(**args)
-
-    # Create config folder in $HOME/.phyling
-    args.cfg_dir.mkdir(exist_ok=True)
-
-    # Load info to namespace object
-    try:
-        with open(f"{args.script_path}/info.yml", "r") as fh:
-            info = yaml.safe_load(fh)
-        info = SimpleNamespace(**info)
-    except:
-        logging.error("info.yml not found")
-        sys.exit(1)
-
-    # Implement shared arguments between sub-menu, reference from https://stackoverflow.com/questions/33645859/how-to-add-common-arguments-to-argparse-subcommands
-    # Build parent_parser which contains shared arguments, and do not use it directly
-    parent_parser = argparse.ArgumentParser(add_help=False)
-
-    parent_parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Verbose mode for debug"
-    )
-
-    _, remaining_args = parent_parser.parse_known_args(namespace=args)
-
-    # The real parser for user
-    parser = argparse.ArgumentParser(
-        prog=info.program,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=textwrap.dedent(info.usage),
-        description=textwrap.dedent(info.description),
-        epilog=textwrap.dedent(info.epilog),
-    )
-
-    parser.add_argument("-V", "--version", action="version", version=info.version)
-
+def parser_submodule(parser, parent_parser) -> None:
     subparsers = parser.add_subparsers()
 
-    # Each subparser would finally called the corresponding function (function "download" is called at the end in this case)
+    # Each subparser would finally called the corresponding function
+    # (function "download" is called at the end in this case)
     p_download = subparsers.add_parser(
         "download",
         parents=[parent_parser],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         help="Download HMM markers",
-        description='Download HMM markerset from BUSCO. Input "list" to show urls for all available markersets.',
+        description=textwrap.dedent(download.__doc__),
     )
     p_download.add_argument(
         "markerset", metavar='HMM markerset or "list"', help="Name of the HMM markerset"
@@ -85,21 +39,22 @@ def main():
     p_aln = subparsers.add_parser(
         "align",
         parents=[parent_parser],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         help="Run multiple sequence alignments against orthologs found among samples",
-        description="Get orthologs by hmmsearch. Get multiple sequence alignment results from orthologs.",
+        description=textwrap.dedent(search_align.__doc__),
     )
     input_type = p_aln.add_mutually_exclusive_group(required=True)
     input_type.add_argument(
         "-i",
         "--inputs",
         nargs="+",
-        help="Query pepetide fasta. Should have at least 3 samples",
+        help="Query pepetide fasta",
     )
     input_type.add_argument(
         "-I",
         "--input_dir",
         type=Path,
-        help="Directory containing at least 3 query pepetide fasta",
+        help="Directory containing query pepetide fasta",
     )
     p_aln.add_argument(
         "-o",
@@ -142,8 +97,9 @@ def main():
     p_tree = subparsers.add_parser(
         "tree",
         parents=[parent_parser],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         help="Build a phylogenetic tree based on multiple sequence alignment results",
-        description="Use biopython Phylo module to build a phylogenetic tree on the multiple sequence alignemt results.",
+        description=textwrap.dedent(phylotree.__doc__),
     )
     input_type = p_tree.add_mutually_exclusive_group(required=True)
     input_type.add_argument(
@@ -160,20 +116,68 @@ def main():
         "--output",
         type=Path,
         default=".",
-        help='Output diretory of the tree newick file (default=".")',
+        help='Output diretory of the newick treefile (default=".")',
     )
     p_tree.add_argument(
         "-m",
         "--method",
         choices=["upgma", "nj"],
         default="upgma",
-        help='Algorithm used for tree building. Support UPGMA and Neighbor Joining (nj) (default="upgma")',
+        help='Algorithm used for tree building (default="upgma")',
     )
     p_tree.add_argument(
         "-f", "--figure", action="store_true", help="Generate a matplotlib tree figure"
     )
     # p_tree.add_argument('-t', '--threads', type=int, default=1, help="Threads for hmmsearch (default=1)")
     p_tree.set_defaults(func=phylotree)
+
+
+def main():
+    """
+    PHYling is a package to extract phylogenomic markers and build a phylogenetic
+    tree upon them. It comprises 3 modules - download, align and tree.
+
+    The download module can be used to download HMM markerset from BUSCO. The align
+    module is the core element of this package which generate multiple sequence
+    alignment among the orthologs found across samples. The tree module help to
+    build a phylogenetic tree.
+    """
+    logging.basicConfig(
+        format="%(asctime)s PHYling %(levelname)s %(message)s", level="INFO"
+    )
+    logger = logging.getLogger()
+
+    # Create namespace object conf
+    args = dict()
+
+    args["script_path"] = Path(__file__).resolve().parent
+    args["database"] = "https://busco-data.ezlab.org/v5/data"
+    args["cfg_dir"] = Path.home() / ".phyling"
+    args = SimpleNamespace(**args)
+
+    # Create config folder in $HOME/.phyling
+    args.cfg_dir.mkdir(exist_ok=True)
+
+    # Implement shared arguments between sub-menu, reference from
+    # https://stackoverflow.com/questions/33645859/how-to-add-common-arguments-to-argparse-subcommands
+    # Build parent_parser which contains shared arguments, and do not use it directly
+    parent_parser = argparse.ArgumentParser(add_help=False)
+
+    parent_parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Verbose mode for debug"
+    )
+
+    # The real parser for user
+    parser = argparse.ArgumentParser(
+        prog=main.__name__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent(main.__doc__),
+        epilog=textwrap.dedent(main._epilog),
+    )
+
+    parser.add_argument("-V", "--version", action="version", version=main.__version__)
+
+    parser_submodule(parser, parent_parser)
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -189,6 +193,17 @@ def main():
     logging.debug(args)
     args.func(**vars(args))
 
+
+main.__name__ = "PHYling"
+main.__version__ = "0.5"
+main._epilog = """
+Written by Jason Stajich (2014-2017)
+jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com
+Rewritten by Cheng-Hung Tsai chenghung.tsai[at]email.ucr.edu
+
+Initially written https://github.com/1KFG/Phylogenomics and
+https://github.com/stajichlab/phyling
+"""
 
 if __name__ == "__main__":
     main()

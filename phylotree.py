@@ -17,6 +17,20 @@ def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
 
 
 def phylotree(inputs, input_dir, output, method, figure, **kwargs):
+    """
+    The tree module uses Biopython Phylo module to build a phylogenetic tree upon
+    the multiple sequence alignemt (MSA) results.
+
+    If passing multiple MSA results, the consensus tree method will be applied which
+    use 50% cutoff to represent the majority of all the trees.
+
+    By default will use UPGMA algorithm for tree building, you can switch to
+    Neighbor Joining method by -m/--method nj as your preference.
+
+    After building the tree, a ascii figure will be displayed and a treefile in
+    newick format will be output. You can also use -f/--figure to output a
+    matplotlib-style figure.
+    """
     # If args.input_dir is used to instead of args.inputs
     logging.info(f"Algorithm choose for tree building: {method}")
     if input_dir:

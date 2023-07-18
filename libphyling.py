@@ -222,6 +222,26 @@ class msa_generator:
 
 
 def main(inputs, input_dir, output, markerset, evalue, non_trim, concat, **kwargs):
+    """
+    The align module generates multiple sequence alignment (MSA) results from the
+    orthologous protein sequences that match the hmm markers across samples.
+
+    First, Hmmsearch is used to match the samples against given markerset and report
+    the top hit of each sample for each hmm profile to represent "orthologs" among
+    all samples. Note that you should have at least 3 samples since the overall
+    purpose is to build a tree.
+
+    Next, the sequences are extracted from each input for orthologs found in more
+    than 3 inputs. These sequences are then sent to hmmalign for MSA. The MSA
+    results will further be trimmed by clipkit by default. If you wish not to trim
+    it, use -n/--non_trim to disable the trimming step.
+
+    By default, the alignment results will output separately by hmm marker. The
+    consensus tree method should be applied to build a phlogenetic tree.
+
+    If you prefer to use the concatenate strategy, you can use -c/--concat to
+    concatenate the aligned sequences by sample and build a single tree afterward.
+    """
     # If args.input_dir is used to instead of args.inputs
     if input_dir:
         inputs = list(Path(input_dir).iterdir())
