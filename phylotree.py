@@ -11,10 +11,11 @@ from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstruct
 
 def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
     MSA = AlignIO.read(file, format="fasta")
-    calculator = DistanceCalculator('identity')
+    calculator = DistanceCalculator("identity")
     constructor = DistanceTreeConstructor(calculator, method)
     return constructor.build_tree(MSA)
-    
+
+
 def phylotree(inputs, input_dir, output, method, figure, **kwargs):
     # If args.input_dir is used to instead of args.inputs
     logging.info(f"Algorithm choose for tree building: {method}")
@@ -26,10 +27,12 @@ def phylotree(inputs, input_dir, output, method, figure, **kwargs):
     if inputs[0].name == "concat_alignments.faa":
         logging.info("Generate phylogenetic tree the on concatenated fasta")
     else:
-        logging.info("Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree")
+        logging.info(
+            "Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree"
+        )
     output = Path(output)
     output.mkdir(exist_ok=True)
-    
+
     if len(inputs) == 1:
         final_tree = tree_generator(inputs[0], method)
     else:
@@ -42,13 +45,12 @@ def phylotree(inputs, input_dir, output, method, figure, **kwargs):
 
     output_tree = output / f"{method}_tree.newick"
     logging.info(f"Output tree to {output_tree}")
-    with open(output_tree, 'w') as f:
-        Phylo.write(final_tree, f, 'newick')
+    with open(output_tree, "w") as f:
+        Phylo.write(final_tree, f, "newick")
 
     fig, ax = plt.subplots(figsize=(20, 12))
-    
+
     if figure:
         output_fig = output / f"{method}_tree.png"
         Phylo.draw(final_tree, axes=ax)
         fig.savefig(output_fig)
-    

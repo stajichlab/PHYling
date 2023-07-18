@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import sys
-import time
 import typing
 from functools import partialmethod
 from io import BytesIO
@@ -12,16 +11,16 @@ from pathlib import Path
 
 import pyhmmer
 from Bio import SeqIO
+from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio.Align import MultipleSeqAlignment
 from clipkit import clipkit
 from pyhmmer.plan7 import HMM, HMMFile
 from tqdm import tqdm
 
-
 # Disable tqdm progress bar implemented in clipkit
 tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
 
 class HMMFiles(typing.ContextManager[typing.Iterable[HMM]]):
     def __init__(self, *files: Path) -> None:
@@ -34,7 +33,8 @@ class HMMFiles(typing.ContextManager[typing.Iterable[HMM]]):
     def __exit__(self, exc_value: object, exc_type: object, traceback: object) -> None:
         self.stack.close()
 
-def concat_Bytes_streams(files: list) -> (BytesIO, list):
+
+def concat_Bytes_streams(files: list) -> "tuple[BytesIO, list]":
     """
     Create a in-memory BytesIO to hold the concatenated fasta files.
 
@@ -54,17 +54,18 @@ def concat_Bytes_streams(files: list) -> (BytesIO, list):
     seq_count = []
     for file in files:
         count = 0
-        with open(file, 'rb') as f:
+        with open(file, "rb") as f:
             for line in f.readlines():
                 concat_stream.write(line)
-                if line.startswith(b'>'):
+                if line.startswith(b">"):
                     count += 1
-            concat_stream.write(b'\n')
+            concat_stream.write(b"\n")
         seq_count.append(count)
-    concat_stream.seek(0)   # Change the stream position to the start of the stream
+    concat_stream.seek(0)  # Change the stream position to the start of the stream
     return concat_stream, seq_count
 
-class msa_generator():
+
+class msa_generator:
     def __init__(self):
         pass
 
@@ -79,15 +80,17 @@ class msa_generator():
         self._markerset = markerset
         all_hmms = list(self._markerset.iterdir())
         logging.info(f"Found {len(all_hmms)} hmm markers")
-        
+
         self.orthologs = {}
         self._kh = pyhmmer.easel.KeyHash()
         seq_start_idx = 0
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
             seq_end_idx = seq_start_idx + self._seq_count[idx]
-            logging.debug(f"Sequences start idx: {seq_start_idx}; end idx: {seq_end_idx}")
-            sub_sequences = self._sequences[seq_start_idx: seq_end_idx]
+            logging.debug(
+                f"Sequences start idx: {seq_start_idx}; end idx: {seq_end_idx}"
+            )
+            sub_sequences = self._sequences[seq_start_idx:seq_end_idx]
             for seq in sub_sequences:
                 # Replace description to taxon name
                 seq.description = sample.name.encode()
@@ -103,7 +106,7 @@ class msa_generator():
                                 self.orthologs[cog].add(hit.name)
                             else:
                                 self.orthologs[cog] = set([hit.name])
-                            break   # The first hit in hits is the best hit
+                            break  # The first hit in hits is the best hit
             seq_start_idx = seq_end_idx
             logging.info(f"Hmmsearch on {sample.name} done")
 
@@ -115,15 +118,21 @@ class msa_generator():
                 if len(hits) >= 3:
                     count += 1
         except AttributeError:
-            logging.error(f"No orthologs dictionary found. Please make sure the search function was run successfully")
+            logging.error(
+                "No orthologs dictionary found. Please make sure the search function was run successfully"
+            )
         logging.info(f"Found {count} orthologs shared among at least 3 samples")
 
-    def align(self, output: Path, non_trim: bool, non_concat: bool) -> None:
+    def align(self, output: Path, non_trim: bool, concat: bool) -> None:
         if non_trim:
-            logging.info("Output non-clipkit-trimmed multiple sequence alignment results")
+            logging.info(
+                "Output non-clipkit-trimmed multiple sequence alignment results"
+            )
         else:
-            logging.debug("Multiple sequence alignment results will be trimmed by clipkit")
-        
+            logging.debug(
+                "Multiple sequence alignment results will be trimmed by clipkit"
+            )
+
         concat_alignments = {sample.name: "" for sample in self._inputs}
 
         concat_alignments = MultipleSeqAlignment([])
@@ -133,12 +142,13 @@ class msa_generator():
 
         with open(os.devnull, "w") as temp_out, contextlib.redirect_stdout(temp_out):
             for hmm, hits in self.orthologs.items():
-
                 if len(hits) < 3:
                     continue
 
                 # Create an empty SequenceBlock object to store the sequences of the orthologs
-                seqs = pyhmmer.easel.DigitalSequenceBlock(pyhmmer.easel.Alphabet.amino())
+                seqs = pyhmmer.easel.DigitalSequenceBlock(
+                    pyhmmer.easel.Alphabet.amino()
+                )
                 for hit in hits:
                     seqs.append(self._sequences[self._kh[hit]])
 
@@ -149,29 +159,35 @@ class msa_generator():
 
                 # Create an empty MultipleSeqAlignment object to store the alignment results
                 alignment = MultipleSeqAlignment([])
-                for name, aligned_seq, seq_info in zip(MSA.names, MSA.alignment, MSA.sequences):
+                for name, aligned_seq, seq_info in zip(
+                    MSA.names, MSA.alignment, MSA.sequences
+                ):
                     alignment.append(
-                        SeqRecord(Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
+                        SeqRecord(
+                            Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
                             id=seq_info.description.decode(),
                             name=name.decode(),
-                            description=seq_info.description.decode())
+                            description=seq_info.description.decode(),
                         )
-                
+                    )
+
                 # Fill sequence with "-" for missing samples
-                missing = set([seq.id for seq in concat_alignments]) - set([seq.id for seq in alignment])
+                missing = set([seq.id for seq in concat_alignments]) - set(
+                    [seq.id for seq in alignment]
+                )
                 for sample in missing:
                     alignment.append(
-                        SeqRecord(Seq("-" * alignment.get_alignment_length()),
+                        SeqRecord(
+                            Seq("-" * alignment.get_alignment_length()),
                             id=sample,
-                            description=sample)
+                            description=sample,
                         )
+                    )
 
                 output_aa = output / f"{hmm}.faa"
                 # Output the alingment fasta without clipkit trimming
                 if not non_trim:
                     # Use clipkit to trim MSA alignment
-                    clipkit_start_time = time.time()
-
                     keepD, trimD = clipkit.keep_trim_and_log(
                         alignment,
                         gaps=0.9,
@@ -179,30 +195,33 @@ class msa_generator():
                         use_log=False,
                         outFile=output_aa,
                         complement=False,
-                        char=clipkit.SeqType("aa")
-                        )
-                    
+                        char=clipkit.SeqType("aa"),
+                    )
+
                     clipkit.check_if_all_sites_were_trimmed(keepD)
-                    
+
                     seqList = []
                     for seq in keepD.keys():
-                        seqList.append(SeqRecord(Seq(str(keepD[seq])), id=str(seq), description=""))
+                        seqList.append(
+                            SeqRecord(Seq(str(keepD[seq])), id=str(seq), description="")
+                        )
                     alignment = MultipleSeqAlignment(seqList)
-                
+
                 alignment.sort()
                 if concat:
-                    with open(output_aa, 'w') as f:
-                        SeqIO.write(alignment, f, format="fasta")
-                else:
                     concat_alignments += alignment
+                else:
+                    with open(output_aa, "w") as f:
+                        SeqIO.write(alignment, f, format="fasta")
         if concat:
-            output_concat = output / f"concat_alignments.faa"
-            with open(output_concat, 'w') as f:
+            output_concat = output / "concat_alignments.faa"
+            with open(output_concat, "w") as f:
                 SeqIO.write(concat_alignments, f, format="fasta")
 
         self._seq_file.close()
 
-def main(inputs, input_dir, output, markerset, evalue, non_trim, non_concat, **kwargs):
+
+def main(inputs, input_dir, output, markerset, evalue, non_trim, concat, **kwargs):
     # If args.input_dir is used to instead of args.inputs
     if input_dir:
         inputs = list(Path(input_dir).iterdir())
