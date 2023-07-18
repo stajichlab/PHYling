@@ -1,13 +1,12 @@
 program: 
   PHYling
 version:
-  "%(prog)s 0.3"
+  "%(prog)s 0.5"
 usage:
   "%(prog)s <command> <arguments>"
 description:
   "
-  Description:  %(prog)s is a package of scripts to extract phylogenomic markers\n
-  Dependencies: HMMER3 MUSCLE RAxML\n
+  %(prog)s is a package to extract phylogenomic markers and build a phylogenetic tree upon them\n
   "
 epilog:
   "

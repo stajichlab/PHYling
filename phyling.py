@@ -11,6 +11,7 @@ import yaml
 from types import SimpleNamespace
 from download import download
 from libphyling import main as search_align
+from phylotree import phylotree
 
 
 def main():
@@ -61,9 +62,9 @@ def main():
     p_download = subparsers.add_parser(
         "download", parents=[parent_parser],
         help="Download HMM markers",
-        description="Download HMM markerset from BUSCO. Input \'list\' to show urls for all available markersets.")
-    p_download.add_argument('markerset', metavar="HMM markerset or \'list\'", help="Name of the HMM markerset")
-    p_download.add_argument('-o', '--output', type=Path, default="./HMM", help="Output directory to save HMM markerset")
+        description="Download HMM markerset from BUSCO. Input \"list\" to show urls for all available markersets.")
+    p_download.add_argument('markerset', metavar="HMM markerset or \"list\"", help="Name of the HMM markerset")
+    p_download.add_argument('-o', '--output', type=Path, default="./HMM", help="Output directory to save HMM markerset (default=\"./HMM\")")
     p_download.set_defaults(func=download)
 
     p_aln = subparsers.add_parser(
@@ -73,13 +74,28 @@ def main():
     input_type = p_aln.add_mutually_exclusive_group(required=True)
     input_type.add_argument('-i', '--inputs', nargs='+', help="Query pepetide fasta. Should have at least 3 samples")
     input_type.add_argument('-I', '--input_dir', type=Path, help="Directory containing at least 3 query pepetide fasta")
-    p_aln.add_argument('-o', '--output', type=Path, required=True, help="Output diretory of the alignment results")
-    p_aln.add_argument('-m', '--markerset', type=Path, required=True, help="Name of the HMM markerset")
+    p_aln.add_argument('-o', '--output', type=Path, default="./align", help="Output diretory of the alignment results (default=\"./align\")" )
+    p_aln.add_argument('-m', '--markerset', type=Path, required=True, help="Directory of the HMM markerset")
     p_aln.add_argument('-E', '--evalue', type=float, default=1e-10, help="Hmmsearch reporting threshold (default=1e-10)")
     p_aln.add_argument('-n', '--non_trim', action='store_true', help="Report non-clipkit-trimmed alignment results")
-    p_aln.add_argument('-c', '--non_concat', action='store_true', help="Report non-concat alignment results")
+    p_aln.add_argument('-c', '--concat', action='store_true', help="Report concatenated alignment results")
     p_aln.add_argument('-t', '--threads', type=int, default=1, help="Threads for hmmsearch (default=1)")
     p_aln.set_defaults(func=search_align)
+
+    p_tree = subparsers.add_parser(
+        "tree", parents=[parent_parser],
+        help="Build a phylogenetic tree based on multiple sequence alignment results",
+        description="Use biopython Phylo module to build a phylogenetic tree on the multiple sequence alignemt results.")
+    input_type = p_tree.add_mutually_exclusive_group(required=True)
+    input_type.add_argument('-i', '--inputs', nargs='+', help="Multiple sequence alignment fasta")
+    input_type.add_argument('-I', '--input_dir', type=Path, help="Directory containing multiple sequence alignment fasta")
+    p_tree.add_argument('-o', '--output', type=Path, default=".", help="Output diretory of the tree newick file (default=\".\")")
+    p_tree.add_argument(
+        '-m', '--method', choices=['upgma', 'nj'], default='upgma',
+        help="Algorithm used for tree building. Support UPGMA and Neighbor Joining (nj) (default=\"upgma\")")
+    p_tree.add_argument('-f', '--figure', action='store_true', help="Generate a matplotlib tree figure")
+    # p_tree.add_argument('-t', '--threads', type=int, default=1, help="Threads for hmmsearch (default=1)")
+    p_tree.set_defaults(func=phylotree)
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)

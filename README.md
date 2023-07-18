@@ -10,6 +10,9 @@ The assumptions in this approach are that the markers are generally single copy 
 
 The marker sets developed for this approach in fungi are available as part of the [1KFG Phylogenomics_HMMs](https://github.com/1KFG/Phylogenomics_HMMs) project resource and preferred use of the [BUSCO marker sets](https://busco-data.ezlab.org/v4/data/lineages/).
 
+### Flow chart
+![PHYling flowchart](phyling_flowchart.png)
+
 ### New features compared to the original version
 - Using pyhmmer to improve the multithread performance in hmmsearch and hmmalign.
 - Implement all stuff in python. The entire program will be more readable and maintainable.
@@ -21,27 +24,17 @@ The marker sets developed for this approach in fungi are available as part of th
 python3 phyling.py --help
 ```
 ```
-usage: PHYling <command> <arguments>
-
-Description:  PHYling is a package of scripts to extract phylogenomic markers
-Dependencies: HMMER3 MUSCLE RAxML
-
 positional arguments:
-  {download,align}
-    download        Download HMM markers
-    align           Run multiple sequence alignments against orthologs found
-                    among samples
+  {download,align,tree}
+    download            Download HMM markers
+    align               Run multiple sequence alignments against orthologs
+                        found among samples
+    tree                Build a phylogenetic tree based on multiple sequence
+                        alignment results
 
 optional arguments:
-  -h, --help        show this help message and exit
-  -V, --version     show program's version number and exit
-
-Written by Jason Stajich (2014-2017)
-jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com
-Rewritten by Cheng-Hung Tsai chenghung.tsai[at]email.ucr.edu
-
-Initially written https://github.com/1KFG/Phylogenomics and
-https://github.com/stajichlab/phyling
+  -h, --help            show this help message and exit
+  -V, --version         show program's version number and exit
 ```
 
 To test run on the example files, please `cd` into the folder `test`.
@@ -55,7 +48,7 @@ The download module is used to download the HMM markerset from BUSCO website. (C
 See all options with `phyling.py download --help`.
 ```
 positional arguments:
-  HMM markerset or 'list'
+  HMM markerset or "list"
                         Name of the HMM markerset
 
 optional arguments:
@@ -63,6 +56,7 @@ optional arguments:
   -v, --verbose         Verbose mode for debug
   -o OUTPUT, --output OUTPUT
                         Output directory to save HMM markerset
+                        (default="./HMM")
 ```
 
 Firstly, use `download list` to show the available BUSCO markersets.
@@ -76,7 +70,9 @@ python3 ../phyling.py download fungi_odb10
 ```
 
 ### Find the orthologs and align them
-Next use the align module to get orthologs among all the samples by hmmsearch and then use hmmalign for multiple sequence alignment. 
+Next use the align module to get orthologs among all the samples by hmmsearch. 
+For HMM profiles have more than 3 matches, hmmalign is further used to perform multiple sequence alignment. 
+You can further choose whether you want to concatenate all the alignment or make it separately depend on your tree building strategy. 
 See all the options with `phyling.py align --help`.
 ```
 optional arguments:
@@ -88,8 +84,9 @@ optional arguments:
                         Directory containing at least 3 query pepetide fasta
   -o OUTPUT, --output OUTPUT
                         Output diretory of the alignment results
+                        (default="./align")
   -m MARKERSET, --markerset MARKERSET
-                        Name of the HMM markerset
+                        Directory of the HMM markerset
   -E EVALUE, --evalue EVALUE
                         Hmmsearch reporting threshold (default=1e-10)
   -n, --non_trim        Report non-clipkit-trimmed alignment results
@@ -98,7 +95,7 @@ optional arguments:
                         Threads for hmmsearch (default=1)
 ```
 
-Run the align module on all the fasta files under folder `pep`.
+Run the align module with all the fasta files under folder `pep`.
 ```
 python3 ../phyling.py align -I pep -o align -m HMM/fungi_odb10/hmms -t 10
 ```
@@ -114,6 +111,44 @@ python3 ../phyling.py align -i pep/Afum.aa.fasta pep/Rant.aa.fasta pep/Scer.aa.f
 ```
 **Note: Required at least 3 samples in order to build a tree!**
 
+### Build tree on multiple sequence alignment results
+Finally, we can run the tree module to use the multiple sequence alignment results to build a phylogenetic tree. 
+It support both concatenated alignment fasta and consensus tree method. (conclude the majority of trees which was built upon each single gene)
+See all the options with `phyling.py tree --help`.
+```
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         Verbose mode for debug
+  -i INPUTS [INPUTS ...], --inputs INPUTS [INPUTS ...]
+                        Multiple sequence alignment fasta
+  -I INPUT_DIR, --input_dir INPUT_DIR
+                        Directory containing multiple sequence alignment fasta
+  -o OUTPUT, --output OUTPUT
+                        Output diretory of the tree newick file (default=".")
+  -m {upgma,nj}, --method {upgma,nj}
+                        Algorithm used for tree building (default="upgma")
+  -f, --figure          Generate a matplotlib tree figure
+```
+
+Run the tree module with all the alignment results under folder `align`.
+```
+python3 ../phyling.py tree -I align
+```
+
+You can also use only part of the alignment results to build tree.
+```
+python3 ../phyling.py tree -i align/100957at4751.faa align/174653at4751.faa align/255412at4751.faa
+```
+
+Change the tree building algorithm
+```
+python3 ../phyling.py tree -I align -m nj
+```
+
+Use matplotlib to generate a tree figure.
+```
+python3 ../phyling.py tree -I align -f
+```
 
 ## Requirements
 - Python >= 3.7

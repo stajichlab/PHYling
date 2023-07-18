@@ -190,12 +190,12 @@ class msa_generator():
                     alignment = MultipleSeqAlignment(seqList)
                 
                 alignment.sort()
-                if non_concat:
+                if concat:
                     with open(output_aa, 'w') as f:
                         SeqIO.write(alignment, f, format="fasta")
                 else:
                     concat_alignments += alignment
-        if not non_concat:
+        if concat:
             output_concat = output / f"concat_alignments.faa"
             with open(output_concat, 'w') as f:
                 SeqIO.write(concat_alignments, f, format="fasta")
@@ -224,4 +224,4 @@ def main(inputs, input_dir, output, markerset, evalue, non_trim, non_concat, **k
     msa.read_seqs(inputs)
     msa.search(markerset, evalue=evalue)
     msa.show_orthologs
-    msa.align(output, non_trim=non_trim, non_concat=non_concat)
+    msa.align(output, non_trim=non_trim, concat=concat)
