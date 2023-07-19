@@ -78,6 +78,13 @@ def parser_submodule(parser, parent_parser) -> None:
         help="Hmmsearch reporting threshold (default=1e-10)",
     )
     p_aln.add_argument(
+        "-M",
+        "--method",
+        choices=["hmmalign", "muscle"],
+        default="hmmalign",
+        help='Program used for multiple sequence alignment (default="hmmalign")',
+    )
+    p_aln.add_argument(
         "-n",
         "--non_trim",
         action="store_true",
@@ -119,7 +126,7 @@ def parser_submodule(parser, parent_parser) -> None:
         help='Output diretory of the newick treefile (default=".")',
     )
     p_tree.add_argument(
-        "-m",
+        "-M",
         "--method",
         choices=["upgma", "nj"],
         default="upgma",

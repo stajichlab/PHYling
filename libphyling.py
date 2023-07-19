@@ -2,7 +2,9 @@ import contextlib
 import logging
 import os
 import re
+import subprocess
 import sys
+import tempfile
 import typing
 from functools import partialmethod
 from io import BytesIO
@@ -10,7 +12,7 @@ from itertools import chain
 from pathlib import Path
 
 import pyhmmer
-from Bio import SeqIO
+from Bio import SeqIO, AlignIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -123,7 +125,51 @@ class msa_generator:
             )
         logging.info(f"Found {count} orthologs shared among at least 3 samples")
 
-    def align(self, output: Path, non_trim: bool, concat: bool) -> None:
+    def _hmmalign(self, hmm, hits) -> MultipleSeqAlignment:
+        # Create an empty SequenceBlock object to store the sequences of the orthologs
+        seqs = pyhmmer.easel.DigitalSequenceBlock(
+            pyhmmer.easel.Alphabet.amino()
+        )
+        for hit in hits:
+            seqs.append(self._sequences[self._kh[hit]])
+
+        # HMMalign the ortholog sequences to the corresponding HMM markers
+        with HMMFile(self._markerset / f"{hmm}.hmm") as hmm_file:
+            hmm_profile = hmm_file.read()
+            MSA = pyhmmer.hmmalign(hmm_profile, seqs, trim=True)
+
+        # Create an empty MultipleSeqAlignment object to store the alignment results
+        alignment = MultipleSeqAlignment([])
+        for name, aligned_seq, seq_info in zip(
+            MSA.names, MSA.alignment, MSA.sequences
+        ):
+            alignment.append(
+                SeqRecord(
+                    Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
+                    id=seq_info.description.decode(),
+                    name=name.decode(),
+                    description=seq_info.description.decode(),
+                )
+            )
+        return alignment
+
+    def _muscle(self, hmm, hits) -> MultipleSeqAlignment:
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            with open(f"{tmpdirname}/{hmm}.faa", 'wb+') as f:
+                for hit in hits:
+                    seq = self._sequences[self._kh[hit]]
+                    seq.name = seq.description
+                    seq.write(f)
+
+            _ = subprocess.check_call(
+                ["muscle", "-align", f"{tmpdirname}/{hmm}.faa", "-output", f"{tmpdirname}/{hmm}.aln.faa", "-threads", "1"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT
+                )
+            alignment = AlignIO.read(f"{tmpdirname}/{hmm}.aln.faa", "fasta")
+        return alignment
+
+    def align(self, output: Path, method: str, non_trim: bool, concat: bool) -> None:
         if non_trim:
             logging.info(
                 "Output non-clipkit-trimmed multiple sequence alignment results"
@@ -144,31 +190,10 @@ class msa_generator:
             if len(hits) < 3:
                 continue
 
-            # Create an empty SequenceBlock object to store the sequences of the orthologs
-            seqs = pyhmmer.easel.DigitalSequenceBlock(
-                pyhmmer.easel.Alphabet.amino()
-            )
-            for hit in hits:
-                seqs.append(self._sequences[self._kh[hit]])
-
-            # HMMalign the ortholog sequences to the corresponding HMM markers
-            with HMMFile(self._markerset / f"{hmm}.hmm") as hmm_file:
-                hmm_profile = hmm_file.read()
-                MSA = pyhmmer.hmmalign(hmm_profile, seqs)
-
-            # Create an empty MultipleSeqAlignment object to store the alignment results
-            alignment = MultipleSeqAlignment([])
-            for name, aligned_seq, seq_info in zip(
-                MSA.names, MSA.alignment, MSA.sequences
-            ):
-                alignment.append(
-                    SeqRecord(
-                        Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
-                        id=seq_info.description.decode(),
-                        name=name.decode(),
-                        description=seq_info.description.decode(),
-                    )
-                )
+            if method == "muscle":
+                alignment = self._muscle(hmm, hits)
+            else:
+                alignment = self._hmmalign(hmm, hits)
 
             # Fill sequence with "-" for missing samples
             missing = set([seq.id for seq in concat_alignments]) - set(
@@ -187,7 +212,7 @@ class msa_generator:
                 # Output the alingment fasta without clipkit trimming
                 if not non_trim:
                     # Use clipkit to trim MSA alignment
-                    keepD, trimD = clipkit.keep_trim_and_log(
+                    keepD, _ = clipkit.keep_trim_and_log(
                         alignment,
                         gaps=0.9,
                         mode=clipkit.TrimmingMode("gappy"),
@@ -220,7 +245,7 @@ class msa_generator:
         self._seq_file.close()
 
 
-def main(inputs, input_dir, output, markerset, evalue, non_trim, concat, **kwargs):
+def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, **kwargs):
     """
     The align module generates multiple sequence alignment (MSA) results from the
     orthologous protein sequences that match the hmm markers across samples.
@@ -231,9 +256,9 @@ def main(inputs, input_dir, output, markerset, evalue, non_trim, concat, **kwarg
     purpose is to build a tree.
 
     Next, the sequences are extracted from each input for orthologs found in more
-    than 3 inputs. These sequences are then sent to hmmalign for MSA. The MSA
-    results will further be trimmed by clipkit by default. If you wish not to trim
-    it, use -n/--non_trim to disable the trimming step.
+    than 3 inputs. These sequences are then underwent MSA. (Use hmmalign by default)
+    The MSA results will further be trimmed by clipkit by default. If you wish not
+    to trim it, use -n/--non_trim to disable the trimming step.
 
     By default, the alignment results will output separately by hmm marker. The
     consensus tree method should be applied to build a phlogenetic tree.
@@ -262,4 +287,4 @@ def main(inputs, input_dir, output, markerset, evalue, non_trim, concat, **kwarg
     msa.read_seqs(inputs)
     msa.search(markerset, evalue=evalue)
     msa.show_orthologs
-    msa.align(output, non_trim=non_trim, concat=concat)
+    msa.align(output, non_trim=non_trim, method=method, concat=concat)

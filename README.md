@@ -69,14 +69,15 @@ python3 ../phyling.py download fungi_odb10
 
 ### Find the orthologs and align them
 Next use the align module to get orthologs among all the samples by hmmsearch. 
-HMM profiles having matches on more than 3 samples are considered **orthologs**. 
-Hmmalign is further used to perform multiple sequence alignment among the seqeunces extracted from each sample. 
+HMM profiles having matches on more than 3 samples are considered **orthologs**.
+For each ortholog, the seqeunces extracted from each sample are underwent multiple sequence alignment.
+By default it is done by hmmalign. You can switch to muscle by specifying `-M/--method muscle`.
 
 By default, each alignment result is output separately and is expected to resolve their phylogeny by consensus tree method.
 If you prefer to use concatenate strategy. You can concatenate all the alignment by passing `-c/--concat`. 
 See all the options with `phyling.py align --help`.
 ```
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -v, --verbose         Verbose mode for debug
   -i INPUTS [INPUTS ...], --inputs INPUTS [INPUTS ...]
@@ -84,12 +85,13 @@ optional arguments:
   -I INPUT_DIR, --input_dir INPUT_DIR
                         Directory containing query pepetide fasta
   -o OUTPUT, --output OUTPUT
-                        Output diretory of the alignment results
-                        (default="./align")
+                        Output diretory of the alignment results (default="./align")
   -m MARKERSET, --markerset MARKERSET
                         Directory of the HMM markerset
   -E EVALUE, --evalue EVALUE
                         Hmmsearch reporting threshold (default=1e-10)
+  -M {hmmalign,muscle}, --method {hmmalign,muscle}
+                        Program used for multiple sequence alignment (default="hmmalign")
   -n, --non_trim        Report non-clipkit-trimmed alignment results
   -c, --concat          Report concatenated alignment results
   -t THREADS, --threads THREADS
@@ -160,7 +162,8 @@ python3 ../phyling.py tree -I align -f
 - Python >= 3.7
 - [Biopython](https://biopython.org/)
 - [pyhmmer](https://pyhmmer.readthedocs.io/en/stable/index.html), a HMMER3 implementation on python3.
-- [clipkit](https://jlsteenwyk.com/ClipKIT/) for trimming
+- [muscle](https://drive5.com/muscle5/) for alternative method for multiple sequence alignment.
+- [clipkit](https://jlsteenwyk.com/ClipKIT/) for trimming.
 
 Use the env.yaml to install all the required packages
 ```
@@ -170,4 +173,4 @@ conda env create -f env.yaml
 ## Notes
 - Training your own marker set is also possible but most busco sets are good starting place.
 - The multiple sequence alignment results can also be sent to other phylogenetic tool like IQ-tree for tree building.
-- Considering parallelize the hmmalign and tree building for multiple files to further increase the speed.
+- Considering parallelize the MSA and tree building for multiple files to further increase the speed.
