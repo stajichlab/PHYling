@@ -140,50 +140,49 @@ class msa_generator:
             concat_alignments.append(SeqRecord(Seq(""), id=sample.name, description=""))
         concat_alignments.sort()
 
-        with open(os.devnull, "w") as temp_out, contextlib.redirect_stdout(temp_out):
-            for hmm, hits in self.orthologs.items():
-                if len(hits) < 3:
-                    continue
+        for hmm, hits in self.orthologs.items():
+            if len(hits) < 3:
+                continue
 
-                # Create an empty SequenceBlock object to store the sequences of the orthologs
-                seqs = pyhmmer.easel.DigitalSequenceBlock(
-                    pyhmmer.easel.Alphabet.amino()
-                )
-                for hit in hits:
-                    seqs.append(self._sequences[self._kh[hit]])
+            # Create an empty SequenceBlock object to store the sequences of the orthologs
+            seqs = pyhmmer.easel.DigitalSequenceBlock(
+                pyhmmer.easel.Alphabet.amino()
+            )
+            for hit in hits:
+                seqs.append(self._sequences[self._kh[hit]])
 
-                # HMMalign the ortholog sequences to the corresponding HMM markers
-                with HMMFile(self._markerset / f"{hmm}.hmm") as hmm_file:
-                    hmm_profile = hmm_file.read()
-                    MSA = pyhmmer.hmmalign(hmm_profile, seqs)
+            # HMMalign the ortholog sequences to the corresponding HMM markers
+            with HMMFile(self._markerset / f"{hmm}.hmm") as hmm_file:
+                hmm_profile = hmm_file.read()
+                MSA = pyhmmer.hmmalign(hmm_profile, seqs)
 
-                # Create an empty MultipleSeqAlignment object to store the alignment results
-                alignment = MultipleSeqAlignment([])
-                for name, aligned_seq, seq_info in zip(
-                    MSA.names, MSA.alignment, MSA.sequences
-                ):
-                    alignment.append(
-                        SeqRecord(
-                            Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
-                            id=seq_info.description.decode(),
-                            name=name.decode(),
-                            description=seq_info.description.decode(),
-                        )
+            # Create an empty MultipleSeqAlignment object to store the alignment results
+            alignment = MultipleSeqAlignment([])
+            for name, aligned_seq, seq_info in zip(
+                MSA.names, MSA.alignment, MSA.sequences
+            ):
+                alignment.append(
+                    SeqRecord(
+                        Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
+                        id=seq_info.description.decode(),
+                        name=name.decode(),
+                        description=seq_info.description.decode(),
                     )
-
-                # Fill sequence with "-" for missing samples
-                missing = set([seq.id for seq in concat_alignments]) - set(
-                    [seq.id for seq in alignment]
                 )
-                for sample in missing:
-                    alignment.append(
-                        SeqRecord(
-                            Seq("-" * alignment.get_alignment_length()),
-                            id=sample,
-                            description=sample,
-                        )
-                    )
 
+            # Fill sequence with "-" for missing samples
+            missing = set([seq.id for seq in concat_alignments]) - set(
+                [seq.id for seq in alignment]
+            )
+            for sample in missing:
+                alignment.append(
+                    SeqRecord(
+                        Seq("-" * alignment.get_alignment_length()),
+                        id=sample,
+                        description=sample,
+                    )
+                )
+            with open(os.devnull, "w") as temp_out, contextlib.redirect_stdout(temp_out):
                 output_aa = output / f"{hmm}.faa"
                 # Output the alingment fasta without clipkit trimming
                 if not non_trim:
@@ -200,19 +199,19 @@ class msa_generator:
 
                     clipkit.check_if_all_sites_were_trimmed(keepD)
 
-                    seqList = []
-                    for seq in keepD.keys():
-                        seqList.append(
-                            SeqRecord(Seq(str(keepD[seq])), id=str(seq), description="")
-                        )
-                    alignment = MultipleSeqAlignment(seqList)
+                seqList = []
+                for seq in keepD.keys():
+                    seqList.append(
+                        SeqRecord(Seq(str(keepD[seq])), id=str(seq), description="")
+                    )
+                alignment = MultipleSeqAlignment(seqList)
 
-                alignment.sort()
-                if concat:
-                    concat_alignments += alignment
-                else:
-                    with open(output_aa, "w") as f:
-                        SeqIO.write(alignment, f, format="fasta")
+            alignment.sort()
+            if concat:
+                concat_alignments += alignment
+            else:
+                with open(output_aa, "w") as f:
+                    SeqIO.write(alignment, f, format="fasta")
         if concat:
             output_concat = output / "concat_alignments.faa"
             with open(output_concat, "w") as f:

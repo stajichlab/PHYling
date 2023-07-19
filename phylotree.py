@@ -62,9 +62,8 @@ def phylotree(inputs, input_dir, output, method, figure, **kwargs):
     with open(output_tree, "w") as f:
         Phylo.write(final_tree, f, "newick")
 
-    fig, ax = plt.subplots(figsize=(20, 12))
-
     if figure:
+        fig, ax = plt.subplots(figsize=(20, 12))
         output_fig = output / f"{method}_tree.png"
         Phylo.draw(final_tree, axes=ax)
         fig.savefig(output_fig)
