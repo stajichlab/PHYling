@@ -95,7 +95,11 @@ def parser_submodule(parser, parent_parser) -> None:
         help="Report concatenated alignment results",
     )
     p_aln.add_argument(
-        "-t", "--threads", type=int, default=1, help="Threads for hmmsearch (default=1)"
+        "-t",
+        "--threads",
+        type=int,
+        default=1,
+        help="Threads for hmmsearch and the number of parallelized jobs in MSA step (default=1)",
     )
     p_aln.set_defaults(func=search_align)
 

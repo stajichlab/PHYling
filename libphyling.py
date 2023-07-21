@@ -6,13 +6,15 @@ import subprocess
 import sys
 import tempfile
 import typing
+from copy import deepcopy
 from functools import partialmethod
 from io import BytesIO
-from itertools import chain
+from itertools import chain, product
+from multiprocessing.dummy import Pool
 from pathlib import Path
 
 import pyhmmer
-from Bio import SeqIO, AlignIO
+from Bio import AlignIO, SeqIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -68,17 +70,14 @@ def concat_Bytes_streams(files: list) -> "tuple[BytesIO, list]":
 
 
 class msa_generator:
-    def __init__(self):
-        pass
-
-    def read_seqs(self, inputs: list) -> None:
+    def __init__(self, inputs: list):
         self._inputs = inputs
-        self._concat_stream, self._seq_count = concat_Bytes_streams(inputs)
-        self._seq_file = pyhmmer.easel.SequenceFile(self._concat_stream, digital=True)
+        concat_stream, self._seq_count = concat_Bytes_streams(inputs)
+        seq_file = pyhmmer.easel.SequenceFile(concat_stream, digital=True)
         # Use the concatnated fasta in order to retrieve sequences by index later
-        self._sequences = self._seq_file.read_block()
+        self._sequences = seq_file.read_block()
 
-    def search(self, markerset: Path, evalue: float) -> None:
+    def search(self, markerset: Path, evalue: float, threads: int) -> None:
         self._markerset = markerset
         all_hmms = list(self._markerset.iterdir())
         logging.info(f"Found {len(all_hmms)} hmm markers")
@@ -98,7 +97,7 @@ class msa_generator:
                 # ortholog sequences by SequenceObject[kh[seq.name]]
                 self._kh.add(seq.name)
             with HMMFiles(*all_hmms) as hmm_file:
-                for hits in pyhmmer.hmmsearch(hmm_file, sub_sequences, E=evalue):
+                for hits in pyhmmer.hmmsearch(hmm_file, sub_sequences, E=evalue, cpus=threads):
                     cog = hits.query_name.decode()
                     for hit in hits:
                         if hit.included:
@@ -111,23 +110,16 @@ class msa_generator:
             logging.info(f"Hmmsearch on {sample.name} done")
 
     @property
-    def show_orthologs(self):
-        count = 0
+    def filter_orthologs(self):
         try:
-            for hits in self.orthologs.values():
-                if len(hits) >= 3:
-                    count += 1
+            self.orthologs = dict(filter(lambda item: len(item[1]) >= 3, self.orthologs.items()))
         except AttributeError:
-            logging.error(
-                "No orthologs dictionary found. Please make sure the search function was run successfully"
-            )
-        logging.info(f"Found {count} orthologs shared among at least 3 samples")
+            logging.error("No orthologs dictionary found. Please make sure the search function was run successfully")
+        logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples")
 
-    def _hmmalign(self, hmm, hits) -> MultipleSeqAlignment:
+    def _run_hmmalign(self, hmm: str, hits: set) -> MultipleSeqAlignment:
         # Create an empty SequenceBlock object to store the sequences of the orthologs
-        seqs = pyhmmer.easel.DigitalSequenceBlock(
-            pyhmmer.easel.Alphabet.amino()
-        )
+        seqs = pyhmmer.easel.DigitalSequenceBlock(pyhmmer.easel.Alphabet.amino())
         for hit in hits:
             seqs.append(self._sequences[self._kh[hit]])
 
@@ -149,32 +141,56 @@ class msa_generator:
             )
         return alignment
 
-    def _muscle(self, hmm, hits) -> MultipleSeqAlignment:
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            with open(f"{tmpdirname}/{hmm}.faa", 'wb+') as f:
-                for hit in hits:
-                    seq = self._sequences[self._kh[hit]]
-                    seq.name = seq.description
-                    seq.write(f)
+    def _run_muscle(self, hmm: str, hits: set, output: str) -> MultipleSeqAlignment:
+        with open(f"{output}/{hmm}.faa", "wb+") as f:
+            for hit in hits:
+                seq = self._sequences[self._kh[hit]].copy()
+                seq.name = deepcopy(seq.description)
+                seq.description = "".encode()
+                seq.write(f)
 
-            _ = subprocess.check_call(
-                ["muscle", "-align", f"{tmpdirname}/{hmm}.faa", "-output", f"{tmpdirname}/{hmm}.aln.faa", "-threads", "1"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.STDOUT
-                )
-            alignment = AlignIO.read(f"{tmpdirname}/{hmm}.aln.faa", "fasta")
+        _ = subprocess.check_call(
+            ["muscle", "-align", f"{output}/{hmm}.faa", "-output", f"{output}/{hmm}.aln.faa", "-threads", "1"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+        )
+        alignment = AlignIO.read(f"{output}/{hmm}.aln.faa", "fasta")
         return alignment
 
-    def align(self, output: Path, method: str, non_trim: bool, concat: bool) -> None:
-        if non_trim:
-            logging.info(
-                "Output non-clipkit-trimmed multiple sequence alignment results"
+    # Fill sequence with "-" for missing samples
+    def _fill_missing_taxon(self, taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
+        missing = set(taxonList) - set([seq.id for seq in alignment])
+        for sample in missing:
+            alignment.append(
+                SeqRecord(
+                    Seq("-" * alignment.get_alignment_length()),
+                    id=sample,
+                    description=sample,
+                )
             )
-        else:
-            logging.debug(
-                "Multiple sequence alignment results will be trimmed by clipkit"
-            )
+        return alignment
 
+    def _run_clipcit(self, hmm: str, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
+        # Use clipkit to trim MSA alignment
+        keepD, _ = clipkit.keep_trim_and_log(
+            alignment,
+            gaps=0.9,
+            mode=clipkit.TrimmingMode("gappy"),
+            use_log=False,
+            outFile=f"{hmm}.faa",
+            complement=False,
+            char=clipkit.SeqType("aa"),
+        )
+
+        clipkit.check_if_all_sites_were_trimmed(keepD)
+
+        seqList = []
+        for seq in keepD.keys():
+            seqList.append(SeqRecord(Seq(str(keepD[seq])), id=str(seq), description=""))
+        alignment = MultipleSeqAlignment(seqList)
+        return alignment
+
+    def align(self, output: Path, method: str, non_trim: bool, concat: bool, threads: int) -> None:
         concat_alignments = {sample.name: "" for sample in self._inputs}
 
         concat_alignments = MultipleSeqAlignment([])
@@ -182,66 +198,52 @@ class msa_generator:
             concat_alignments.append(SeqRecord(Seq(""), id=sample.name, description=""))
         concat_alignments.sort()
 
-        for hmm, hits in self.orthologs.items():
-            if len(hits) < 3:
-                continue
-
+        # Parallelize the MSA step
+        logging.info(f"Use {method} for MSA")
+        logging.info(f"Use {threads} threads to parallelize MSA")
+        with Pool(threads) as pool:
             if method == "muscle":
-                alignment = self._muscle(hmm, hits)
+                with tempfile.TemporaryDirectory() as tempdir:
+                    logging.debug(f"Create tempdir at: {tempdir}")
+                    alignmentList = pool.starmap(
+                        self._run_muscle, [(hmm, hits, tempdir) for hmm, hits in self.orthologs.items()]
+                    )
             else:
-                alignment = self._hmmalign(hmm, hits)
+                alignmentList = pool.starmap(self._run_hmmalign, [(hmm, hits) for hmm, hits in self.orthologs.items()])
+            logging.info("MSA done")
 
-            # Fill sequence with "-" for missing samples
-            missing = set([seq.id for seq in concat_alignments]) - set(
-                [seq.id for seq in alignment]
+            alignmentList = pool.starmap(
+                self._fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
             )
-            for sample in missing:
-                alignment.append(
-                    SeqRecord(
-                        Seq("-" * alignment.get_alignment_length()),
-                        id=sample,
-                        description=sample,
-                    )
-                )
-            with open(os.devnull, "w") as temp_out, contextlib.redirect_stdout(temp_out):
-                output_aa = output / f"{hmm}.faa"
-                # Output the alingment fasta without clipkit trimming
-                if not non_trim:
-                    # Use clipkit to trim MSA alignment
-                    keepD, _ = clipkit.keep_trim_and_log(
-                        alignment,
-                        gaps=0.9,
-                        mode=clipkit.TrimmingMode("gappy"),
-                        use_log=False,
-                        outFile=output_aa,
-                        complement=False,
-                        char=clipkit.SeqType("aa"),
-                    )
+            logging.info("Filling missing taxon done")
 
-                    clipkit.check_if_all_sites_were_trimmed(keepD)
-
-                seqList = []
-                for seq in keepD.keys():
-                    seqList.append(
-                        SeqRecord(Seq(str(keepD[seq])), id=str(seq), description="")
+            # Output the alingment fasta without clipkit trimming
+            if not non_trim:
+                with open(os.devnull, "w") as temp_out, contextlib.redirect_stdout(temp_out):
+                    alignmentList = pool.starmap(
+                        self._run_clipcit, zip([hmm for hmm in self.orthologs.keys()], alignmentList)
                     )
-                alignment = MultipleSeqAlignment(seqList)
+                logging.info("Clipkit done")
 
+        for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
+            output_aa = output / f"{hmm}.faa"
             alignment.sort()
             if concat:
                 concat_alignments += alignment
             else:
                 with open(output_aa, "w") as f:
                     SeqIO.write(alignment, f, format="fasta")
+
         if concat:
             output_concat = output / "concat_alignments.faa"
             with open(output_concat, "w") as f:
                 SeqIO.write(concat_alignments, f, format="fasta")
+            logging.info(f"Output concatenated fasta to {output_concat}")
+        else:
+            logging.info(f"Output individual fasta to folder {output}")
 
-        self._seq_file.close()
 
-
-def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, **kwargs):
+def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, threads, **kwargs):
     """
     The align module generates multiple sequence alignment (MSA) results from the
     orthologous protein sequences that match the hmm markers across samples.
@@ -279,8 +281,7 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat,
         sys.exit(1)
     markerset = Path(markerset)
 
-    msa = msa_generator()
-    msa.read_seqs(inputs)
-    msa.search(markerset, evalue=evalue)
-    msa.show_orthologs
-    msa.align(output, non_trim=non_trim, method=method, concat=concat)
+    msa = msa_generator(inputs)
+    msa.search(markerset, evalue=evalue, threads=threads)
+    msa.filter_orthologs
+    msa.align(output, non_trim=non_trim, method=method, concat=concat, threads=threads)

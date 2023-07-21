@@ -17,6 +17,7 @@ The marker sets developed for this approach in fungi are available as part of th
 - Using pyhmmer to improve the multithread performance in hmmsearch and hmmalign.
 - Implement all stuff in python. The entire program will be more readable and maintainable.
 - Simplify some steps and reduce the intermediate files as much as possible.
+- Muscle is now available for alternative alignment method.
 
 ## Usage
 PHYling is a package to extract phylogenomic markers and build a phylogenetic
@@ -71,7 +72,7 @@ python3 ../phyling.py download fungi_odb10
 Next use the align module to get orthologs among all the samples by hmmsearch. 
 HMM profiles having matches on more than 3 samples are considered **orthologs**.
 For each ortholog, the seqeunces extracted from each sample are underwent multiple sequence alignment.
-By default it is done by hmmalign. You can switch to muscle by specifying `-M/--method muscle`.
+By default the alignment is done by **hmmalign**. You can switch to **muscle** by specifying `-M/--method muscle`.
 
 By default, each alignment result is output separately and is expected to resolve their phylogeny by consensus tree method.
 If you prefer to use concatenate strategy. You can concatenate all the alignment by passing `-c/--concat`. 
@@ -95,7 +96,7 @@ options:
   -n, --non_trim        Report non-clipkit-trimmed alignment results
   -c, --concat          Report concatenated alignment results
   -t THREADS, --threads THREADS
-                        Threads for hmmsearch (default=1)
+                        Threads for hmmsearch and the number of parallelized jobs in MSA step (default=1)
 ```
 
 Run the align module with all the fasta files under folder `pep`.
@@ -114,14 +115,17 @@ python3 ../phyling.py align -i pep/Afum.aa.fasta pep/Rant.aa.fasta pep/Scer.aa.f
 ```
 **Note: Required at least 3 samples in order to build a tree!**
 
-Using 10 threads to accelerate the hmmsearch
+Accelerate by using 10 threads. 
+The hmmsearch step is not parallized so 10 threads will be used to process sample in each loop.
+For the alignment step, 10 parallel jobs will be launched with single-thread for each job.
+Highly recommended if **muscle** is chosen for alignment. (**muscle** is much slower than **hmmalign**)
 ```
 python3 ../phyling.py align -I pep -m HMM/fungi_odb10/hmms -t 10
 ```
 
 ### Build tree on multiple sequence alignment results
 Finally, we can run the tree module to use the multiple sequence alignment results to build a phylogenetic tree. 
-It support both consensus tree (conclude the majority of trees which was built upon each single gene) and concatenated alignment method. 
+It support both *consensus tree* (conclude the majority of trees which was built upon each single gene) and *concatenated alignment* method. 
 See all the options with `phyling.py tree --help`.
 ```
 optional arguments:
@@ -173,4 +177,3 @@ conda env create -f env.yaml
 ## Notes
 - Training your own marker set is also possible but most busco sets are good starting place.
 - The multiple sequence alignment results can also be sent to other phylogenetic tool like IQ-tree for tree building.
-- Considering parallelize the MSA and tree building for multiple files to further increase the speed.
