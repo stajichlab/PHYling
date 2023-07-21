@@ -24,9 +24,7 @@ def parser_submodule(parser, parent_parser) -> None:
         help="Download HMM markers",
         description=textwrap.dedent(download.__doc__),
     )
-    p_download.add_argument(
-        "markerset", metavar='HMM markerset or "list"', help="Name of the HMM markerset"
-    )
+    p_download.add_argument("markerset", metavar='HMM markerset or "list"', help="Name of the HMM markerset")
     p_download.add_argument(
         "-o",
         "--output",
@@ -109,9 +107,7 @@ def parser_submodule(parser, parent_parser) -> None:
         description=textwrap.dedent(phylotree.__doc__),
     )
     input_type = p_tree.add_mutually_exclusive_group(required=True)
-    input_type.add_argument(
-        "-i", "--inputs", nargs="+", help="Multiple sequence alignment fasta"
-    )
+    input_type.add_argument("-i", "--inputs", nargs="+", help="Multiple sequence alignment fasta")
     input_type.add_argument(
         "-I",
         "--input_dir",
@@ -132,9 +128,7 @@ def parser_submodule(parser, parent_parser) -> None:
         default="upgma",
         help='Algorithm used for tree building (default="upgma")',
     )
-    p_tree.add_argument(
-        "-f", "--figure", action="store_true", help="Generate a matplotlib tree figure"
-    )
+    p_tree.add_argument("-f", "--figure", action="store_true", help="Generate a matplotlib tree figure")
     # p_tree.add_argument('-t', '--threads', type=int, default=1, help="Threads for hmmsearch (default=1)")
     p_tree.set_defaults(func=phylotree)
 
@@ -149,9 +143,7 @@ def main():
     alignment among the orthologs found across samples. The tree module help to
     build a phylogenetic tree.
     """
-    logging.basicConfig(
-        format="%(asctime)s PHYling %(levelname)s %(message)s", level="INFO"
-    )
+    logging.basicConfig(format="%(asctime)s PHYling %(levelname)s %(message)s", level="INFO")
     logger = logging.getLogger()
 
     # Create namespace object conf
@@ -170,9 +162,7 @@ def main():
     # Build parent_parser which contains shared arguments, and do not use it directly
     parent_parser = argparse.ArgumentParser(add_help=False)
 
-    parent_parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Verbose mode for debug"
-    )
+    parent_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode for debug")
 
     # The real parser for user
     parser = argparse.ArgumentParser(

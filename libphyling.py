@@ -89,9 +89,7 @@ class msa_generator:
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
             seq_end_idx = seq_start_idx + self._seq_count[idx]
-            logging.debug(
-                f"Sequences start idx: {seq_start_idx}; end idx: {seq_end_idx}"
-            )
+            logging.debug(f"Sequences start idx: {seq_start_idx}; end idx: {seq_end_idx}")
             sub_sequences = self._sequences[seq_start_idx:seq_end_idx]
             for seq in sub_sequences:
                 # Replace description to taxon name
@@ -140,9 +138,7 @@ class msa_generator:
 
         # Create an empty MultipleSeqAlignment object to store the alignment results
         alignment = MultipleSeqAlignment([])
-        for name, aligned_seq, seq_info in zip(
-            MSA.names, MSA.alignment, MSA.sequences
-        ):
+        for name, aligned_seq, seq_info in zip(MSA.names, MSA.alignment, MSA.sequences):
             alignment.append(
                 SeqRecord(
                     Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),

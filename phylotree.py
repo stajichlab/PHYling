@@ -41,9 +41,7 @@ def phylotree(inputs, input_dir, output, method, figure, **kwargs):
     if inputs[0].name == "concat_alignments.faa":
         logging.info("Generate phylogenetic tree the on concatenated fasta")
     else:
-        logging.info(
-            "Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree"
-        )
+        logging.info("Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree")
     output = Path(output)
     output.mkdir(exist_ok=True)
 

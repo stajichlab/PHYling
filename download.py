@@ -57,9 +57,7 @@ class Data_updater(ABC):
         logging.debug(f"Check {self._filetype} exist or not ...")
         if self._data.is_file():
             logging.debug(f"{self._filetype} exist ({self._data})")
-            logging.debug(
-                f"Compare md5 checksums between the online latest record and the local {self._filetype}"
-            )
+            logging.debug(f"Compare md5 checksums between the online latest record and the local {self._filetype}")
             if self._get_local_md5 == self._get_remote_md5:
                 logging.debug("md5 is the same. No need to update metadata")
                 return self._load_data()
@@ -123,9 +121,7 @@ class HMM_markerset_updater(Data_updater):
         self._filetype = "HMM markerset"
         self._database_url = "/".join([self._database_url, "lineages"])
         self._markerset = metadata[name]
-        self._data = (
-            output_dir / name / "md5sum"
-        )  # Using md5sum file to represent the database.
+        self._data = output_dir / name / "md5sum"  # Using md5sum file to represent the database.
         self._data_url = self._markerset["url"]
 
     @property
