@@ -116,7 +116,6 @@ class msa_generator:
                 for hits in pyhmmer.hmmsearch(hmm_file, sub_sequences, cpus=threads):
                     cog = hits.query_name.decode()
                     for hit in hits:
-                        cog = hit.query_name.decode()
                         if (use_cutoffs and hit.score < cutoffs[cog]) or (not use_cutoffs and hit.evalue > evalue):
                             continue
 
