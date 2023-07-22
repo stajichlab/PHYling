@@ -69,13 +69,18 @@ python3 ../phyling.py download fungi_odb10
 ```
 
 ### Find the orthologs and align them
-Next use the align module to get orthologs among all the samples by hmmsearch. 
-HMM profiles having matches on more than 3 samples are considered **orthologs**.
-For each ortholog, the seqeunces extracted from each sample are underwent multiple sequence alignment.
-By default the alignment is done by **hmmalign**. You can switch to **muscle** by specifying `-M/--method muscle`.
+The align module identify the orthologs among all the samples using *hmmsearch*.
+HMM profiles that have matches on more than 3 samples are considered **orthologs**.
+
+Before conducting *hmmsearch*, the module will first search for the bitscore cutoff file within the root HMM folder.
+If the cutoff file is not found, the reporting threshold for *hmmsearch* will be determined based on the `-E/-evalue` (default is 1e-10).
+
+Once the orthologs are identified, the sequences extracted from each sample undergo multiple sequence alignment.
+By default, the alignment is performed using the *hmmalign* method.
+However, users have the option to switch to using *muscle* by specifying the `-M/--method muscle flag`.
 
 By default, each alignment result is output separately and is expected to resolve their phylogeny by consensus tree method.
-If you prefer to use concatenate strategy. You can concatenate all the alignment by passing `-c/--concat`. 
+If you prefer to use concatenate strategy. You can concatenate all the alignment by passing `-c/--concat`.
 See all the options with `phyling.py align --help`.
 ```
 options:
@@ -90,7 +95,7 @@ options:
   -m MARKERSET, --markerset MARKERSET
                         Directory of the HMM markerset
   -E EVALUE, --evalue EVALUE
-                        Hmmsearch reporting threshold (default=1e-10)
+                        Hmmsearch reporting threshold when score cutoff file is not found (default=1e-10)
   -M {hmmalign,muscle}, --method {hmmalign,muscle}
                         Program used for multiple sequence alignment (default="hmmalign")
   -n, --non_trim        Report non-clipkit-trimmed alignment results

@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import sys
+import csv
 import tempfile
 import typing
 from copy import deepcopy
@@ -77,10 +78,25 @@ class msa_generator:
         # Use the concatnated fasta in order to retrieve sequences by index later
         self._sequences = seq_file.read_block()
 
+    def _get_cutoffs(self) -> dict:
+        cutoffs = {}
+        try:
+            with open(self._markerset.parent / "scores_cutoff", 'r') as f:
+                for line in csv.reader(f, delimiter='\t'):
+                    if line[0].startswith("#"):
+                        continue
+                    cutoffs[line[0]] = float(line[1])
+        except FileNotFoundError:
+            logging.warning("Cutoff file for HMM not found")
+        return cutoffs
+
     def search(self, markerset: Path, evalue: float, threads: int) -> None:
         self._markerset = markerset
         all_hmms = list(self._markerset.iterdir())
         logging.info(f"Found {len(all_hmms)} hmm markers")
+        cutoffs = self._get_cutoffs()
+        logging.info(f"Found {len(cutoffs)} hmm marker cutoffs")
+        use_cutoffs = len(cutoffs) == len(all_hmms)
 
         self.orthologs = {}
         self._kh = pyhmmer.easel.KeyHash()
@@ -97,15 +113,15 @@ class msa_generator:
                 # ortholog sequences by SequenceObject[kh[seq.name]]
                 self._kh.add(seq.name)
             with HMMFiles(*all_hmms) as hmm_file:
-                for hits in pyhmmer.hmmsearch(hmm_file, sub_sequences, E=evalue, cpus=threads):
+                for hits in pyhmmer.hmmsearch(hmm_file, sub_sequences, cpus=threads):
                     cog = hits.query_name.decode()
                     for hit in hits:
-                        if hit.included:
-                            if cog in self.orthologs:
-                                self.orthologs[cog].add(hit.name)
-                            else:
-                                self.orthologs[cog] = set([hit.name])
-                            break  # The first hit in hits is the best hit
+                        cog = hit.query_name.decode()
+                        if (use_cutoffs and hit.score < cutoffs[cog]) or (not use_cutoffs and hit.evalue > evalue):
+                            continue
+
+                        self.orthologs.setdefault(cog, set()).add(hit.name)
+                        break  # The first hit in hits is the best hit
             seq_start_idx = seq_end_idx
             logging.info(f"Hmmsearch on {sample.name} done")
 
@@ -245,24 +261,24 @@ class msa_generator:
 
 def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, threads, **kwargs):
     """
-    The align module generates multiple sequence alignment (MSA) results from the
-    orthologous protein sequences that match the hmm markers across samples.
+    The align module performs multiple sequence alignment (MSA) on orthologous
+    protein sequences that match the hmm markers across samples.
 
-    First, Hmmsearch is used to match the samples against given markerset and report
-    the top hit of each sample for each hmm profile to represent "orthologs" among
-    all samples. Note that you should have at least 3 samples since the overall
-    purpose is to build a tree.
+    Initially, Hmmsearch is used to match the samples against a given markerset and
+    report the top hit of each sample for each hmm marker, representing "orthologs"
+    across all samples. In order to build a tree, minimum of 3 samples should be
+    used. If the bitscore cutoff file is present in the hmms folder, it will be used
+    as the cutoff. Otherwise, an evalue of 1e-10 will be used as the default cutoff.
 
-    Next, the sequences are extracted from each input for orthologs found in more
-    than 3 inputs. These sequences are then underwent MSA. (Use hmmalign by default)
-    The MSA results will further be trimmed by clipkit by default. If you wish not
-    to trim it, use -n/--non_trim to disable the trimming step.
+    Sequences corresponding to orthologs found in more than 3 samples are extracted
+    from each input. These sequences then undergo MSA with hmmalign or muscle. The
+    resulting alignment is further trimmed using clipkit by default. You can use the
+    -n/--non_trim option to skip the trimming step.
 
-    By default, the alignment results will output separately by hmm marker. The
-    consensus tree method should be applied to build a phlogenetic tree.
-
-    If you prefer to use the concatenate strategy, you can use -c/--concat to
-    concatenate the aligned sequences by sample and build a single tree afterward.
+    By default, the alignment results are output separately for each hmm marker. The
+    consensus tree method is applying by default to construct a phylogenetic tree.
+    You can use the -c/--concat option to concatenate the aligned sequences by sample
+    and build a single tree afterward.
     """
     # If args.input_dir is used to instead of args.inputs
     if input_dir:
