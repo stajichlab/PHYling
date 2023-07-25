@@ -1,16 +1,15 @@
 import contextlib
+import csv
 import logging
 import os
 import re
 import subprocess
 import sys
-import csv
 import tempfile
-import typing
 from copy import deepcopy
 from functools import partialmethod
 from io import BytesIO
-from itertools import chain, product
+from itertools import product
 from multiprocessing.dummy import Pool
 from pathlib import Path
 
@@ -20,23 +19,10 @@ from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from clipkit import clipkit
-from pyhmmer.plan7 import HMM, HMMFile
 from tqdm import tqdm
 
 # Disable tqdm progress bar implemented in clipkit
 tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-
-
-class HMMFiles(typing.ContextManager[typing.Iterable[HMM]]):
-    def __init__(self, *files: Path) -> None:
-        self.stack = contextlib.ExitStack()
-        self.hmmfiles = [self.stack.enter_context(HMMFile(f)) for f in files]
-
-    def __enter__(self) -> typing.Iterable[HMM]:
-        return chain.from_iterable(self.hmmfiles)
-
-    def __exit__(self, exc_value: object, exc_type: object, traceback: object) -> None:
-        self.stack.close()
 
 
 def concat_Bytes_streams(files: list) -> "tuple[BytesIO, list]":
@@ -78,6 +64,15 @@ class msa_generator:
         # Use the concatnated fasta in order to retrieve sequences by index later
         self._sequences = seq_file.read_block()
 
+    def _load_hmms(self) -> dict:
+        hmms = {}
+        for hmm_path in list(self._markerset.iterdir()):
+            with pyhmmer.plan7.HMMFile(hmm_path) as hmm_file:
+                hmm = hmm_file.read()
+            hmms[hmm.name.decode()] = hmm
+        logging.info(f"Found {len(hmms)} hmm markers")
+        return hmms
+
     def _get_cutoffs(self) -> dict:
         cutoffs = {}
         try:
@@ -86,17 +81,20 @@ class msa_generator:
                     if line[0].startswith("#"):
                         continue
                     cutoffs[line[0]] = float(line[1])
+            logging.info(f"Found {len(cutoffs)} hmm marker cutoffs")
         except FileNotFoundError:
-            logging.warning("Cutoff file for HMM not found")
+            logging.warning("HMM cutoff file not found")
         return cutoffs
 
     def search(self, markerset: Path, evalue: float, threads: int) -> None:
         self._markerset = markerset
-        all_hmms = list(self._markerset.iterdir())
-        logging.info(f"Found {len(all_hmms)} hmm markers")
+        self._hmms = self._load_hmms()
         cutoffs = self._get_cutoffs()
-        logging.info(f"Found {len(cutoffs)} hmm marker cutoffs")
-        use_cutoffs = len(cutoffs) == len(all_hmms)
+        if len(cutoffs) == len(self._hmms):
+            logging.info("Use HMM cutoff file to determine cutoff")
+        else:
+            logging.info("Use evalue to determine cutoff")
+            cutoffs = None
 
         self.orthologs = {}
         self._kh = pyhmmer.easel.KeyHash()
@@ -112,15 +110,13 @@ class msa_generator:
                 # Use a KeyHash to store seq.name/index pairs which can be used to retreive
                 # ortholog sequences by SequenceObject[kh[seq.name]]
                 self._kh.add(seq.name)
-            with HMMFiles(*all_hmms) as hmm_file:
-                for hits in pyhmmer.hmmsearch(hmm_file, sub_sequences, cpus=threads):
-                    cog = hits.query_name.decode()
-                    for hit in hits:
-                        if (use_cutoffs and hit.score < cutoffs[cog]) or (not use_cutoffs and hit.evalue > evalue):
-                            continue
-
-                        self.orthologs.setdefault(cog, set()).add(hit.name)
-                        break  # The first hit in hits is the best hit
+            for hits in pyhmmer.hmmsearch(self._hmms.values(), sub_sequences, cpus=threads):
+                cog = hits.query_name.decode()
+                for hit in hits:
+                    if (cutoffs and hit.score < cutoffs[cog]) or (not cutoffs and hit.evalue > evalue):
+                        continue
+                    self.orthologs.setdefault(cog, set()).add(hit.name)
+                    break  # The first hit in hits is the best hit
             seq_start_idx = seq_end_idx
             logging.info(f"Hmmsearch on {sample.name} done")
 
@@ -139,9 +135,8 @@ class msa_generator:
             seqs.append(self._sequences[self._kh[hit]])
 
         # HMMalign the ortholog sequences to the corresponding HMM markers
-        with HMMFile(self._markerset / f"{hmm}.hmm") as hmm_file:
-            hmm_profile = hmm_file.read()
-            MSA = pyhmmer.hmmalign(hmm_profile, seqs, trim=True)
+        hmm_profile = self._hmms[hmm]
+        MSA = pyhmmer.hmmalign(hmm_profile, seqs, trim=True)
 
         # Create an empty MultipleSeqAlignment object to store the alignment results
         alignment = MultipleSeqAlignment([])
