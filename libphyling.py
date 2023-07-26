@@ -39,21 +39,30 @@ def concat_Bytes_streams(files: list) -> "tuple[BytesIO, list]":
     BytesIO
         A BytesIO object that can use as a regular bytes stream.
     list
-        A list that recorded the sequence length of each fasta file.
+        A list that includes a tuple of start and end index of each fasta file.
     """
     concat_stream = BytesIO()
     seq_count = []
+    count = 0
     for file in files:
-        count = 0
+        start_idx = count
         with open(file, "rb") as f:
             for line in f.readlines():
                 concat_stream.write(line)
                 if line.startswith(b">"):
                     count += 1
             concat_stream.write(b"\n")
-        seq_count.append(count)
+        seq_count.append((start_idx, count))
     concat_stream.seek(0)  # Change the stream position to the start of the stream
     return concat_stream, seq_count
+
+
+def dict_merge(dicts_list):
+    result = {}
+    for d in dicts_list:
+        for k, v in d.items():
+            result.setdefault(k, set()).add(v)
+    return result
 
 
 class msa_generator:
@@ -76,8 +85,8 @@ class msa_generator:
     def _get_cutoffs(self) -> dict:
         cutoffs = {}
         try:
-            with open(self._markerset.parent / "scores_cutoff", 'r') as f:
-                for line in csv.reader(f, delimiter='\t'):
+            with open(self._markerset.parent / "scores_cutoff", "r") as f:
+                for line in csv.reader(f, delimiter="\t"):
                     if line[0].startswith("#"):
                         continue
                     cutoffs[line[0]] = float(line[1])
@@ -85,6 +94,18 @@ class msa_generator:
         except FileNotFoundError:
             logging.warning("HMM cutoff file not found")
         return cutoffs
+
+    def _run_hmmsearch(self, sample, sequence, cutoffs, evalue, threads=4):
+        results = {}
+        for hits in pyhmmer.hmmsearch(self._hmms.values(), sequence, cpus=threads):
+            cog = hits.query_name.decode()
+            for hit in hits:
+                if (cutoffs and hit.score < cutoffs[cog]) or (not cutoffs and hit.evalue > evalue):
+                    continue
+                results.setdefault(cog, hit.name)
+                break  # The first hit in hits is the best hit
+        logging.info(f"Hmmsearch on {sample} done")
+        return results
 
     def search(self, markerset: Path, evalue: float, threads: int) -> None:
         self._markerset = markerset
@@ -96,29 +117,41 @@ class msa_generator:
             logging.info("Use evalue to determine cutoff")
             cutoffs = None
 
-        self.orthologs = {}
+        search_res = []
         self._kh = pyhmmer.easel.KeyHash()
-        seq_start_idx = 0
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
-            seq_end_idx = seq_start_idx + self._seq_count[idx]
-            logging.debug(f"Sequences start idx: {seq_start_idx}; end idx: {seq_end_idx}")
-            sub_sequences = self._sequences[seq_start_idx:seq_end_idx]
+            sub_sequences = self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]]
             for seq in sub_sequences:
                 # Replace description to taxon name
                 seq.description = sample.name.encode()
                 # Use a KeyHash to store seq.name/index pairs which can be used to retreive
                 # ortholog sequences by SequenceObject[kh[seq.name]]
                 self._kh.add(seq.name)
-            for hits in pyhmmer.hmmsearch(self._hmms.values(), sub_sequences, cpus=threads):
-                cog = hits.query_name.decode()
-                for hit in hits:
-                    if (cutoffs and hit.score < cutoffs[cog]) or (not cutoffs and hit.evalue > evalue):
-                        continue
-                    self.orthologs.setdefault(cog, set()).add(hit.name)
-                    break  # The first hit in hits is the best hit
-            seq_start_idx = seq_end_idx
-            logging.info(f"Hmmsearch on {sample.name} done")
+            if threads >= 8:
+                pass
+            else:
+                # Single process mode
+                logging.debug(f"Run in single process mode with {threads} threads")
+                search_res.append(self._run_hmmsearch(sample.name, sub_sequences, cutoffs, evalue, threads))
+        # Multi processes mode
+        if threads >= 8:
+            processes = threads // 4
+            logging.debug(f"Run in multiprocesses mode. {processes} jobs with 4 threads for each are run concurrently")
+            with Pool(processes) as pool:
+                search_res = pool.starmap(
+                    self._run_hmmsearch,
+                    [
+                        (
+                            sample.name,
+                            self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]],
+                            cutoffs,
+                            evalue,
+                        )
+                        for idx, sample in enumerate(self._inputs)
+                    ],
+                )
+        self.orthologs = dict_merge(search_res)
 
     @property
     def filter_orthologs(self):
