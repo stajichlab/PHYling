@@ -25,7 +25,7 @@ from tqdm import tqdm
 tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
 
-def concat_Bytes_streams(files: list) -> "tuple[BytesIO, list]":
+def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
     """
     Create a in-memory BytesIO to hold the concatenated fasta files.
 
@@ -57,7 +57,7 @@ def concat_Bytes_streams(files: list) -> "tuple[BytesIO, list]":
     return concat_stream, seq_count
 
 
-def dict_merge(dicts_list):
+def dict_merge(dicts_list: list[dict]) -> dict:
     result = {}
     for d in dicts_list:
         for k, v in d.items():
@@ -66,14 +66,14 @@ def dict_merge(dicts_list):
 
 
 class msa_generator:
-    def __init__(self, inputs: list):
+    def __init__(self, inputs: list[Path]):
         self._inputs = inputs
         concat_stream, self._seq_count = concat_Bytes_streams(inputs)
         seq_file = pyhmmer.easel.SequenceFile(concat_stream, digital=True)
         # Use the concatnated fasta in order to retrieve sequences by index later
         self._sequences = seq_file.read_block()
 
-    def _load_hmms(self) -> dict:
+    def _load_hmms(self) -> dict[pyhmmer.plan7.HMM]:
         hmms = {}
         for hmm_path in list(self._markerset.iterdir()):
             with pyhmmer.plan7.HMMFile(hmm_path) as hmm_file:
@@ -95,7 +95,9 @@ class msa_generator:
             logging.warning("HMM cutoff file not found")
         return cutoffs
 
-    def _run_hmmsearch(self, sample, sequence, cutoffs, evalue, threads=4):
+    def _run_hmmsearch(
+        self, sample: str, sequence: pyhmmer.easel.DigitalSequence, cutoffs: dict, evalue: float, threads: int = 4
+    ) -> dict:
         results = {}
         for hits in pyhmmer.hmmsearch(self._hmms.values(), sequence, cpus=threads):
             cog = hits.query_name.decode()
@@ -121,7 +123,7 @@ class msa_generator:
         self._kh = pyhmmer.easel.KeyHash()
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
-            sub_sequences = self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]]
+            sub_sequences = self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]]
             for seq in sub_sequences:
                 # Replace description to taxon name
                 seq.description = sample.name.encode()
@@ -144,7 +146,7 @@ class msa_generator:
                     [
                         (
                             sample.name,
-                            self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]],
+                            self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]],
                             cutoffs,
                             evalue,
                         )
