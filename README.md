@@ -120,12 +120,15 @@ python3 ../phyling.py align -i pep/Afum.aa.fasta pep/Rant.aa.fasta pep/Scer.aa.f
 ```
 **Note: Required at least 3 samples in order to build a tree!**
 
-Accelerate by using 10 threads. 
-The hmmsearch step is not parallized so 10 threads will be used to process sample in each loop.
-For the alignment step, 10 parallel jobs will be launched with single-thread for each job.
+Accelerate by using 16 cpus.
+According to [pyhmmer benchmark](https://pyhmmer.readthedocs.io/en/stable/benchmarks.html) the multithread acceleration drop dramatically when more cpu is used.
+When less then 8 cpus are given, the hmmsearch step will run in single-thread manner and all cpus will be used for each round of hmmsearch.
+When 8 or more cpus are given, the hmmsearch step will use 4 cpus for each parallel job.
+In this example, 4 hmmsearch jobs will run parallelly and each job utilize 4 cpus.
+For the alignment step, 16 parallel jobs will be launched and each parallel job is running in single-thread manner.
 Highly recommended if **muscle** is chosen for alignment. (**muscle** is much slower than **hmmalign**)
 ```
-python3 ../phyling.py align -I pep -m HMM/fungi_odb10/hmms -t 10
+python3 ../phyling.py align -I pep -m HMM/fungi_odb10/hmms -t 16
 ```
 
 ### Build tree on multiple sequence alignment results
