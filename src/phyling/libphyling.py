@@ -252,9 +252,16 @@ class msa_generator:
             if method == "muscle":
                 with tempfile.TemporaryDirectory() as tempdir:
                     logging.debug(f"Create tempdir at: {tempdir}")
-                    alignmentList = pool.starmap(
-                        self._run_muscle, [(hmm, hits, tempdir) for hmm, hits in self.orthologs.items()]
-                    )
+                    try:
+                        alignmentList = pool.starmap(
+                            self._run_muscle, [(hmm, hits, tempdir) for hmm, hits in self.orthologs.items()]
+                        )
+                    except FileNotFoundError:
+                        logging.error(
+                            f'{method} not found, please install it through "conda install -c bioconda muscle>=5.1" '
+                            "or build from the source following the instruction on https://github.com/rcedgar/muscle"
+                        )
+                        sys.exit(1)
             else:
                 alignmentList = pool.starmap(self._run_hmmalign, [(hmm, hits) for hmm, hits in self.orthologs.items()])
             logging.info("MSA done")
