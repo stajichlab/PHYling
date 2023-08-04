@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-
-from Bio import AlignIO
-from Bio import Phylo
+from Bio import AlignIO, Phylo
 from Bio.Phylo.Consensus import majority_consensus
 from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
 

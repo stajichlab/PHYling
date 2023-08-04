@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 
 import argparse
 import logging
@@ -7,9 +8,10 @@ import textwrap
 from pathlib import Path
 from types import SimpleNamespace
 
-from download import download
-from libphyling import main as search_align
-from phylotree import phylotree
+from ._version import __version__
+from .download import download
+from .libphyling import main as search_align
+from .phylotree import phylotree
 
 
 def parser_submodule(parser, parent_parser) -> None:
@@ -175,7 +177,7 @@ def main():
         epilog=textwrap.dedent(main._epilog),
     )
 
-    parser.add_argument("-V", "--version", action="version", version=main.__version__)
+    parser.add_argument("-V", "--version", action="version", version=__version__)
 
     parser_submodule(parser, parent_parser)
 
@@ -195,7 +197,6 @@ def main():
 
 
 main.__name__ = "PHYling"
-main.__version__ = "0.5"
 main._epilog = """
 Written by Jason Stajich (2014-2017)
 jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com

@@ -11,7 +11,7 @@ The assumptions in this approach are that the markers are generally single copy 
 The marker sets developed for this approach in fungi are available as part of the [1KFG Phylogenomics_HMMs](https://github.com/1KFG/Phylogenomics_HMMs) project resource and preferred use of the [BUSCO marker sets](https://busco-data.ezlab.org/v5/data/lineages/).
 
 ### Flow chart
-![PHYling flowchart](phyling_flowchart.png)
+![PHYling flowchart](misc/phyling_flowchart.png)
 
 ### New features compared to the original version
 - Using pyhmmer to improve the multithread performance in hmmsearch and hmmalign.
@@ -20,8 +20,10 @@ The marker sets developed for this approach in fungi are available as part of th
 - Muscle is now available for alternative alignment method.
 
 ## Usage
+First of all, install the package following the [instruction](#requirements-and-installation) below.
+
 PHYling is a package to extract phylogenomic markers and build a phylogenetic
-tree upon them. It comprises 3 modules - download, align and tree. Use `python3 phyling.py --help` to see more details.
+tree upon them. It comprises 3 modules - download, align and tree. Use `phyling --help` to see more details.
 ```
 positional arguments:
   {download,align,tree}
@@ -36,15 +38,15 @@ optional arguments:
   -V, --version         show program's version number and exit
 ```
 
-To test run on the example files, please `cd` into the folder `test`.
+To test run on the example files, please `cd` into the folder `example`.
 ```
-cd test
+cd example
 ```
-The folder `test/pep` includes 4 example peptide fasta - **Afum.aa.fasta**, **Rant.aa.fasta**, **Scer.aa.fasta** and **Zymps1.aa.fasta**.
+The folder `example/pep` includes 4 example peptide fasta - **Afum.aa.fasta**, **Rant.aa.fasta**, **Scer.aa.fasta** and **Zymps1.aa.fasta**.
 
 ### Download HMM markerset
 The download module is used to download the HMM markerset from BUSCO website. (Currently is updated to v5) 
-See all options with `phyling.py download --help`.
+See all options with `phyling download --help`.
 ```
 positional arguments:
   HMM markerset or "list"
@@ -60,12 +62,12 @@ optional arguments:
 
 Firstly, use `download list` to show the available BUSCO markersets.
 ```
-python3 ../phyling.py download list
+phyling download list
 ```
 
 Copy and paste the markerset to download it. Here we use `fungi_odb10` as example.
 ```
-python3 ../phyling.py download fungi_odb10
+phyling download fungi_odb10
 ```
 
 ### Find the orthologs and align them
@@ -81,7 +83,7 @@ However, users have the option to switch to using *muscle* by specifying the `-M
 
 By default, each alignment result is output separately and is expected to resolve their phylogeny by consensus tree method.
 If you prefer to use concatenate strategy. You can concatenate all the alignment by passing `-c/--concat`.
-See all the options with `phyling.py align --help`.
+See all the options with `phyling align --help`.
 ```
 options:
   -h, --help            show this help message and exit
@@ -106,17 +108,17 @@ options:
 
 Run the align module with all the fasta files under folder `pep`.
 ```
-python3 ../phyling.py align -I pep -m HMM/fungi_odb10/hmms
+phyling align -I pep -m HMM/fungi_odb10/hmms
 ```
 
 An equivalent way to send inputs.
 ```
-python3 ../phyling.py align -i pep/*.fasta -m HMM/fungi_odb10/hmms
+phyling align -i pep/*.fasta -m HMM/fungi_odb10/hmms
 ```
 
 Or if you're just interested in part of the fasta, you can specify the inputs one-by-one.
 ```
-python3 ../phyling.py align -i pep/Afum.aa.fasta pep/Rant.aa.fasta pep/Scer.aa.fasta -m HMM/fungi_odb10/hmms
+phyling align -i pep/Afum.aa.fasta pep/Rant.aa.fasta pep/Scer.aa.fasta -m HMM/fungi_odb10/hmms
 ```
 **Note: Required at least 3 samples in order to build a tree!**
 
@@ -126,15 +128,16 @@ When less then 8 cpus are given, the hmmsearch step will run in single-thread ma
 When 8 or more cpus are given, the hmmsearch step will use 4 cpus for each parallel job.
 In this example, 4 hmmsearch jobs will run parallelly and each job utilize 4 cpus.
 For the alignment step, 16 parallel jobs will be launched and each parallel job is running in single-thread manner.
-Highly recommended if **muscle** is chosen for alignment. (**muscle** is much slower than **hmmalign**)
+
+Highly recommended if **muscle** is chosen for alignment. (**muscle** is much slower than **hmmalign**!!)
 ```
-python3 ../phyling.py align -I pep -m HMM/fungi_odb10/hmms -t 16
+phyling align -I pep -m HMM/fungi_odb10/hmms -t 16
 ```
 
 ### Build tree on multiple sequence alignment results
 Finally, we can run the tree module to use the multiple sequence alignment results to build a phylogenetic tree. 
 It support both *consensus tree* (conclude the majority of trees which was built upon each single gene) and *concatenated alignment* method. 
-See all the options with `phyling.py tree --help`.
+See all the options with `phyling tree --help`.
 ```
 optional arguments:
   -h, --help            show this help message and exit
@@ -152,34 +155,39 @@ optional arguments:
 
 Run the tree module with all the alignment results under folder `align`.
 ```
-python3 ../phyling.py tree -I align
+phyling tree -I align
 ```
 
 You can also use only part of the alignment results to build tree.
 ```
-python3 ../phyling.py tree -i align/100957at4751.faa align/174653at4751.faa align/255412at4751.faa
+phyling tree -i align/100957at4751.faa align/174653at4751.faa align/255412at4751.faa
 ```
 
 Use Neighbor Joining algorithm instead of the default UPGMA method for tree building.
 ```
-python3 ../phyling.py tree -I align -m nj
+phyling tree -I align -m nj
 ```
 
 Use matplotlib to generate a tree figure.
 ```
-python3 ../phyling.py tree -I align -f
+phyling tree -I align -f
 ```
 
-## Requirements
+## Requirements and Installation
 - Python >= 3.7
 - [Biopython](https://biopython.org/)
 - [pyhmmer](https://pyhmmer.readthedocs.io/en/stable/index.html), a HMMER3 implementation on python3.
-- [muscle](https://drive5.com/muscle5/) for alternative method for multiple sequence alignment.
 - [clipkit](https://jlsteenwyk.com/ClipKIT/) for trimming.
+- [muscle](https://drive5.com/muscle5/) for alternative method for multiple sequence alignment. (Optional)
 
-Use the env.yaml to install all the required packages
+Use the environment.yml to install all the required packages
 ```
-conda env create -f env.yaml
+conda env create -f environment.yml
+```
+
+Go into the phyling folder and install the package through pip
+```
+pip install .
 ```
 
 ## Notes

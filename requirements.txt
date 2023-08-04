@@ -1,0 +1,4 @@
+biopython>=1.79
+clipkit>=1.4.1
+pyhmmer>=0.8.1
+matplotlib>=3.5.3

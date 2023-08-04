@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 import pickle
@@ -184,7 +186,7 @@ def download(database, cfg_dir, markerset, output, **kwargs) -> None:
         # Adjust databases display according to the terminal size
         width, _ = shutil.get_terminal_size((80, 24))
         col = width // 40
-        url_list = [url_list[x: x + col] for x in range(0, len(url_list), col)]
+        url_list = [url_list[x : x + col] for x in range(0, len(url_list), col)]
         col_width = max(len(word) for row in url_list for word in row) + 3  # padding
         for row in url_list:
             # Print the database list
