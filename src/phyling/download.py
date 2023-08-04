@@ -138,6 +138,7 @@ class HMM_markerset_updater(Data_updater):
 
     def _save_data(self, data):
         output = self._data.parent
+        output.mkdir(parents=True, exist_ok=True)
         logging.debug(f"Save to {output}.tar.gz")
         with open(f"{output}.tar.gz", "wb") as f:
             f.write(data)
