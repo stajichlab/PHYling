@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import gzip
 import logging
 import os
 import re
@@ -48,12 +49,18 @@ def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
     count = 0
     for file in files:
         start_idx = count
-        with open(file, "rb") as f:
-            for line in f.readlines():
-                concat_stream.write(line)
-                if line.startswith(b">"):
-                    count += 1
-            concat_stream.write(b"\n")
+        f = open(file, "rb")
+        if f.read(2) == b"\x1f\x8b":
+            f.close()
+            f = gzip.open(file, "rb")
+        else:
+            f.seek(0)
+        for line in f.readlines():
+            concat_stream.write(line)
+            if line.startswith(b">"):
+                count += 1
+        concat_stream.write(b"\n")
+        f.close()
         seq_count.append((start_idx, count))
     concat_stream.seek(0)  # Change the stream position to the start of the stream
     return concat_stream, seq_count
