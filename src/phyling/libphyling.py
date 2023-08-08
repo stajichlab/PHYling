@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import contextlib
 import csv
 import gzip
 import logging
-import os
 import re
 import subprocess
 import sys
 import tempfile
 from copy import deepcopy
-from functools import partialmethod
 from io import BytesIO
 from itertools import product
 from multiprocessing.dummy import Pool
@@ -21,11 +18,8 @@ from Bio import AlignIO, SeqIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from clipkit import clipkit
-from tqdm import tqdm
-
-# Disable tqdm progress bar implemented in clipkit
-tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+from clipkit.helpers import SeqType, get_gap_chars, keep_trim_and_log
+from clipkit.modes import TrimmingMode
 
 
 def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
@@ -226,22 +220,25 @@ class msa_generator:
 
     def _run_clipcit(self, hmm: str, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
         # Use clipkit to trim MSA alignment
-        keepD, _ = clipkit.keep_trim_and_log(
+        logger = logging.getLogger()
+        logger.setLevel("ERROR")
+        for handler in logger.handlers:
+            handler.setLevel("ERROR")
+        keep_msa, _, _ = keep_trim_and_log(
             alignment,
             gaps=0.9,
-            mode=clipkit.TrimmingMode("gappy"),
+            mode=TrimmingMode("gappy"),
             use_log=False,
-            outFile=f"{hmm}.faa",
+            out_file_name=f"{hmm}.faa",
             complement=False,
-            char=clipkit.SeqType("aa"),
+            gap_chars=get_gap_chars(SeqType.aa),
+            quiet=True,
         )
 
-        clipkit.check_if_all_sites_were_trimmed(keepD)
-
-        seqList = []
-        for seq in keepD.keys():
-            seqList.append(SeqRecord(Seq(str(keepD[seq])), id=str(seq), description=""))
-        alignment = MultipleSeqAlignment(seqList)
+        alignment = keep_msa.to_bio_msa()
+        logger.setLevel("INFO")
+        for handler in logger.handlers:
+            handler.setLevel("INFO")
         return alignment
 
     def align(self, output: Path, method: str, non_trim: bool, concat: bool, threads: int) -> None:
@@ -280,10 +277,9 @@ class msa_generator:
 
             # Output the alingment fasta without clipkit trimming
             if not non_trim:
-                with open(os.devnull, "w") as temp_out, contextlib.redirect_stdout(temp_out):
-                    alignmentList = pool.starmap(
-                        self._run_clipcit, zip([hmm for hmm in self.orthologs.keys()], alignmentList)
-                    )
+                alignmentList = pool.starmap(
+                    self._run_clipcit, zip([hmm for hmm in self.orthologs.keys()], alignmentList)
+                )
                 logging.info("Clipkit done")
 
         for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
