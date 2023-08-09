@@ -7,19 +7,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "phyling"
+version = "0.5"
 authors = [
   { name="Jason Stajich", email="jasonstajich.phd@gmail.com" },
   { name="Cheng-Hung Tsai", email="chenghung.tsai@email.ucr.edu" },
 ]
+license = {file = "LICENSE"}
 description = "A lightweight phylogenetic tree builder from annotated genomes"
 readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-dynamic = ["version", "dependencies"]
+dynamic = ["dependencies"]
 
 [project.scripts]
 phyling = "phyling.phyling:main"
@@ -29,7 +36,6 @@ phyling = "phyling.phyling:main"
 "Bug Tracker" = "https://github.com/stajichlab/PHYling_unified/issues"
 
 [tool.setuptools.dynamic]
-version = {attr = "phyling.__version__"}
 dependencies = {file = ["requirements.txt"]}
 
 [tool.pytest.ini_options]

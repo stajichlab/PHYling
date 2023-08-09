@@ -8,7 +8,11 @@ import textwrap
 from pathlib import Path
 from types import SimpleNamespace
 
-from ._version import __version__
+try:
+    from importlib.metadata import version
+except ImportError:
+    from importlib_metadata import version
+
 from .download import download
 from .libphyling import main as search_align
 from .phylotree import phylotree
@@ -177,7 +181,7 @@ def main():
         epilog=textwrap.dedent(main._epilog),
     )
 
-    parser.add_argument("-V", "--version", action="version", version=__version__)
+    parser.add_argument("-V", "--version", action="version", version=version("phyling"))
 
     parser_submodule(parser, parent_parser)
 

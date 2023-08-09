@@ -1,4 +1,5 @@
 biopython>=1.79
-clipkit>=1.4.1
+clipkit>=2.0.1
+importlib-metadata; python_version<"3.8"
 pyhmmer>=0.8.1
 matplotlib>=3.5.3
