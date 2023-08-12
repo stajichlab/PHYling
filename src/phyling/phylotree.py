@@ -19,7 +19,8 @@ def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
 
 
 def phylotree(inputs, input_dir, output, method, figure, **kwargs):
-    """Construct a phylogenetic tree based on the results of multiple sequence alignment (MSA).
+    """
+    Construct a phylogenetic tree based on the results of multiple sequence alignment (MSA).
 
     If multiple MSA results are given, the consensus tree method will be employed, using a 50% cutoff to represent
     the majority of all the trees.

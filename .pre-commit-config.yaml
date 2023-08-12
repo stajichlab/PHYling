@@ -56,5 +56,6 @@ repos:
           - --source
           - --explain
           - --convention=google
+          - --add-ignore=D212
         additional_dependencies: ["toml", "tomli"]
         exclude: ^tests

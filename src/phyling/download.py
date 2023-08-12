@@ -190,7 +190,8 @@ class HMM_markerset_updater(Data_updater):
 
 
 def download(database, cfg_dir, markerset, output, **kwargs) -> None:
-    """Help to download/update BUSCO v5 markerset to a local folder.
+    """
+    Help to download/update BUSCO v5 markerset to a local folder.
 
     First it check whether the ~/.phyling/metadata.pickle is exist. A missing or outdated file will trigger the module
     to update the metadata.

@@ -318,7 +318,8 @@ class msa_generator:
 
 
 def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, threads, **kwargs):
-    """Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
+    """
+    Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
 
     Initially, Hmmsearch is used to match the samples against a given markerset and report the top hit of each sample
     for each hmm marker, representing "orthologs" across all samples. In order to build a tree, minimum of 3 samples
