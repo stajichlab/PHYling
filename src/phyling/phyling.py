@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""The PHYling CLI menu and sub-process execution."""
 from __future__ import annotations
 
 import argparse
@@ -19,6 +20,7 @@ from .phylotree import phylotree
 
 
 def parser_submodule(parser, parent_parser) -> None:
+    """Parser for command line inputs."""
     subparsers = parser.add_subparsers()
 
     # Each subparser would finally called the corresponding function
@@ -65,7 +67,7 @@ def parser_submodule(parser, parent_parser) -> None:
         "--output",
         type=Path,
         default="./align",
-        help='Output diretory of the alignment results (default="./align")',
+        help='Output directory of the alignment results (default="./align")',
     )
     p_aln.add_argument(
         "-m",
@@ -129,7 +131,7 @@ def parser_submodule(parser, parent_parser) -> None:
         "--output",
         type=Path,
         default=".",
-        help='Output diretory of the newick treefile (default=".")',
+        help='Output directory of the newick treefile (default=".")',
     )
     p_tree.add_argument(
         "-M",
@@ -143,7 +145,8 @@ def parser_submodule(parser, parent_parser) -> None:
 
 
 def main():
-    """
+    """The PHYling tool for constructing phylogenetic trees from proteome datasets.
+
     PHYling is a package to extract phylogenomic markers and build a phylogenetic
     tree upon them. It comprises 3 modules - download, align and tree.
 

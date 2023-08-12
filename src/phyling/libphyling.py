@@ -1,3 +1,4 @@
+"""Library of routines for supporting PHYling process."""
 from __future__ import annotations
 
 import csv
@@ -23,8 +24,7 @@ from clipkit.modes import TrimmingMode
 
 
 def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
-    """
-    Create a in-memory BytesIO to hold the concatenated fasta files.
+    """Create a in-memory BytesIO to hold the concatenated fasta files.
 
     Attributes
     ----------
@@ -61,6 +61,7 @@ def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
 
 
 def dict_merge(dicts_list: list[dict]) -> dict:
+    """Helper function to merge dictionaries."""
     result = {}
     for d in dicts_list:
         for k, v in d.items():
@@ -69,7 +70,9 @@ def dict_merge(dicts_list: list[dict]) -> dict:
 
 
 class msa_generator:
+    """Generate a multiple sequence alignment using hmmer or muscle."""
     def __init__(self, inputs: list[Path]):
+        """Initialize the MSA generator object."""
         self._inputs = inputs
         concat_stream, self._seq_count = concat_Bytes_streams(inputs)
         seq_file = pyhmmer.easel.SequenceFile(concat_stream, digital=True)
@@ -77,6 +80,7 @@ class msa_generator:
         self._sequences = seq_file.read_block()
 
     def _load_hmms(self) -> dict[pyhmmer.plan7.HMM]:
+        """Run the pyhmmer steps for loading HMMs for search or alignment."""
         hmms = {}
         for hmm_path in list(self._markerset.iterdir()):
             with pyhmmer.plan7.HMMFile(hmm_path) as hmm_file:
@@ -86,9 +90,10 @@ class msa_generator:
         return hmms
 
     def _get_cutoffs(self) -> dict:
+        """Retrieve the E-value cutoffs for each specific HMM to use in searching."""
         cutoffs = {}
         try:
-            with open(self._markerset.parent / "scores_cutoff", "r") as f:
+            with open(self._markerset.parent / "scores_cutoff") as f:
                 for line in csv.reader(f, delimiter="\t"):
                     if line[0].startswith("#"):
                         continue
@@ -101,6 +106,12 @@ class msa_generator:
     def _run_hmmsearch(
         self, sample: str, sequence: pyhmmer.easel.DigitalSequence, cutoffs: dict, evalue: float, threads: int = 4
     ) -> dict:
+        """Run the hmmsearch process using the pyhmmer library.
+
+        This supports multithreaded running. Empirical testing shows that efficiency drops off after more than
+        four (4) CPU threads are used so the defaults are best here if applied.
+
+        """
         results = {}
         for hits in pyhmmer.hmmsearch(self._hmms.values(), sequence, cpus=threads):
             cog = hits.query_name.decode()
@@ -113,6 +124,7 @@ class msa_generator:
         return results
 
     def search(self, markerset: Path, evalue: float, threads: int) -> None:
+        """Search a database of proteins with a set of HMMs to find matching protein sequences."""
         self._markerset = markerset
         self._hmms = self._load_hmms()
         cutoffs = self._get_cutoffs()
@@ -126,11 +138,11 @@ class msa_generator:
         self._kh = pyhmmer.easel.KeyHash()
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
-            sub_sequences = self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]]
+            sub_sequences = self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]]
             for seq in sub_sequences:
                 # Replace description to taxon name
                 seq.description = sample.name.encode()
-                # Use a KeyHash to store seq.name/index pairs which can be used to retreive
+                # Use a KeyHash to store seq.name/index pairs which can be used to retrieve
                 # ortholog sequences by SequenceObject[kh[seq.name]]
                 self._kh.add(seq.name)
             if threads >= 8:
@@ -149,7 +161,7 @@ class msa_generator:
                     [
                         (
                             sample.name,
-                            self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]],
+                            self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]],
                             cutoffs,
                             evalue,
                         )
@@ -160,6 +172,7 @@ class msa_generator:
 
     @property
     def filter_orthologs(self):
+        """Filter the found sequence hits from an HMM search."""
         try:
             self.orthologs = dict(filter(lambda item: len(item[1]) >= 3, self.orthologs.items()))
         except AttributeError:
@@ -167,6 +180,7 @@ class msa_generator:
         logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples")
 
     def _run_hmmalign(self, hmm: str, hits: set) -> MultipleSeqAlignment:
+        """Perform an alignment of a set of protein sequences against a target HMM using pyhmmer."""
         # Create an empty SequenceBlock object to store the sequences of the orthologs
         seqs = pyhmmer.easel.DigitalSequenceBlock(pyhmmer.easel.Alphabet.amino())
         for hit in hits:
@@ -190,11 +204,12 @@ class msa_generator:
         return alignment
 
     def _run_muscle(self, hmm: str, hits: set, output: str) -> MultipleSeqAlignment:
+        """Run the multiple sequence alignment tool muscle. This assumes muscle v5 CLI interface and options."""
         with open(f"{output}/{hmm}.faa", "wb+") as f:
             for hit in hits:
                 seq = self._sequences[self._kh[hit]].copy()
                 seq.name = deepcopy(seq.description)
-                seq.description = "".encode()
+                seq.description = b""
                 seq.write(f)
 
         _ = subprocess.check_call(
@@ -207,7 +222,7 @@ class msa_generator:
 
     # Fill sequence with "-" for missing samples
     def _fill_missing_taxon(self, taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
-        missing = set(taxonList) - set([seq.id for seq in alignment])
+        missing = set(taxonList) - {seq.id for seq in alignment}
         for sample in missing:
             alignment.append(
                 SeqRecord(
@@ -218,7 +233,7 @@ class msa_generator:
             )
         return alignment
 
-    def _run_clipcit(self, hmm: str, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
+    def _run_clipkit(self, hmm: str, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
         # Use clipkit to trim MSA alignment
         logger = logging.getLogger()
         logger.setLevel("ERROR")
@@ -242,6 +257,7 @@ class msa_generator:
         return alignment
 
     def align(self, output: Path, method: str, non_trim: bool, concat: bool, threads: int) -> None:
+        """Align a set of identify orthologous proteins."""
         concat_alignments = {sample.name: "" for sample in self._inputs}
 
         concat_alignments = MultipleSeqAlignment([])
@@ -275,10 +291,10 @@ class msa_generator:
             )
             logging.info("Filling missing taxon done")
 
-            # Output the alingment fasta without clipkit trimming
+            # Output the alignment fasta without clipkit trimming
             if not non_trim:
                 alignmentList = pool.starmap(
-                    self._run_clipcit, zip([hmm for hmm in self.orthologs.keys()], alignmentList)
+                    self._run_clipkit, zip([hmm for hmm in self.orthologs.keys()], alignmentList)
                 )
                 logging.info("Clipkit done")
 
@@ -301,7 +317,8 @@ class msa_generator:
 
 
 def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, threads, **kwargs):
-    """
+    """Primary function for running the PHYling pipeline for alignment of protein sequences.
+
     The align module performs multiple sequence alignment (MSA) on orthologous
     protein sequences that match the hmm markers across samples.
 

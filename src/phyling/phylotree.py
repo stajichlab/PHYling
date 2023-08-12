@@ -1,3 +1,4 @@
+"""Phylogenetic tree construction methods."""
 from __future__ import annotations
 
 import logging
@@ -6,10 +7,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from Bio import AlignIO, Phylo
 from Bio.Phylo.Consensus import majority_consensus
-from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
+from Bio.Phylo.TreeConstruction import (DistanceCalculator,
+                                        DistanceTreeConstructor)
 
 
 def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
+    """Run the tree calculation using a simple distance method."""
     MSA = AlignIO.read(file, format="fasta")
     calculator = DistanceCalculator("identity")
     constructor = DistanceTreeConstructor(calculator, method)
@@ -17,7 +20,8 @@ def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
 
 
 def phylotree(inputs, input_dir, output, method, figure, **kwargs):
-    """
+    """Construct a phylogenetic tree from input data set.
+
     The tree module utilizes the Biopython Phylo module to construct a phylogenetic
     tree based on the results of multiple sequence alignment (MSA).
 
