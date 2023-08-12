@@ -6,10 +6,10 @@ name: Python version
 on:
   push:
     branches: [ "main" ]
-    paths: [ "**.py" ]
+    paths: [ "**.py", "environment.yaml", "requirements.txt" ]
   pull_request:
     branches: [ "main" ]
-    paths: [ "**.py" ]
+    paths: [ "**.py", "environment.yaml", "requirements.txt" ]
 
 jobs:
   build:
