@@ -1,3 +1,4 @@
+"""Phylogenetic tree construction methods."""
 from __future__ import annotations
 
 import logging
@@ -10,6 +11,7 @@ from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstruct
 
 
 def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
+    """Run the tree calculation using a simple distance method."""
     MSA = AlignIO.read(file, format="fasta")
     calculator = DistanceCalculator("identity")
     constructor = DistanceTreeConstructor(calculator, method)
@@ -17,19 +19,17 @@ def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
 
 
 def phylotree(inputs, input_dir, output, method, figure, **kwargs):
-    """
-    The tree module utilizes the Biopython Phylo module to construct a phylogenetic
-    tree based on the results of multiple sequence alignment (MSA).
+    """Construct a phylogenetic tree based on the results of multiple sequence alignment (MSA).
 
-    If multiple MSA results are given, the consensus tree method will be employed,
-    using a 50% cutoff to represent the majority of all the trees.
+    If multiple MSA results are given, the consensus tree method will be employed, using a 50% cutoff to represent
+    the majority of all the trees.
 
-    By default, the UPGMA algorithm is used for tree construction. Users can switch
-    to the Neighbor Joining method by specifying the -m/--method nj.
+    By default, the UPGMA algorithm is used for tree construction. Users can switch to the Neighbor Joining method by
+    specifying the -m/--method nj.
 
-    Once the tree is built, an ASCII figure representing the tree will be displayed,
-    and a treefile in Newick format will be generated as output. Additionally, users
-    can choose to obtain a matplotlib-style figure using the -f/--figure option.
+    Once the tree is built, an ASCII figure representing the tree will be displayed, and a treefile in Newick format
+    will be generated as output. Additionally, users can choose to obtain a matplotlib-style figure using the
+    -f/--figure option.
     """
     # If args.input_dir is used to instead of args.inputs
     logging.info(f"Algorithm choose for tree building: {method}")

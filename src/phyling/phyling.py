@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""The PHYling CLI menu and sub-process execution."""
 from __future__ import annotations
 
 import argparse
@@ -19,6 +20,7 @@ from .phylotree import phylotree
 
 
 def parser_submodule(parser, parent_parser) -> None:
+    """Parser for command line inputs."""
     subparsers = parser.add_subparsers()
 
     # Each subparser would finally called the corresponding function
@@ -65,7 +67,7 @@ def parser_submodule(parser, parent_parser) -> None:
         "--output",
         type=Path,
         default="./align",
-        help='Output diretory of the alignment results (default="./align")',
+        help='Output directory of the alignment results (default="./align")',
     )
     p_aln.add_argument(
         "-m",
@@ -129,7 +131,7 @@ def parser_submodule(parser, parent_parser) -> None:
         "--output",
         type=Path,
         default=".",
-        help='Output diretory of the newick treefile (default=".")',
+        help='Output directory of the newick treefile (default=".")',
     )
     p_tree.add_argument(
         "-M",
@@ -143,14 +145,11 @@ def parser_submodule(parser, parent_parser) -> None:
 
 
 def main():
-    """
-    PHYling is a package to extract phylogenomic markers and build a phylogenetic
-    tree upon them. It comprises 3 modules - download, align and tree.
+    """A package to extract phylogenomic markers and build a phylogenetic tree upon them.
 
-    The download module can be used to download HMM markerset from BUSCO. The align
-    module is the core element of this package which generate multiple sequence
-    alignment among the orthologs found across samples. The tree module help to
-    build a phylogenetic tree.
+    PhYling comprises 3 modules - download, align and tree. The download module can be used to download HMM markerset
+    from BUSCO. The align module is the core element of this package which generate multiple sequence alignment among
+    the orthologs found across samples. The tree module help to build a phylogenetic tree.
     """
     logging.basicConfig(format="%(asctime)s PHYling %(levelname)s %(message)s", level="INFO")
     logger = logging.getLogger()
@@ -202,12 +201,10 @@ def main():
 
 main.__name__ = "PHYling"
 main._epilog = """
-Written by Jason Stajich (2014-2017)
-jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com
-Rewritten by Cheng-Hung Tsai chenghung.tsai[at]email.ucr.edu
+Written by Jason Stajich (jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com).
+Rewritten by Cheng-Hung Tsai (chenghung.tsai[at]email.ucr.edu).
 
-Initially written https://github.com/1KFG/Phylogenomics and
-https://github.com/stajichlab/phyling
+Initially written https://github.com/1KFG/Phylogenomics and https://github.com/stajichlab/phyling.
 """
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # PHYling tool
 The unified PHYling pipeline for phylogenomic data collection from annotated genomes.
 
-This is latest iteration of tool for using phylogenetically conserved markers to pull out informative 
+This is latest iteration of tool for using phylogenetically conserved markers to pull out informative
 gene or protein info from genomic and transcriptomic datasets in order to construct gene trees and species phylogenies.
 
 The aligned markers can be extracted from protein sequences for phylogenetic analyses and also projected into coding sequence alignments for codon-based analyses for better resolution of recently diverged species.
@@ -45,7 +45,7 @@ cd example
 The folder `example/pep` includes 4 example peptide fasta - **Afum.aa.fasta**, **Rant.aa.fasta**, **Scer.aa.fasta** and **Zymps1.aa.fasta**.
 
 ### Download HMM markerset
-The download module is used to download the HMM markerset from BUSCO website. (Currently is updated to v5) 
+The download module is used to download the HMM markerset from BUSCO website. (Currently is updated to v5)
 See all options with `phyling download --help`.
 ```
 positional arguments:
@@ -93,7 +93,7 @@ options:
   -I INPUT_DIR, --input_dir INPUT_DIR
                         Directory containing query pepetide fasta
   -o OUTPUT, --output OUTPUT
-                        Output diretory of the alignment results (default="./align")
+                        Output directory of the alignment results (default="./align")
   -m MARKERSET, --markerset MARKERSET
                         Directory of the HMM markerset
   -E EVALUE, --evalue EVALUE
@@ -135,8 +135,8 @@ phyling align -I pep -m HMM/fungi_odb10/hmms -t 16
 ```
 
 ### Build tree on multiple sequence alignment results
-Finally, we can run the tree module to use the multiple sequence alignment results to build a phylogenetic tree. 
-It support both *consensus tree* (conclude the majority of trees which was built upon each single gene) and *concatenated alignment* method. 
+Finally, we can run the tree module to use the multiple sequence alignment results to build a phylogenetic tree.
+It support both *consensus tree* (conclude the majority of trees which was built upon each single gene) and *concatenated alignment* method.
 See all the options with `phyling tree --help`.
 ```
 optional arguments:
@@ -147,7 +147,7 @@ optional arguments:
   -I INPUT_DIR, --input_dir INPUT_DIR
                         Directory containing multiple sequence alignment fasta
   -o OUTPUT, --output OUTPUT
-                        Output diretory of the newick treefile (default=".")
+                        Output directory of the newick treefile (default=".")
   -m {upgma,nj}, --method {upgma,nj}
                         Algorithm used for tree building (default="upgma")
   -f, --figure          Generate a matplotlib tree figure

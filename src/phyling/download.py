@@ -1,3 +1,4 @@
+"""Supporting routines for downloading data especially BUSCO markers."""
 from __future__ import annotations
 
 import hashlib
@@ -13,29 +14,35 @@ from urllib.request import urlopen
 
 
 class Data_updater(ABC):
+    """Dataset representations for storing, updating, and retrieving BUSCO markers."""
+
     def __init__(self, database_url, **kwargs):
+        """Initialize database URL."""
         self._database_url = database_url
 
     @property
     @abstractmethod
     def _get_local_md5(self):
+        """A function for computing md5 of local downloads to check as to whether to update."""
         pass
 
     @property
     @abstractmethod
     def _get_remote_md5(self):
+        """A function for checking remote md5 for downloads to check as to whether to update."""
         pass
 
     def _load_data(self):
+        """A function for loading datasets up."""
         pass
 
     @abstractmethod
     def _save_data(self, data):
+        """A function for saving datasets from downloading."""
         pass
 
     def fetch_url(self, url) -> bytes:
-        """
-        Download the content from the url.
+        """Download data content from a url.
 
         Attributes
         ----------
@@ -56,6 +63,7 @@ class Data_updater(ABC):
         return content
 
     def updater(self) -> dict:
+        """Function determines whether to update local copy of data download."""
         logging.debug(f"Check {self._filetype} exist or not ...")
         if self._data.is_file():
             logging.debug(f"{self._filetype} exist ({self._data})")
@@ -78,7 +86,14 @@ class Data_updater(ABC):
 
 
 class Metadata_updater(Data_updater):
+    """Update local metadata for local dataset storage for BUSCO markers.
+
+    This writes to user defined cfg_dir for storing metata about version and
+    dataset names for downloading BUSCO markers.
+    """
+
     def __init__(self, database_url, cfg_dir):
+        """Initialize metadata object and local db file."""
         super().__init__(database_url)
         self._filetype = "metadata"
         self._data = cfg_dir / "metadata.pickle"
@@ -87,24 +102,29 @@ class Metadata_updater(Data_updater):
 
     @property
     def get_metadata_path(self):
+        """Obtain the local metadata DB path."""
         return self._data
 
     @property
     def _get_local_md5(self):
+        """Retrieve the local cached md5 checksums."""
         with open(self._data, "rb") as f:
             _, md5 = pickle.load(f)
         return md5
 
     @property
     def _get_remote_md5(self):
+        """Retrieve the remote md5 checksum for a file."""
         return self.fetch_url(self._metadata_md5_url).decode().strip("\n")
 
     def _load_data(self):
+        """Load local metadata DB file."""
         with open(self._data, "rb") as f:
             data, _ = pickle.load(f)
         return data
 
     def _save_data(self, data):
+        """Save metadata into local DB file."""
         markerset = {}
         for line in data.decode().split("\n"):
             line = line.split("\t")
@@ -118,7 +138,10 @@ class Metadata_updater(Data_updater):
 
 
 class HMM_markerset_updater(Data_updater):
+    """Update and store local copy of HMM files into destination."""
+
     def __init__(self, database_url, output_dir, metadata: dict, name: str):
+        """Initialize the markerset objects for download and retrieval."""
         super().__init__(database_url)
         self._filetype = "HMM markerset"
         self._database_url = "/".join([self._database_url, "lineages"])
@@ -128,15 +151,18 @@ class HMM_markerset_updater(Data_updater):
 
     @property
     def _get_local_md5(self):
-        with open(self._data, "r") as f:
+        """Read and retrieve local md5 checksums."""
+        with open(self._data) as f:
             md5 = f.read().strip("\n")
         return md5
 
     @property
     def _get_remote_md5(self):  # Actually is the md5sum recorded in markerset_dict
+        """Get the md5sum stored in theh markerset_dict object."""
         return self._markerset["md5"]
 
     def _save_data(self, data):
+        """Save the marker dataset into a folder for HMM use."""
         output = self._data.parent
         output.mkdir(parents=True, exist_ok=True)
         logging.debug(f"Save to {output}.tar.gz")
@@ -164,16 +190,13 @@ class HMM_markerset_updater(Data_updater):
 
 
 def download(database, cfg_dir, markerset, output, **kwargs) -> None:
-    """
-    The download module helps to download/update BUSCO markerset. Current using
-    BUSCO v5 database.
+    """Help to download/update BUSCO v5 markerset to a local folder.
 
-    First it check whether the ~/.phyling/metadata.pickle is exist. A missing or
-    outdated file will trigger the module to update the metadata.
+    First it check whether the ~/.phyling/metadata.pickle is exist. A missing or outdated file will trigger the module
+    to update the metadata.
 
-    Passing "list" to markerset argument will list all the available markersets.
-    Passing a valid name to the markerset argument will download the markerset to
-    the given output path.
+    Passing "list" to markerset argument will list all the available markersets. Passing a valid name to the markerset
+    argument will download the markerset to the given output path.
     """
     metadata_updater = Metadata_updater(database_url=database, cfg_dir=cfg_dir)
     markerset_dict = metadata_updater.updater()
