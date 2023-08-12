@@ -33,6 +33,7 @@ repos:
           - --max-line-length=456
           - --show-source
           - --statistics
+          - --ignore=E203
         exclude: ^tests/augustus*
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.3.1
