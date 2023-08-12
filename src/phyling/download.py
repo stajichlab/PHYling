@@ -15,6 +15,7 @@ from urllib.request import urlopen
 
 class Data_updater(ABC):
     """Dataset representations for storing, updating, and retrieving BUSCO markers."""
+
     def __init__(self, database_url, **kwargs):
         """Initialize database URL."""
         self._database_url = database_url
@@ -90,6 +91,7 @@ class Metadata_updater(Data_updater):
     This writes to user defined cfg_dir for storing metata about version and
     dataset names for downloading BUSCO markers.
     """
+
     def __init__(self, database_url, cfg_dir):
         """Initialize metadata object and local db file."""
         super().__init__(database_url)
@@ -137,6 +139,7 @@ class Metadata_updater(Data_updater):
 
 class HMM_markerset_updater(Data_updater):
     """Update and store local copy of HMM files into destination."""
+
     def __init__(self, database_url, output_dir, metadata: dict, name: str):
         """Initialize the markerset objects for download and retrieval."""
         super().__init__(database_url)
@@ -187,17 +190,13 @@ class HMM_markerset_updater(Data_updater):
 
 
 def download(database, cfg_dir, markerset, output, **kwargs) -> None:
-    """Download the BUSCO marker sets into a local folder.
+    """Help to download/update BUSCO v5 markerset to a local folder.
 
-    The download module helps to download/update BUSCO markerset. Currently using
-    BUSCO v5 database.
+    First it check whether the ~/.phyling/metadata.pickle is exist. A missing or outdated file will trigger the module
+    to update the metadata.
 
-    First it check whether the ~/.phyling/metadata.pickle is exist. A missing or
-    outdated file will trigger the module to update the metadata.
-
-    Passing "list" to markerset argument will list all the available markersets.
-    Passing a valid name to the markerset argument will download the markerset to
-    the given output path.
+    Passing "list" to markerset argument will list all the available markersets. Passing a valid name to the markerset
+    argument will download the markerset to the given output path.
     """
     metadata_updater = Metadata_updater(database_url=database, cfg_dir=cfg_dir)
     markerset_dict = metadata_updater.updater()
@@ -211,7 +210,7 @@ def download(database, cfg_dir, markerset, output, **kwargs) -> None:
         # Adjust databases display according to the terminal size
         width, _ = shutil.get_terminal_size((80, 24))
         col = width // 40
-        url_list = [url_list[x: x + col] for x in range(0, len(url_list), col)]
+        url_list = [url_list[x : x + col] for x in range(0, len(url_list), col)]
         col_width = max(len(word) for row in url_list for word in row) + 3  # padding
         for row in url_list:
             # Print the database list

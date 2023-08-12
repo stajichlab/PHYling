@@ -71,6 +71,7 @@ def dict_merge(dicts_list: list[dict]) -> dict:
 
 class msa_generator:
     """Generate a multiple sequence alignment using hmmer or muscle."""
+
     def __init__(self, inputs: list[Path]):
         """Initialize the MSA generator object."""
         self._inputs = inputs
@@ -138,7 +139,7 @@ class msa_generator:
         self._kh = pyhmmer.easel.KeyHash()
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
-            sub_sequences = self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]]
+            sub_sequences = self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]]
             for seq in sub_sequences:
                 # Replace description to taxon name
                 seq.description = sample.name.encode()
@@ -161,7 +162,7 @@ class msa_generator:
                     [
                         (
                             sample.name,
-                            self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]],
+                            self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]],
                             cutoffs,
                             evalue,
                         )
@@ -317,26 +318,20 @@ class msa_generator:
 
 
 def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, threads, **kwargs):
-    """Primary function for running the PHYling pipeline for alignment of protein sequences.
+    """Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
 
-    The align module performs multiple sequence alignment (MSA) on orthologous
-    protein sequences that match the hmm markers across samples.
+    Initially, Hmmsearch is used to match the samples against a given markerset and report the top hit of each sample
+    for each hmm marker, representing "orthologs" across all samples. In order to build a tree, minimum of 3 samples
+    should be used. If the bitscore cutoff file is present in the hmms folder, it will be used as the cutoff. Otherwise,
+    an evalue of 1e-10 will be used as the default cutoff.
 
-    Initially, Hmmsearch is used to match the samples against a given markerset and
-    report the top hit of each sample for each hmm marker, representing "orthologs"
-    across all samples. In order to build a tree, minimum of 3 samples should be
-    used. If the bitscore cutoff file is present in the hmms folder, it will be used
-    as the cutoff. Otherwise, an evalue of 1e-10 will be used as the default cutoff.
+    Sequences corresponding to orthologs found in more than 3 samples are extracted from each input. These sequences
+    then undergo MSA with hmmalign or muscle. The resulting alignment is further trimmed using clipkit by default. You
+    can use the -n/--non_trim option to skip the trimming step.
 
-    Sequences corresponding to orthologs found in more than 3 samples are extracted
-    from each input. These sequences then undergo MSA with hmmalign or muscle. The
-    resulting alignment is further trimmed using clipkit by default. You can use the
-    -n/--non_trim option to skip the trimming step.
-
-    By default, the alignment results are output separately for each hmm marker. The
-    consensus tree method is applying by default to construct a phylogenetic tree.
-    You can use the -c/--concat option to concatenate the aligned sequences by sample
-    and build a single tree afterward.
+    By default, the alignment results are output separately for each hmm marker. The consensus tree method is applying
+    by default to construct a phylogenetic tree. You can use the -c/--concat option to concatenate the aligned
+    sequences by sample and build a single tree afterward.
     """
     # If args.input_dir is used to instead of args.inputs
     if input_dir:

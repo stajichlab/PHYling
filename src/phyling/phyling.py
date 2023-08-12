@@ -145,15 +145,11 @@ def parser_submodule(parser, parent_parser) -> None:
 
 
 def main():
-    """The PHYling tool for constructing phylogenetic trees from proteome datasets.
+    """A package to extract phylogenomic markers and build a phylogenetic tree upon them.
 
-    PHYling is a package to extract phylogenomic markers and build a phylogenetic
-    tree upon them. It comprises 3 modules - download, align and tree.
-
-    The download module can be used to download HMM markerset from BUSCO. The align
-    module is the core element of this package which generate multiple sequence
-    alignment among the orthologs found across samples. The tree module help to
-    build a phylogenetic tree.
+    PhYling comprises 3 modules - download, align and tree. The download module can be used to download HMM markerset
+    from BUSCO. The align module is the core element of this package which generate multiple sequence alignment among
+    the orthologs found across samples. The tree module help to build a phylogenetic tree.
     """
     logging.basicConfig(format="%(asctime)s PHYling %(levelname)s %(message)s", level="INFO")
     logger = logging.getLogger()
@@ -205,12 +201,10 @@ def main():
 
 main.__name__ = "PHYling"
 main._epilog = """
-Written by Jason Stajich (2014-2017)
-jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com
-Rewritten by Cheng-Hung Tsai chenghung.tsai[at]email.ucr.edu
+Written by Jason Stajich (jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com).
+Rewritten by Cheng-Hung Tsai (chenghung.tsai[at]email.ucr.edu).
 
-Initially written https://github.com/1KFG/Phylogenomics and
-https://github.com/stajichlab/phyling
+Initially written https://github.com/1KFG/Phylogenomics and https://github.com/stajichlab/phyling.
 """
 
 if __name__ == "__main__":
