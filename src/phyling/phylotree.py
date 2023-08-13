@@ -9,6 +9,8 @@ from Bio import AlignIO, Phylo
 from Bio.Phylo.Consensus import majority_consensus
 from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
 
+import phyling.config
+
 
 def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
     """Run the tree calculation using a simple distance method."""
@@ -39,7 +41,7 @@ def phylotree(inputs, input_dir, output, method, figure, **kwargs):
     else:
         inputs = [Path(sample) for sample in inputs]
     logging.info(f"Found {len(inputs)} MSA fasta")
-    if inputs[0].name == "concat_alignments.faa":
+    if inputs[0].name == f"concat_alignments.{phyling.config.prot_aln_ext}":
         logging.info("Generate phylogenetic tree the on concatenated fasta")
     else:
         logging.info("Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree")

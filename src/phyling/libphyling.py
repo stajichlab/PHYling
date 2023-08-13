@@ -22,6 +22,8 @@ from Bio.SeqRecord import SeqRecord
 from clipkit.helpers import SeqType, get_gap_chars, keep_trim_and_log
 from clipkit.modes import TrimmingMode
 
+import phyling.config
+
 
 def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
     """Create a in-memory BytesIO to hold the concatenated fasta files.
@@ -61,7 +63,7 @@ def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
 
 
 def dict_merge(dicts_list: list[dict]) -> dict:
-    """Helper function to merge dictionaries."""
+    """Merge dictionaries with this helper function."""
     result = {}
     for d in dicts_list:
         for k, v in d.items():
@@ -77,7 +79,7 @@ class msa_generator:
         self._inputs = inputs
         concat_stream, self._seq_count = concat_Bytes_streams(inputs)
         seq_file = pyhmmer.easel.SequenceFile(concat_stream, digital=True)
-        # Use the concatnated fasta in order to retrieve sequences by index later
+        # Use the concatenated fasta in order to retrieve sequences by index later
         self._sequences = seq_file.read_block()
 
     def _load_hmms(self) -> dict[pyhmmer.plan7.HMM]:
@@ -139,7 +141,7 @@ class msa_generator:
         self._kh = pyhmmer.easel.KeyHash()
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
-            sub_sequences = self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]]
+            sub_sequences = self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]]
             for seq in sub_sequences:
                 # Replace description to taxon name
                 seq.description = sample.name.encode()
@@ -162,7 +164,7 @@ class msa_generator:
                     [
                         (
                             sample.name,
-                            self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]],
+                            self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]],
                             cutoffs,
                             evalue,
                         )
@@ -206,7 +208,7 @@ class msa_generator:
 
     def _run_muscle(self, hmm: str, hits: set, output: str) -> MultipleSeqAlignment:
         """Run the multiple sequence alignment tool muscle. This assumes muscle v5 CLI interface and options."""
-        with open(f"{output}/{hmm}.faa", "wb+") as f:
+        with open(f"{output}/{hmm}.{phyling.config.prot_aln_ext}", "wb+") as f:
             for hit in hits:
                 seq = self._sequences[self._kh[hit]].copy()
                 seq.name = deepcopy(seq.description)
@@ -214,15 +216,18 @@ class msa_generator:
                 seq.write(f)
 
         _ = subprocess.check_call(
-            ["muscle", "-align", f"{output}/{hmm}.faa", "-output", f"{output}/{hmm}.aln.faa", "-threads", "1"],
+            ["muscle", "-align", f"{output}/{hmm}.faa",
+             "-output", f"{output}/{hmm}.{phyling.config.prot_aln_ext}",
+             "-threads", "1"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
         )
-        alignment = AlignIO.read(f"{output}/{hmm}.aln.faa", "fasta")
+        alignment = AlignIO.read(f"{output}/{hmm}.{phyling.config.prot_aln_ext}", "fasta")
         return alignment
 
     # Fill sequence with "-" for missing samples
     def _fill_missing_taxon(self, taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
+        """Include empty gap-only strings in alignment for taxa lacking an ortholog."""
         missing = set(taxonList) - {seq.id for seq in alignment}
         for sample in missing:
             alignment.append(
@@ -245,7 +250,7 @@ class msa_generator:
             gaps=0.9,
             mode=TrimmingMode("gappy"),
             use_log=False,
-            out_file_name=f"{hmm}.faa",
+            out_file_name=f"{hmm}.{phyling.config.prot_aln_ext}",
             complement=False,
             gap_chars=get_gap_chars(SeqType.aa),
             quiet=True,
@@ -300,7 +305,7 @@ class msa_generator:
                 logging.info("Clipkit done")
 
         for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
-            output_aa = output / f"{hmm}.faa"
+            output_aa = output / f"{hmm}.{phyling.config.protein_ext}"
             alignment.sort()
             if concat:
                 concat_alignments += alignment
@@ -309,7 +314,7 @@ class msa_generator:
                     SeqIO.write(alignment, f, format="fasta")
 
         if concat:
-            output_concat = output / "concat_alignments.faa"
+            output_concat = output / f"concat_alignments.{phyling.config.prot_aln_ext}"
             with open(output_concat, "w") as f:
                 SeqIO.write(concat_alignments, f, format="fasta")
             logging.info(f"Output concatenated fasta to {output_concat}")
