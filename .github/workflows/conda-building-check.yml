@@ -3,10 +3,10 @@ name: Conda build
 on:
   push:
     branches: [ "main" ]
-    paths: [ "**.py" ]
+    paths: [ "**.py", "environment.yml" ]
   pull_request:
     branches: [ "main" ]
-    paths: [ "**.py" ]
+    paths: [ "**.py", "environment.yml" ]
 
 jobs:
   build-linux:
