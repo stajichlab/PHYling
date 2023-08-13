@@ -14,7 +14,7 @@ from urllib.request import urlopen
 
 
 class Data_updater(ABC):
-    """Dataset representations for storing, updating, and retrieving BUSCO markers."""
+    """Store, update and retrieve BUSCO markers."""
 
     def __init__(self, database_url, **kwargs):
         """Initialize database URL."""
@@ -23,26 +23,26 @@ class Data_updater(ABC):
     @property
     @abstractmethod
     def _get_local_md5(self):
-        """A function for computing md5 of local downloads to check as to whether to update."""
+        """Compute md5 of local downloads to check as to whether to update."""
         pass
 
     @property
     @abstractmethod
     def _get_remote_md5(self):
-        """A function for checking remote md5 for downloads to check as to whether to update."""
+        """Check remote md5 for downloads to check as to whether to update."""
         pass
 
     def _load_data(self):
-        """A function for loading datasets up."""
+        """Load datasets up."""
         pass
 
     @abstractmethod
     def _save_data(self, data):
-        """A function for saving datasets from downloading."""
+        """Save datasets when downloading."""
         pass
 
     def fetch_url(self, url) -> bytes:
-        """Download data content from a url.
+        """Fetch URL data content.
 
         Attributes
         ----------
@@ -63,7 +63,7 @@ class Data_updater(ABC):
         return content
 
     def updater(self) -> dict:
-        """Function determines whether to update local copy of data download."""
+        """Determine whether to update local copy of data download."""
         logging.debug(f"Check {self._filetype} exist or not ...")
         if self._data.is_file():
             logging.debug(f"{self._filetype} exist ({self._data})")
@@ -211,7 +211,7 @@ def download(database, cfg_dir, markerset, output, **kwargs) -> None:
         # Adjust databases display according to the terminal size
         width, _ = shutil.get_terminal_size((80, 24))
         col = width // 40
-        url_list = [url_list[x : x + col] for x in range(0, len(url_list), col)]
+        url_list = [url_list[x: x + col] for x in range(0, len(url_list), col)]
         col_width = max(len(word) for row in url_list for word in row) + 3  # padding
         for row in url_list:
             # Print the database list
