@@ -14,6 +14,8 @@ try:
 except ImportError:
     from importlib_metadata import version
 
+import phyling.config
+
 from .download import download
 from .libphyling import main as search_align
 from .phylotree import phylotree
@@ -37,8 +39,8 @@ def parser_submodule(parser, parent_parser) -> None:
         "-o",
         "--output",
         type=Path,
-        default="./HMM",
-        help='Output directory to save HMM markerset (default="./HMM")',
+        default=f"./{phyling.config.default_HMM}",
+        help=f'Output directory to save HMM markerset (default="./{phyling.config.default_HMM}")',
     )
     p_download.set_defaults(func=download)
 
