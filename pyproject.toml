@@ -15,11 +15,9 @@ authors = [
 license = {file = "LICENSE"}
 description = "A lightweight phylogenetic tree builder from annotated genomes"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 classifiers = [
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -32,7 +30,7 @@ dynamic = ["dependencies"]
 phyling = "phyling.phyling:main"
 
 [project.urls]
-"Homepage" = "https://github.com/stajichlab/PHYling_unified/tree/rewrite"
+"Homepage" = "https://github.com/stajichlab/PHYling_unified"
 "Bug Tracker" = "https://github.com/stajichlab/PHYling_unified/issues"
 
 [tool.setuptools.dynamic]
