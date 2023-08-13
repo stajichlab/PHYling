@@ -1,3 +1,6 @@
+![Conda](https://github.com/stajichlab/PHYling_unified/actions/workflows/conda-building-check.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.9_%7C_3.10_%7C_3.10-blue)
+
 # PHYling tool
 The unified PHYling pipeline for phylogenomic data collection from annotated genomes.
 
