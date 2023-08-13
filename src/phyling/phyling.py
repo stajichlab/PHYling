@@ -146,9 +146,9 @@ def parser_submodule(parser, parent_parser) -> None:
 
 def main():
     """
-    A package to extract phylogenomic markers and build a phylogenetic tree upon them.
+    Package will extract phylogenomic markers and build a phylogenetic tree with these.
 
-    PhYling comprises 3 modules - download, align and tree. The download module can be used to download HMM markerset
+    PHYling comprises 3 modules - download, align and tree. The download module can be used to download HMM markerset
     from BUSCO. The align module is the core element of this package which generate multiple sequence alignment among
     the orthologs found across samples. The tree module help to build a phylogenetic tree.
     """
