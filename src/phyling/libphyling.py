@@ -81,6 +81,7 @@ class msa_generator:
         seq_file = pyhmmer.easel.SequenceFile(concat_stream, digital=True)
         # Use the concatenated fasta in order to retrieve sequences by index later
         self._sequences = seq_file.read_block()
+        self.fastastrip_re = re.compile(r'(\.(aa|pep|cds|fna|faa))?\.(fasta|fa|fas|seq|faa|fna)(\.gz)?')
 
     def _load_hmms(self) -> dict[pyhmmer.plan7.HMM]:
         """Run the pyhmmer steps for loading HMMs for search or alignment."""
@@ -123,7 +124,7 @@ class msa_generator:
                     continue
                 results.setdefault(cog, hit.name)
                 break  # The first hit in hits is the best hit
-        logging.info(f"Hmmsearch on {sample} done")
+        logging.info(f"hmmsearch on {sample} done")
         return results
 
     def search(self, markerset: Path, evalue: float, threads: int) -> None:
@@ -196,12 +197,14 @@ class msa_generator:
         # Create an empty MultipleSeqAlignment object to store the alignment results
         alignment = MultipleSeqAlignment([])
         for name, aligned_seq, seq_info in zip(MSA.names, MSA.alignment, MSA.sequences):
+            # strip the .fasta or .aa.fasta from the filename
+            seqid = self.fastastrip_re.sub(r'', seq_info.description.decode())
             alignment.append(
                 SeqRecord(
                     Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
-                    id=seq_info.description.decode(),
+                    id=seqid,
                     name=name.decode(),
-                    description=seq_info.description.decode(),
+                    description=seqid,
                 )
             )
         return alignment
@@ -268,7 +271,9 @@ class msa_generator:
 
         concat_alignments = MultipleSeqAlignment([])
         for sample in self._inputs:
-            concat_alignments.append(SeqRecord(Seq(""), id=sample.name, description=""))
+            # strip the filename extension from name so that this resembles sp name
+            seqid = self.fastastrip_re.sub(r'', sample.name)
+            concat_alignments.append(SeqRecord(Seq(""), id=seqid, description=""))
         concat_alignments.sort()
 
         # Parallelize the MSA step
@@ -291,11 +296,11 @@ class msa_generator:
             else:
                 alignmentList = pool.starmap(self._run_hmmalign, [(hmm, hits) for hmm, hits in self.orthologs.items()])
             logging.info("MSA done")
-
-            alignmentList = pool.starmap(
-                self._fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
-            )
-            logging.info("Filling missing taxon done")
+            if concat:
+                alignmentList = pool.starmap(
+                    self._fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
+                )
+                logging.info("Filling missing taxon done")
 
             # Output the alignment fasta without clipkit trimming
             if not non_trim:
@@ -326,7 +331,7 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat,
     """
     Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
 
-    Initially, Hmmsearch is used to match the samples against a given markerset and report the top hit of each sample
+    Initially, HMMsearch is used to match the samples against a given markerset and report the top hit of each sample
     for each hmm marker, representing "orthologs" across all samples. In order to build a tree, minimum of 3 samples
     should be used. If the bitscore cutoff file is present in the hmms folder, it will be used as the cutoff. Otherwise,
     an evalue of 1e-10 will be used as the default cutoff.
@@ -354,7 +359,15 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat,
     if any(output.iterdir()):
         logging.warning(f"Output directory {output} is not empty. Aborted")
         sys.exit(1)
-    markerset = Path(markerset)
+
+    if not markerset.exists():
+        markerset = Path(phyling.config.default_HMM, markerset, 'hmms')
+    else:
+        markerset = Path(markerset)
+
+    if not markerset.exists():
+        logging.error(f"Markerset folder does not exist {markerset} - did you download BUSCO?")
+        sys.exit(1)
 
     msa = msa_generator(inputs)
     msa.search(markerset, evalue=evalue, threads=threads)
