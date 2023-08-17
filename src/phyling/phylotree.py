@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import logging
+import subprocess
+import tempfile
+from io import StringIO
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 from Bio import AlignIO, Phylo
-from Bio.Phylo.Consensus import majority_consensus
 from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
 
 
@@ -16,6 +18,16 @@ def tree_generator(file: Path, method: str) -> Phylo.BaseTree.Tree:
     calculator = DistanceCalculator("identity")
     constructor = DistanceTreeConstructor(calculator, method)
     return constructor.build_tree(MSA)
+
+
+def run_astral(file: Path):
+    """Run astral to get consensus tree."""
+    final_tree = subprocess.check_output(
+        ["astral", "-i", file],
+        # stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return Phylo.read(StringIO(final_tree.decode().strip("\n")), "newick")
 
 
 def phylotree(inputs, input_dir, output, method, figure, **kwargs):
@@ -50,13 +62,15 @@ def phylotree(inputs, input_dir, output, method, figure, **kwargs):
         final_tree = tree_generator(inputs[0], method)
     else:
         trees = []
-        for marker in inputs:
-            trees.append(tree_generator(marker, method))
-        final_tree = majority_consensus(trees, 0.5)
-
+        with tempfile.TemporaryDirectory() as tempdir:
+            for marker in inputs:
+                trees.append(tree_generator(marker, method))
+            trees_file = f"{tempdir}/trees.nw"
+            Phylo.write(trees, trees_file, "newick")
+            final_tree = run_astral(trees_file)
     Phylo.draw_ascii(final_tree)
 
-    output_tree = output / f"{method}_tree.newick"
+    output_tree = output / f"{method}_tree.nw"
     logging.info(f"Output tree to {output_tree}")
     with open(output_tree, "w") as f:
         Phylo.write(final_tree, f, "newick")
