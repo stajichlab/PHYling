@@ -136,7 +136,7 @@ def parser_submodule(parser, parent_parser) -> None:
     p_tree.add_argument(
         "-M",
         "--method",
-        choices=["upgma", "nj"],
+        choices=["upgma", "nj", "ft"],
         default="upgma",
         help='Algorithm used for tree building (default="upgma")',
     )
