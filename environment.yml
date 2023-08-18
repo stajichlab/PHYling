@@ -5,8 +5,9 @@ channels:
   - defaults
 dependencies:
   - biopython>=1.81
-  - clipkit>=1.4.1
+  - clipkit>=2.0.1
+  - matplotlib>=3.5.3
+  - muscle>=5.1
   - pyhmmer>=0.8.1
   - python>=3.7.12
-  - muscle>=5.1
-  - matplotlib>=3.5.3
+  - veryfasttree>=4.0.2
