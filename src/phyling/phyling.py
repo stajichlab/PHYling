@@ -14,6 +14,8 @@ try:
 except ImportError:
     from importlib_metadata import version
 
+import phyling.config
+
 from .download import download
 from .libphyling import main as search_align
 from .phylotree import phylotree
@@ -37,8 +39,8 @@ def parser_submodule(parser, parent_parser) -> None:
         "-o",
         "--output",
         type=Path,
-        default="./HMM",
-        help='Output directory to save HMM markerset (default="./HMM")',
+        default=f"./{phyling.config.default_HMM}",
+        help=f'Output directory to save HMM markerset (default="./{phyling.config.default_HMM}")',
     )
     p_download.set_defaults(func=download)
 
@@ -153,9 +155,9 @@ def parser_submodule(parser, parent_parser) -> None:
 
 def main():
     """
-    A package to extract phylogenomic markers and build a phylogenetic tree upon them.
+    Package will extract phylogenomic markers and build a phylogenetic tree with these.
 
-    PhYling comprises 3 modules - download, align and tree. The download module can be used to download HMM markerset
+    PHYling comprises 3 modules - download, align and tree. The download module can be used to download HMM markerset
     from BUSCO. The align module is the core element of this package which generate multiple sequence alignment among
     the orthologs found across samples. The tree module help to build a phylogenetic tree.
     """

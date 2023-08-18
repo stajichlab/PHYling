@@ -23,6 +23,8 @@ from Bio.SeqRecord import SeqRecord
 from clipkit.helpers import SeqType, get_gap_chars, keep_trim_and_log
 from clipkit.modes import TrimmingMode
 
+import phyling.config
+
 
 def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
     """Create a in-memory BytesIO to hold the concatenated fasta files.
@@ -62,7 +64,7 @@ def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
 
 
 def dict_merge(dicts_list: list[dict]) -> dict:
-    """Helper function to merge dictionaries."""
+    """Merge dictionaries with this helper function."""
     result = {}
     for d in dicts_list:
         for k, v in d.items():
@@ -78,8 +80,9 @@ class msa_generator:
         self._inputs = inputs
         concat_stream, self._seq_count = concat_Bytes_streams(inputs)
         seq_file = pyhmmer.easel.SequenceFile(concat_stream, digital=True)
-        # Use the concatnated fasta in order to retrieve sequences by index later
+        # Use the concatenated fasta in order to retrieve sequences by index later
         self._sequences = seq_file.read_block()
+        self.fastastrip_re = re.compile(r'(\.(aa|pep|cds|fna|faa))?\.(fasta|fa|fas|seq|faa|fna)(\.gz)?')
 
     def _load_hmms(self) -> dict[pyhmmer.plan7.HMM]:
         """Run the pyhmmer steps for loading HMMs for search or alignment."""
@@ -122,7 +125,7 @@ class msa_generator:
                     continue
                 results.setdefault(cog, hit.name)
                 break  # The first hit in hits is the best hit
-        logging.info(f"Hmmsearch on {sample} done")
+        logging.info(f"hmmsearch on {sample} done")
         return results
 
     def search(self, markerset: Path, evalue: float, threads: int) -> None:
@@ -140,7 +143,7 @@ class msa_generator:
         self._kh = pyhmmer.easel.KeyHash()
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
-            sub_sequences = self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]]
+            sub_sequences = self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]]
             for seq in sub_sequences:
                 # Replace description to taxon name
                 seq.description = sample.name.encode()
@@ -163,7 +166,7 @@ class msa_generator:
                     [
                         (
                             sample.name,
-                            self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]],
+                            self._sequences[self._seq_count[idx][0]: self._seq_count[idx][1]],
                             cutoffs,
                             evalue,
                         )
@@ -195,19 +198,21 @@ class msa_generator:
         # Create an empty MultipleSeqAlignment object to store the alignment results
         alignment = MultipleSeqAlignment([])
         for name, aligned_seq, seq_info in zip(MSA.names, MSA.alignment, MSA.sequences):
+            # strip the .fasta or .aa.fasta from the filename
+            seqid = self.fastastrip_re.sub(r'', seq_info.description.decode())
             alignment.append(
                 SeqRecord(
                     Seq(re.sub(r"[ZzBbXx\*\.]", "-", aligned_seq)),
-                    id=seq_info.description.decode(),
+                    id=seqid,
                     name=name.decode(),
-                    description=seq_info.description.decode(),
+                    description=seqid,
                 )
             )
         return alignment
 
     def _run_muscle(self, hmm: str, hits: set, output: str) -> MultipleSeqAlignment:
         """Run the multiple sequence alignment tool muscle. This assumes muscle v5 CLI interface and options."""
-        with open(f"{output}/{hmm}.faa", "wb+") as f:
+        with open(f"{output}/{hmm}.{phyling.config.prot_aln_ext}", "wb+") as f:
             for hit in hits:
                 seq = self._sequences[self._kh[hit]].copy()
                 seq.name = deepcopy(seq.description)
@@ -215,15 +220,18 @@ class msa_generator:
                 seq.write(f)
 
         _ = subprocess.check_call(
-            ["muscle", "-align", f"{output}/{hmm}.faa", "-output", f"{output}/{hmm}.aln.faa", "-threads", "1"],
+            ["muscle", "-align", f"{output}/{hmm}.faa",
+             "-output", f"{output}/{hmm}.{phyling.config.prot_aln_ext}",
+             "-threads", "1"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
         )
-        alignment = AlignIO.read(f"{output}/{hmm}.aln.faa", "fasta")
+        alignment = AlignIO.read(f"{output}/{hmm}.{phyling.config.prot_aln_ext}", "fasta")
         return alignment
 
     # Fill sequence with "-" for missing samples
     def _fill_missing_taxon(self, taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
+        """Include empty gap-only strings in alignment for taxa lacking an ortholog."""
         missing = set(taxonList) - {seq.id for seq in alignment}
         for sample in missing:
             alignment.append(
@@ -246,7 +254,7 @@ class msa_generator:
             gaps=0.9,
             mode=TrimmingMode("gappy"),
             use_log=False,
-            out_file_name=f"{hmm}.faa",
+            out_file_name=f"{hmm}.{phyling.config.prot_aln_ext}",
             complement=False,
             gap_chars=get_gap_chars(SeqType.aa),
             quiet=True,
@@ -264,7 +272,9 @@ class msa_generator:
 
         concat_alignments = MultipleSeqAlignment([])
         for sample in self._inputs:
-            concat_alignments.append(SeqRecord(Seq(""), id=sample.name, description=""))
+            # strip the filename extension from name so that this resembles sp name
+            seqid = self.fastastrip_re.sub(r'', sample.name)
+            concat_alignments.append(SeqRecord(Seq(""), id=seqid, description=""))
         concat_alignments.sort()
 
         # Parallelize the MSA step
@@ -280,11 +290,11 @@ class msa_generator:
             else:
                 alignmentList = pool.starmap(self._run_hmmalign, [(hmm, hits) for hmm, hits in self.orthologs.items()])
             logging.info("MSA done")
-
-            alignmentList = pool.starmap(
-                self._fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
-            )
-            logging.info("Filling missing taxon done")
+            if concat:
+                alignmentList = pool.starmap(
+                    self._fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
+                )
+                logging.info("Filling missing taxon done")
 
             # Output the alignment fasta without clipkit trimming
             if not non_trim:
@@ -294,7 +304,7 @@ class msa_generator:
                 logging.info("Clipkit done")
 
         for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
-            output_aa = output / f"{hmm}.faa"
+            output_aa = output / f"{hmm}.{phyling.config.protein_ext}"
             alignment.sort()
             if concat:
                 concat_alignments += alignment
@@ -303,7 +313,7 @@ class msa_generator:
                     SeqIO.write(alignment, f, format="fasta")
 
         if concat:
-            output_concat = output / "concat_alignments.faa"
+            output_concat = output / f"concat_alignments.{phyling.config.prot_aln_ext}"
             with open(output_concat, "w") as f:
                 SeqIO.write(concat_alignments, f, format="fasta")
             logging.info(f"Output concatenated fasta to {output_concat}")
@@ -315,7 +325,7 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat,
     """
     Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
 
-    Initially, Hmmsearch is used to match the samples against a given markerset and report the top hit of each sample
+    Initially, HMMsearch is used to match the samples against a given markerset and report the top hit of each sample
     for each hmm marker, representing "orthologs" across all samples. In order to build a tree, minimum of 3 samples
     should be used. If the bitscore cutoff file is present in the hmms folder, it will be used as the cutoff. Otherwise,
     an evalue of 1e-10 will be used as the default cutoff.
@@ -349,7 +359,15 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat,
             "or build from the source following the instruction on https://github.com/rcedgar/muscle"
         )
         sys.exit(1)
-    markerset = Path(markerset)
+
+    if not markerset.exists():
+        markerset = Path(phyling.config.default_HMM, markerset, 'hmms')
+    else:
+        markerset = Path(markerset)
+
+    if not markerset.exists():
+        logging.error(f"Markerset folder does not exist {markerset} - did you download BUSCO?")
+        sys.exit(1)
 
     msa = msa_generator(inputs)
     msa.search(markerset, evalue=evalue, threads=threads)

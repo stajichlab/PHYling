@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 from Bio import AlignIO, Phylo
 from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
 
+import phyling.config
+
 
 class tree_generator:
     def __init__(self, method: str, threads: int, *file: Path):
@@ -97,7 +99,7 @@ def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
     else:
         inputs = [Path(sample) for sample in inputs]
     logging.info(f"Found {len(inputs)} MSA fasta")
-    if inputs[0].name == "concat_alignments.faa":
+    if inputs[0].name == f"concat_alignments.{phyling.config.prot_aln_ext}":
         logging.info("Generate phylogenetic tree the on concatenated fasta")
     else:
         logging.info("Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree")
