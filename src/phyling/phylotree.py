@@ -110,7 +110,7 @@ def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
             "or build from the source following the instruction on https://github.com/citiususc/veryfasttree"
         )
         sys.exit(1)
-    if len(inputs) > 1 and not shutil.which("Astral"):
+    if len(inputs) > 1 and not shutil.which("astral"):
         logging.error(
             "Astral not found. "
             "Please build the C++ version from the source following the instruction on https://github.com/chaoszhang/ASTER"
