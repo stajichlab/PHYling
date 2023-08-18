@@ -141,6 +141,13 @@ def parser_submodule(parser, parent_parser) -> None:
         help='Algorithm used for tree building (default="upgma")',
     )
     p_tree.add_argument("-f", "--figure", action="store_true", help="Generate a matplotlib tree figure")
+    p_tree.add_argument(
+        "-t",
+        "--threads",
+        type=int,
+        default=1,
+        help="Threads for tree construction (default=1)",
+    )
     p_tree.set_defaults(func=phylotree)
 
 
