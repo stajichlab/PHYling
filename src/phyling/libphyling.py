@@ -5,6 +5,7 @@ import csv
 import gzip
 import logging
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -273,16 +274,9 @@ class msa_generator:
             if method == "muscle":
                 with tempfile.TemporaryDirectory() as tempdir:
                     logging.debug(f"Create tempdir at: {tempdir}")
-                    try:
-                        alignmentList = pool.starmap(
-                            self._run_muscle, [(hmm, hits, tempdir) for hmm, hits in self.orthologs.items()]
-                        )
-                    except FileNotFoundError:
-                        logging.error(
-                            f'{method} not found, please install it through "conda install -c bioconda muscle>=5.1" '
-                            "or build from the source following the instruction on https://github.com/rcedgar/muscle"
-                        )
-                        sys.exit(1)
+                    alignmentList = pool.starmap(
+                        self._run_muscle, [(hmm, hits, tempdir) for hmm, hits in self.orthologs.items()]
+                    )
             else:
                 alignmentList = pool.starmap(self._run_hmmalign, [(hmm, hits) for hmm, hits in self.orthologs.items()])
             logging.info("MSA done")
@@ -348,6 +342,12 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat,
     # Check if output dir is empty
     if any(output.iterdir()):
         logging.warning(f"Output directory {output} is not empty. Aborted")
+        sys.exit(1)
+    if method == "muscle" and not shutil.which("muscle"):
+        logging.error(
+            'muscle not found. Please install it through "conda install -c bioconda muscle>=5.1" '
+            "or build from the source following the instruction on https://github.com/rcedgar/muscle"
+        )
         sys.exit(1)
     markerset = Path(markerset)
 
