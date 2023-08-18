@@ -82,7 +82,7 @@ class msa_generator:
         seq_file = pyhmmer.easel.SequenceFile(concat_stream, digital=True)
         # Use the concatenated fasta in order to retrieve sequences by index later
         self._sequences = seq_file.read_block()
-        self.fastastrip_re = re.compile(r'(\.(aa|pep|cds|fna|faa))?\.(fasta|fa|fas|seq|faa|fna)(\.gz)?')
+        self.fastastrip_re = re.compile(r'(\.(aa|pep|cds|fna|faa))?\.(fasta|fas|faa|fna|seq|fa)(\.gz)?')
 
     def _load_hmms(self) -> dict[pyhmmer.plan7.HMM]:
         """Run the pyhmmer steps for loading HMMs for search or alignment."""
