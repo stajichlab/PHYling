@@ -15,10 +15,9 @@ except ImportError:
     from importlib_metadata import version
 
 import phyling.config
-
-from .download import download
-from .libphyling import main as search_align
-from .phylotree import phylotree
+from phyling.download import download
+from phyling.libphyling import main as search_align
+from phyling.phylotree import phylotree
 
 
 def parser_submodule(parser, parent_parser) -> None:
