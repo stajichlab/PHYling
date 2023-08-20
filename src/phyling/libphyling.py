@@ -219,7 +219,7 @@ class msa_generator:
                 seq.write(f)
 
         _ = subprocess.check_call(
-            ["muscle", "-align", f"{output}/{hmm}.faa",
+            ["muscle", "-align", f"{output}/{hmm}.{phyling.config.protein_ext}",
              "-output", f"{output}/{hmm}.{phyling.config.prot_aln_ext}",
              "-threads", "1"],
             stdout=subprocess.DEVNULL,
