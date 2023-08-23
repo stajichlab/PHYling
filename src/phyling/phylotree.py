@@ -46,7 +46,7 @@ class tree_generator:
         """Run the tree calculation using a simple distance method."""
         MSA = AlignIO.read(file, format="fasta")
         calculator = DistanceCalculator("identity")
-        constructor = DistanceTreeConstructor(calculator, self._method)
+        constructor = DistanceTreeConstructor(calculator, self.method)
         return constructor.build_tree(MSA)
 
     def _build(self, file: Path, threads: int = 1) -> Phylo.BaseTree.Tree:
