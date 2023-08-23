@@ -162,4 +162,5 @@ cython_debug/
 # Example files
 example/*
 !example/pep/
+!example/cds/
 *.ipynb
