@@ -55,13 +55,13 @@ def parser_submodule(parser, parent_parser) -> None:
         "-i",
         "--inputs",
         nargs="+",
-        help="Query pepetide fasta",
+        help="Query pepetide/cds fasta or gzipped fasta",
     )
     input_type.add_argument(
         "-I",
         "--input_dir",
         type=Path,
-        help="Directory containing query pepetide fasta",
+        help="Directory containing query pepetide/cds fasta or gzipped fasta",
     )
     p_aln.add_argument(
         "-o",
