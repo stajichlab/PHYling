@@ -95,7 +95,7 @@ def parser_submodule(parser, parent_parser) -> None:
         "-n",
         "--non_trim",
         action="store_true",
-        help="Report non-clipkit-trimmed alignment results",
+        help="Report non-trimmed alignment results",
     )
     p_aln.add_argument(
         "-c",

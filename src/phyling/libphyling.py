@@ -13,12 +13,12 @@ from itertools import product
 from multiprocessing.dummy import Pool
 from pathlib import Path
 
+import numpy as np
 import pyhmmer
 from Bio import AlignIO, SeqIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from clipkit.helpers import SeqType, get_gap_chars, report_column_features
 
 import phyling.config
 
@@ -89,10 +89,12 @@ def bp_mrtrans(pep_msa: MultipleSeqAlignment, cds_seqs: list[SeqRecord]) -> Mult
             else:
                 dna_align += codon
             dna_idx += codon_size
-        id = dna_seq.id if hasattr(dna_seq, "id") else pep_seq.id
-        name = dna_seq.id if hasattr(dna_seq, "name") else pep_seq.name
-        description = dna_seq.id if hasattr(dna_seq, "description") else pep_seq.description
-        cds_msa.append(SeqRecord(Seq(dna_align), id=id, name=name, description=description))
+        info = {
+            "id": dna_seq.id if hasattr(dna_seq, "id") else pep_seq.id,
+            "name": dna_seq.name if hasattr(dna_seq, "name") else pep_seq.name,
+            "description": dna_seq.description if hasattr(dna_seq, "description") else pep_seq.description,
+        }
+        cds_msa.append(SeqRecord(Seq(dna_align), **info))
     return cds_msa
 
 
@@ -275,30 +277,29 @@ class msa_generator:
             seq.seq = Seq(re.sub(r"[ZzBbXx\*\.]", "-", str(seq.seq)))
         return alignment
 
-    def _run_clipkit(
+    def _trim_gaps(
         self, pep_msa: MultipleSeqAlignment, cds_msa: MultipleSeqAlignment = None, gaps: int = 0.9
     ) -> MultipleSeqAlignment:
-        """Use clipkit to trim MSA alignment."""
-        keep_msa = pep_msa[:, :0]
-        cds_trimList = []
-        for pep_idx in range(pep_msa.get_alignment_length()):
-            _, gappyness = report_column_features(pep_msa, pep_idx, get_gap_chars(SeqType.aa))
-            if gappyness <= gaps:
-                keep_msa += pep_msa[:, pep_idx : pep_idx + 1]
-            else:
-                if cds_msa:
-                    cds_idx = pep_idx * 3
-                    cds_trimList.extend(list(range(cds_idx, cds_idx + 3)))
+        """Trim the locations on MSA if the gappyness ratio (gaps/total length) is higher than a the arg gaps."""
+        if gaps > 1 or gaps < 0:
+            raise ValueError('The argument "gaps" should be a float between 0 to 1.')
+        infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in pep_msa]
+        msa_array = np.array([list(rec) for rec in pep_msa])
+        gappyness = (msa_array == "-").mean(axis=0)
+        pep_trimList = np.where(gappyness > gaps)[0]
+        if pep_trimList.size > 0:
+            msa_array = np.delete(msa_array, pep_trimList, axis=1)
 
         if cds_msa:
-            keep_msa = cds_msa[:, :0]
-            for idx in range(cds_msa.get_alignment_length()):
-                if idx in cds_trimList:
-                    continue
-                else:
-                    keep_msa += cds_msa[:, idx : idx + 1]
+            infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in cds_msa]
+            msa_array = np.array([list(rec) for rec in cds_msa])
+            if pep_trimList.size > 0:
+                cds_trimList = np.concatenate([np.arange(num * 3, (num + 1) * 3) for num in pep_trimList])
+                msa_array = np.delete(msa_array, cds_trimList, axis=1)
 
-        return keep_msa
+        return MultipleSeqAlignment(
+            [SeqRecord(Seq("".join(rec)), **info) for rec, info in zip(msa_array.tolist(), infoList)]
+        )
 
     def _fill_missing_taxon(self, taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
         """Include empty gap-only strings in alignment for taxa lacking an ortholog."""

@@ -108,7 +108,7 @@ options:
                         Hmmsearch reporting threshold (default=1e-10)
   -M {hmmalign,muscle}, --method {hmmalign,muscle}
                         Program used for multiple sequence alignment (default="hmmalign")
-  -n, --non_trim        Report non-clipkit-trimmed alignment results
+  -n, --non_trim        Report non-trimmed alignment results
   -c, --concat          Report concatenated alignment results
   -t THREADS, --threads THREADS
                         Threads for hmmsearch and the number of parallelized jobs in MSA step (default=1)
@@ -203,7 +203,6 @@ phyling tree -I align -f
 - Python >= 3.9
 - [Biopython](https://biopython.org/)
 - [pyhmmer], a HMMER3 implementation on python3.
-- [clipkit](https://jlsteenwyk.com/ClipKIT/) for trimming.
 - [muscle] for alternative method for multiple sequence alignment. (Optional)
 - [VeryFastTree], use approximately maximum-likelihood to build trees. (Optional)
 - [ASTER], a C++ re-implementation of [ASTRAL] to resolve consensus among trees.
