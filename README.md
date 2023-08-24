@@ -206,7 +206,7 @@ phyling tree -I align -f
 - [clipkit](https://jlsteenwyk.com/ClipKIT/) for trimming.
 - [muscle] for alternative method for multiple sequence alignment. (Optional)
 - [VeryFastTree], use approximately maximum-likelihood to build trees. (Optional)
-- [ASTER], a C++ re-implementation of ASTRAL(https://github.com/smirarab/ASTRAL) to resolve consensus among trees.
+- [ASTER], a C++ re-implementation of [ASTRAL] to resolve consensus among trees.
 
 Use the environment.yml to install all the required packages
 ```bash
@@ -227,3 +227,4 @@ pip install .
 [muscle]: https://drive5.com/muscle5/
 [VeryFastTree]: https://github.com/citiususc/veryfasttree
 [ASTER]: https://github.com/chaoszhang/ASTER
+[ASTRAL]: https://github.com/smirarab/ASTRAL
