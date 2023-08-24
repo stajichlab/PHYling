@@ -70,7 +70,7 @@ def dict_merge(dicts_list: list[dict]) -> dict:
 
 
 def bp_mrtrans(pep_msa: MultipleSeqAlignment, cds_seqs: list[SeqRecord]) -> MultipleSeqAlignment:
-    """Implement a transformer of alignments from protein to mrna/cdna coordinates"""
+    """Implement a transformer of alignments from protein to mrna/cdna coordinates."""
     stop_codons = {"TAA", "TAG", "TGA"}
     codon_size = 3
     gap = "-"
@@ -278,7 +278,7 @@ class msa_generator:
     def _run_clipkit(
         self, pep_msa: MultipleSeqAlignment, cds_msa: MultipleSeqAlignment = None, gaps: int = 0.9
     ) -> MultipleSeqAlignment:
-        """Use clipkit to trim MSA alignment"""
+        """Use clipkit to trim MSA alignment."""
         keep_msa = pep_msa[:, :0]
         cds_trimList = []
         for pep_idx in range(pep_msa.get_alignment_length()):
@@ -315,7 +315,6 @@ class msa_generator:
 
     def align(self, output: Path, method: str, non_trim: bool, concat: bool, threads: int) -> None:
         """Align a set of identify orthologous proteins."""
-
         # Parallelize the MSA step
         logging.info(f"Use {method} for peptide MSA")
         logging.info(f"Use {threads} threads to parallelize MSA")

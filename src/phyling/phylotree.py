@@ -18,14 +18,17 @@ import phyling.config
 
 
 class tree_generator:
+    """A phylogentic tree generator used in phyling."""
+
     def __init__(self, method: str, threads: int, *file: Path):
+        """Initialize the tree generator object."""
         self._file = file
         self.method = method
         self._threads = threads
 
     def _with_VeryFastTree(self, file: Path, threads: int) -> Phylo.BaseTree.Tree:
         stream = BytesIO()
-        with open(file, "r") as f:
+        with open(file) as f:
             for line in f.read().splitlines():
                 if not line.startswith(">"):
                     line = line.upper()
@@ -58,6 +61,7 @@ class tree_generator:
         return tree
 
     def get(self) -> list[Phylo.BaseTree.Tree]:
+        """Run the phylogeny analysis and get the tree object list."""
         if len(self._file) == 1:
             return [self._build(self._file[0], self._threads)]
         else:
