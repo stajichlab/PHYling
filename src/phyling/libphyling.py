@@ -337,13 +337,12 @@ class msa_generator:
                 cds_msa_List = pool.starmap(bp_mrtrans, zip(pep_msa_List, cds_seqs_List))
                 logging.info("Back translate complete")
 
-            # Output the alignment fasta without clipkit trimming
             if not non_trim:
                 if hasattr(self, "_cds_seqs"):
-                    cds_msa_List = pool.starmap(self._run_clipkit, zip(pep_msa_List, cds_msa_List))
+                    cds_msa_List = pool.starmap(self._trim_gaps, zip(pep_msa_List, cds_msa_List))
                 else:
-                    pep_msa_List = pool.map(self._run_clipkit, pep_msa_List)
-                logging.info("Clipkit done")
+                    pep_msa_List = pool.map(self._trim_gaps, pep_msa_List)
+                logging.info("Trimming done")
 
             if hasattr(self, "_cds_seqs"):
                 alignmentList = cds_msa_List
