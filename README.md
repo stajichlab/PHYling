@@ -1,5 +1,5 @@
 ![Conda](https://github.com/stajichlab/PHYling_unified/actions/workflows/conda-building-check.yml/badge.svg)
-![Python](https://img.shields.io/badge/python-3.7_%7C_3.8_%7C_3.9_%7C_3.10_%7C_3.11-blue?logo=python)[https://github.com/stajichlab/PHYling_unified/actions/workflows/build-with-python-versions.yml]
+![Python](https://img.shields.io/badge/python-3.7_%7C_3.8_%7C_3.9_%7C_3.10_%7C_3.11-blue?logo=python)
 
 # PHYling tool
 The unified PHYling pipeline for phylogenomic data collection from annotated genomes.
@@ -14,7 +14,7 @@ The assumptions in this approach are that the markers are generally single copy 
 The marker sets developed for this approach in fungi are available as part of the [1KFG Phylogenomics_HMMs](https://github.com/1KFG/Phylogenomics_HMMs) project resource and preferred use of the [BUSCO marker sets][Busco].
 
 ### Flow chart
-![PHYling flowchart](misc/phyling_flowchart.png)
+<img src= "misc/phyling_flowchart.svg" alt="PHYling flowchart" width="800">
 
 ### New features compared to the original version
 - Using [pyhmmer] to improve the multithread performance in hmmsearch and hmmalign.
