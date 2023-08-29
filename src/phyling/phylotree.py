@@ -5,7 +5,6 @@ import logging
 import shutil
 import subprocess
 import sys
-import tempfile
 from io import BytesIO, StringIO
 from multiprocessing.dummy import Pool
 from pathlib import Path
@@ -27,13 +26,13 @@ class tree_generator:
         self._threads = threads
 
     def _with_VeryFastTree(self, file: Path, threads: int) -> Phylo.BaseTree.Tree:
-        stream = BytesIO()
+        stream = StringIO()
         with open(file) as f:
             for line in f.read().splitlines():
                 if not line.startswith(">"):
                     line = line.upper()
-                stream.write(line.encode())
-                stream.write(b"\n")
+                stream.write(line)
+                stream.write("\n")
         stream.seek(0)
         p = subprocess.Popen(
             ["VeryFastTree", "-lg", "-gamma", "-threads", str(threads)],
@@ -43,7 +42,7 @@ class tree_generator:
         )
         tree, _ = p.communicate(stream.read())
         stream.close()
-        return Phylo.read(StringIO(tree.decode().strip("\n")), "newick")
+        return Phylo.read(StringIO(tree), "newick")
 
     def _with_phylo_module(self, file: Path) -> Phylo.BaseTree.Tree:
         """Run the tree calculation using a simple distance method."""
@@ -71,15 +70,18 @@ class tree_generator:
             return trees
 
 
-def run_astral(file: Path):
+def run_astral(trees: list[Phylo.BaseTree.Tree]) -> Phylo.BaseTree.Tree:
     """Run astral to get consensus tree."""
     logging.info("Run ASTRAL to resolve consensus among multiple trees")
-    final_tree = subprocess.check_output(
-        ["astral", "-i", file],
-        # stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+    temp = StringIO()
+    Phylo.write(trees, temp, "newick")
+    temp.seek(0)
+    p = subprocess.Popen(
+        ["astral", "/dev/stdin"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
-    return Phylo.read(StringIO(final_tree.decode().strip("\n")), "newick")
+    stdout, _ = p.communicate(temp.read())
+    temp.close()
+    return Phylo.read(StringIO(stdout), "newick")
 
 
 def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
@@ -127,10 +129,7 @@ def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
     if len(trees) == 1:
         final_tree = trees[0]
     else:
-        with tempfile.TemporaryDirectory() as tempdir:
-            trees_file = f"{tempdir}/trees.nw"
-            Phylo.write(trees, trees_file, "newick")
-            final_tree = run_astral(trees_file)
+        final_tree = run_astral(trees)
     Phylo.draw_ascii(final_tree)
 
     output_tree = output / f"{method}_tree.nw"
