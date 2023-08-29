@@ -98,6 +98,31 @@ def bp_mrtrans(pep_msa: MultipleSeqAlignment, cds_seqs: list[SeqRecord]) -> Mult
     return cds_msa
 
 
+def trim_gaps(
+    pep_msa: MultipleSeqAlignment, cds_msa: MultipleSeqAlignment = None, gaps: int = 0.9
+) -> MultipleSeqAlignment:
+    """Trim the locations on MSA if the gappyness ratio (gaps/total length) is higher than a the arg gaps."""
+    if gaps > 1 or gaps < 0:
+        raise ValueError('The argument "gaps" should be a float between 0 to 1.')
+    infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in pep_msa]
+    msa_array = np.array([list(rec) for rec in pep_msa])
+    gappyness = (msa_array == "-").mean(axis=0)
+    pep_trimList = np.where(gappyness > gaps)[0]
+    if pep_trimList.size > 0:
+        msa_array = np.delete(msa_array, pep_trimList, axis=1)
+
+    if cds_msa:
+        infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in cds_msa]
+        msa_array = np.array([list(rec) for rec in cds_msa])
+        if pep_trimList.size > 0:
+            cds_trimList = np.concatenate([np.arange(num * 3, (num + 1) * 3) for num in pep_trimList])
+            msa_array = np.delete(msa_array, cds_trimList, axis=1)
+
+    return MultipleSeqAlignment(
+        [SeqRecord(Seq("".join(rec)), **info) for rec, info in zip(msa_array.tolist(), infoList)]
+    )
+
+
 class msa_generator:
     """Generate a multiple sequence alignment using hmmer or muscle."""
 
@@ -277,30 +302,6 @@ class msa_generator:
             seq.seq = Seq(re.sub(r"[ZzBbXx\*\.]", "-", str(seq.seq)))
         return alignment
 
-    def _trim_gaps(
-        self, pep_msa: MultipleSeqAlignment, cds_msa: MultipleSeqAlignment = None, gaps: int = 0.9
-    ) -> MultipleSeqAlignment:
-        """Trim the locations on MSA if the gappyness ratio (gaps/total length) is higher than a the arg gaps."""
-        if gaps > 1 or gaps < 0:
-            raise ValueError('The argument "gaps" should be a float between 0 to 1.')
-        infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in pep_msa]
-        msa_array = np.array([list(rec) for rec in pep_msa])
-        gappyness = (msa_array == "-").mean(axis=0)
-        pep_trimList = np.where(gappyness > gaps)[0]
-        if pep_trimList.size > 0:
-            msa_array = np.delete(msa_array, pep_trimList, axis=1)
-
-        if cds_msa:
-            infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in cds_msa]
-            msa_array = np.array([list(rec) for rec in cds_msa])
-            if pep_trimList.size > 0:
-                cds_trimList = np.concatenate([np.arange(num * 3, (num + 1) * 3) for num in pep_trimList])
-                msa_array = np.delete(msa_array, cds_trimList, axis=1)
-
-        return MultipleSeqAlignment(
-            [SeqRecord(Seq("".join(rec)), **info) for rec, info in zip(msa_array.tolist(), infoList)]
-        )
-
     def _fill_missing_taxon(self, taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
         """Include empty gap-only strings in alignment for taxa lacking an ortholog."""
         missing = set(taxonList) - {seq.id for seq in alignment}
@@ -339,9 +340,9 @@ class msa_generator:
 
             if not non_trim:
                 if hasattr(self, "_cds_seqs"):
-                    cds_msa_List = pool.starmap(self._trim_gaps, zip(pep_msa_List, cds_msa_List))
+                    cds_msa_List = pool.starmap(trim_gaps, zip(pep_msa_List, cds_msa_List))
                 else:
-                    pep_msa_List = pool.map(self._trim_gaps, pep_msa_List)
+                    pep_msa_List = pool.map(trim_gaps, pep_msa_List)
                 logging.info("Trimming done")
 
             if hasattr(self, "_cds_seqs"):
