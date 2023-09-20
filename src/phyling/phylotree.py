@@ -5,7 +5,7 @@ import logging
 import shutil
 import subprocess
 import sys
-from io import BytesIO, StringIO
+from io import StringIO
 from multiprocessing.dummy import Pool
 from pathlib import Path
 
@@ -39,6 +39,7 @@ class tree_generator:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            text=True,
         )
         tree, _ = p.communicate(stream.read())
         stream.close()
