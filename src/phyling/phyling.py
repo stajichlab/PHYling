@@ -160,7 +160,7 @@ def main():
     from BUSCO. The align module is the core element of this package which generate multiple sequence alignment among
     the orthologs found across samples. The tree module help to build a phylogenetic tree.
     """
-    logging.basicConfig(format="%(asctime)s PHYling %(levelname)s %(message)s", level="INFO")
+    logging.basicConfig(format=f"%(asctime)s {main.__name__} %(levelname)s %(message)s", level="INFO")
     logger = logging.getLogger()
 
     # Create namespace object conf

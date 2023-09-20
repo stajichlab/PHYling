@@ -1,5 +1,11 @@
-from phyling.libphyling import *
+from pathlib import Path
+
 import pytest
+from Bio.Align import MultipleSeqAlignment
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+
+from phyling.libphyling import bp_mrtrans, dict_merge, msa_generator, trim_gaps
 
 
 class TestMSAGenerator:
