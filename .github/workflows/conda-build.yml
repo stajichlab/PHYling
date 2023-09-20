@@ -1,0 +1,42 @@
+name: Conda build
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["**.py", "environment.yml"]
+  pull_request:
+    branches: ["main"]
+    paths: ["**.py", "environment.yml"]
+  workflow_dispatch:
+
+jobs:
+  build-conda:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: environment.yml
+          create-args: >-
+            python=3.10
+            flake8
+            pytest
+
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=130 --statistics
+        shell: micromamba-shell {0}
+
+      - name: Install package
+        run: |
+          pip install .
+        shell: micromamba-shell {0}
+
+      - name: Test with pytest
+        run: |
+          pytest
+        shell: micromamba-shell {0}
