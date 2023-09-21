@@ -24,6 +24,18 @@ class tree_generator:
         self._file = file
         self.method = method
         self._threads = threads
+        if method == "ft" and not shutil.which("VeryFastTree"):
+            logging.error(
+                'VeryFastTree not found. Please install it through "conda install -c bioconda veryfasttree>=4.0.2" '
+                "or build from the source following the instruction on https://github.com/citiususc/veryfasttree"
+            )
+            sys.exit(1)
+        if len(self._file) > 1 and not shutil.which("astral"):
+            logging.error(
+                "Astral not found. "
+                "Please build the C++ version from the source following the instruction on https://github.com/chaoszhang/ASTER"
+            )
+            sys.exit(1)
 
     def _with_VeryFastTree(self, file: Path, threads: int) -> Phylo.BaseTree.Tree:
         stream = StringIO()
@@ -60,15 +72,16 @@ class tree_generator:
         logging.debug(f"Tree building on {file.name} is done")
         return tree
 
-    def get(self) -> list[Phylo.BaseTree.Tree]:
+    def get(self) -> Phylo.BaseTree.Tree:
         """Run the phylogeny analysis and get the tree object list."""
         if len(self._file) == 1:
-            return [self._build(self._file[0], self._threads)]
+            final_tree = self._build(self._file[0], self._threads)
         else:
             logging.debug(f"Run in multiprocesses mode. {self._threads} jobs are run concurrently")
             with Pool(self._threads) as pool:
                 trees = pool.map(self._build, self._file)
-            return trees
+            final_tree = run_astral(trees)
+        return final_tree
 
 
 def run_astral(trees: list[Phylo.BaseTree.Tree]) -> Phylo.BaseTree.Tree:
@@ -111,26 +124,10 @@ def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
     else:
         logging.info("Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree")
     output = Path(output)
-    if method == "ft" and not shutil.which("VeryFastTree"):
-        logging.error(
-            'VeryFastTree not found. Please install it through "conda install -c bioconda veryfasttree>=4.0.2" '
-            "or build from the source following the instruction on https://github.com/citiususc/veryfasttree"
-        )
-        sys.exit(1)
-    if len(inputs) > 1 and not shutil.which("astral"):
-        logging.error(
-            "Astral not found. "
-            "Please build the C++ version from the source following the instruction on https://github.com/chaoszhang/ASTER"
-        )
-        sys.exit(1)
     output.mkdir(exist_ok=True)
 
     tree_generator_obj = tree_generator(method, threads, *inputs)
-    trees = tree_generator_obj.get()
-    if len(trees) == 1:
-        final_tree = trees[0]
-    else:
-        final_tree = run_astral(trees)
+    final_tree = tree_generator_obj.get()
     Phylo.draw_ascii(final_tree)
 
     output_tree = output / f"{method}_tree.nw"
