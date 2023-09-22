@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cache ASTER binary
+      - name: Cache VeryFastTree binary
         uses: actions/cache@v3
         with:
           path: ~/.local/bin/astral
@@ -96,7 +96,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    needs: build_ASTER
+    needs: [build_ASTER, build_VeryFastTree]
 
     strategy:
       fail-fast: false
@@ -140,11 +140,11 @@ jobs:
           path: ~/.local/bin/astral
           key: ASTER-Linux
 
-      - name: Export binary to PATH and verify
-        run: |
-          export PATH=$PATH:$HOME/.local/bin
-          which astral
-          which VeryFastTree
+      - name: Cache VeryFastTree binary
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/bin/VeryFastTree
+          key: VeryFastTree-Linux
 
       - name: Test with pytest
         run: |
