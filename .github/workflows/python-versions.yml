@@ -51,6 +51,48 @@ jobs:
           export PATH=$PATH:$HOME/.local/bin
           which astral
 
+  build_VeryFastTree:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cache ASTER binary
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/bin/VeryFastTree
+          key: VeryFastTree-Linux
+
+      - name: Install dependencies
+        run: |
+          if ! [ -f ~/.local/bin/VeryFastTree ]; \
+            then sudo apt-get install build-essential cmake g++ wget unzip; \
+          fi
+
+      - name: Build VeryFastTree
+        run: |
+          if ! [ -f ~/.local/bin/VeryFastTree ]; \
+            then \
+            wget https://github.com/citiususc/veryfasttree/archive/refs/tags/v4.0.3.zip; \
+            unzip v4.0.3.zip; \
+            cd veryfasttree-4.0.3; \
+            cmake .; \
+            make; \
+          fi
+
+      - name: Move Binary
+        run: |
+          if ! [ -f ~/.local/bin/VeryFastTree ]; \
+            then \
+            mkdir -p ~/.local/bin; \
+            cp veryfasttree-4.0.3/VeryFastTree ~/.local/bin/; \
+            chmod +x ~/.local/bin/VeryFastTree; \
+          fi
+        working-directory: ${{ github.workspace }}
+
+      - name: Export VeryFastTree to PATH and verify
+        run: |
+          export PATH=$PATH:$HOME/.local/bin
+          which VeryFastTree
+
   build:
     runs-on: ubuntu-latest
 
@@ -98,10 +140,11 @@ jobs:
           path: ~/.local/bin/astral
           key: ASTER-Linux
 
-      - name: Export ASTER to PATH and verify
+      - name: Export binary to PATH and verify
         run: |
           export PATH=$PATH:$HOME/.local/bin
           which astral
+          which VeryFastTree
 
       - name: Test with pytest
         run: |
