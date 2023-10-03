@@ -111,7 +111,7 @@ def trim_gaps(
     
     clipkit_pep_msa.trim(mode=TrimmingMode.gappy, gap_threshold=gaps)
 
-    if cds_msa: # and clipkit_pep_msa.sites_trimmed.size > 0:
+    if cds_msa:
         clipkit_cds_msa = MSA.from_bio_msa(cds_msa)
         if clipkit_pep_msa.sites_trimmed.size > 0:
             cds_site_positions_to_trim = np.concatenate([np.arange(num * 3, (num + 1) * 3) for num in clipkit_pep_msa.sites_trimmed])
