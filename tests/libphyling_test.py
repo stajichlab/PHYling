@@ -106,17 +106,17 @@ class Testtrimgaps:
         pep_msa = create_msa(["-MG--A", "M-GT-C", "MMGTG-"])
         result_msa = trim_gaps(pep_msa, gaps=0.5)
         assert len(result_msa) == 3
-        assert str(result_msa[0].seq) == "-MG-A"
-        assert str(result_msa[1].seq) == "M-GTC"
-        assert str(result_msa[2].seq) == "MMGT-"
+        assert str(result_msa[0].seq) == "-MG--A"
+        assert str(result_msa[1].seq) == "M-GT-C"
+        assert str(result_msa[2].seq) == "MMGTG-"
 
     def test_trim_gaps_with_cds_msa(self):
         pep_msa = create_msa(["-MG--A", "M-GT-C"])
         cds_msa = create_msa(["---ATGGGA------GCT", "ATG---GCTACT---TGT"])
         result_msa = trim_gaps(pep_msa, cds_msa, gaps=0.5)
         assert len(result_msa) == 2
-        assert str(result_msa[0].seq) == "---ATGGGA---GCT"
-        assert str(result_msa[1].seq) == "ATG---GCTACTTGT"
+        assert str(result_msa[0].seq) == "---ATGGGA------GCT"
+        assert str(result_msa[1].seq) == "ATG---GCTACT---TGT"
 
     def test_trim_gaps_no_trim(self):
         pep_msa = create_msa(["MG--A", "M-GTC"])

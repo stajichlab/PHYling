@@ -19,6 +19,8 @@ from Bio import AlignIO, SeqIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+from clipkit.msa import MSA
+from clipkit.modes import TrimmingMode
 
 import phyling.config
 
@@ -104,23 +106,19 @@ def trim_gaps(
     """Trim the locations on MSA if the gappyness ratio (gaps/total length) is higher than a the arg gaps."""
     if gaps > 1 or gaps < 0:
         raise ValueError('The argument "gaps" should be a float between 0 to 1.')
-    infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in pep_msa]
-    msa_array = np.array([list(rec) for rec in pep_msa])
-    gappyness = (msa_array == "-").mean(axis=0)
-    pep_trimList = np.where(gappyness > gaps)[0]
-    if pep_trimList.size > 0:
-        msa_array = np.delete(msa_array, pep_trimList, axis=1)
+    
+    clipkit_pep_msa = MSA.from_bio_msa(pep_msa)
+    
+    clipkit_pep_msa.trim(mode=TrimmingMode.gappy, gap_threshold=gaps)
 
-    if cds_msa:
-        infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in cds_msa]
-        msa_array = np.array([list(rec) for rec in cds_msa])
-        if pep_trimList.size > 0:
-            cds_trimList = np.concatenate([np.arange(num * 3, (num + 1) * 3) for num in pep_trimList])
-            msa_array = np.delete(msa_array, cds_trimList, axis=1)
-
-    return MultipleSeqAlignment(
-        [SeqRecord(Seq("".join(rec)), **info) for rec, info in zip(msa_array.tolist(), infoList)]
-    )
+    if cds_msa: # and clipkit_pep_msa.sites_trimmed.size > 0:
+        clipkit_cds_msa = MSA.from_bio_msa(cds_msa)
+        if clipkit_pep_msa.sites_trimmed.size > 0:
+            cds_site_positions_to_trim = np.concatenate([np.arange(num * 3, (num + 1) * 3) for num in clipkit_pep_msa.sites_trimmed])
+            clipkit_cds_msa.trim(site_positions_to_trim=cds_site_positions_to_trim)
+        return clipkit_cds_msa.to_bio_msa()
+    else:
+        return clipkit_pep_msa.to_bio_msa()
 
 
 class msa_generator:
