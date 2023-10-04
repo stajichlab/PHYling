@@ -115,7 +115,7 @@ def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
     method_dict = {"upgma": "UPGMA", "nj": "Neighbor Joining", "ft": "VeryFastTree"}
     logging.info(f"Algorithm choose for tree building: {method_dict[method]}")
     if input_dir:
-        inputs = list(Path(input_dir).iterdir())
+        inputs = list(Path(input_dir).glob(f"*.{phyling.config.aln_ext}"))
     else:
         inputs = [Path(sample) for sample in inputs]
     logging.info(f"Found {len(inputs)} MSA fasta")
