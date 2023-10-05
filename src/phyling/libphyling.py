@@ -145,6 +145,11 @@ class msa_generator:
                 # Use a KeyHash to store seq.name/index pairs which can be used to retrieve
                 # ortholog sequences by SequenceObject[kh[seq.name]]
                 self._kh.add(seq.name)
+                if len(seq.sequence) % 3 != 0:
+                    logging.debug(f"seq {seq.name} is len {len(seq.sequence)} truncating")
+                    # create a new sequence object which is truncated
+                    seq = pyhmmer.easel.DigitalSequence(seq.alphabet, name=seq.name, description=seq.description,
+                                                        sequence=seq.sequence[0: 3 * int(len(seq.sequence) / 3)])
 
         # Check the inputs are peptide or dna sequences
         if self._sequences.alphabet.is_amino():
