@@ -130,6 +130,8 @@ class msa_generator:
     def __init__(self, inputs: list[Path]):
         """Initialize the MSA generator object."""
         self._inputs = inputs
+        self._fastastrip_re = re.compile(r"(\.(aa|pep|cds|fna|faa))?\.(fasta|fas|faa|fna|seq|fa)(\.gz)?")
+        self._inputs_basename_check()
         concat_stream, self._seq_count = concat_Bytes_streams(inputs)
         self._sequences = pyhmmer.easel.SequenceFile(concat_stream, digital=True).read_block()
         # Use the concatenated fasta in order to retrieve sequences by index later
@@ -149,7 +151,6 @@ class msa_generator:
 
         # Create dict for sequence retrieval later
         self._kh = pyhmmer.easel.KeyHash()
-        self._fastastrip_re = re.compile(r"(\.(aa|pep|cds|fna|faa))?\.(fasta|fas|faa|fna|seq|fa)(\.gz)?")
         for idx, sample in enumerate(self._inputs):
             # Select the sequences of each sample
             sub_sequences = self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]]
@@ -172,7 +173,18 @@ class msa_generator:
             logging.error(
                 "Inputs are rna sequences, which are not a supported format. Please convert them to DNA first"
             )
-            sys.exit()
+            sys.exit(1)
+
+    def _inputs_basename_check(self):
+        """Check whether inputs share the same basename."""
+        check_dict = {}
+        [check_dict.setdefault(self._fastastrip_re.sub(r"", file.name), []).append(str(file)) for file in self._inputs]
+        if any(len(x) > 1 for x in check_dict.values()):
+            logging.error("The following files share the same basename:")
+            for x in check_dict.values():
+                if len(x) > 1:
+                    logging.error(", ".join(x))
+            sys.exit(1)
 
     def _load_hmms(self) -> dict[pyhmmer.plan7.HMM]:
         """Run the pyhmmer steps for loading HMMs for search or alignment."""
