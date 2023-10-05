@@ -107,7 +107,7 @@ def trim_gaps(
     infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in pep_msa]
     msa_array = np.array([list(rec) for rec in pep_msa])
     gappyness = (msa_array == "-").mean(axis=0)
-    pep_trimList = np.where(gappyness > gaps)[0]
+    pep_trimList = np.where(gappyness >= gaps)[0]
     if pep_trimList.size > 0:
         msa_array = np.delete(msa_array, pep_trimList, axis=1)
 
@@ -115,7 +115,8 @@ def trim_gaps(
         infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in cds_msa]
         msa_array = np.array([list(rec) for rec in cds_msa])
         if pep_trimList.size > 0:
-            cds_trimList = np.concatenate([np.arange(num * 3, (num + 1) * 3) for num in pep_trimList])
+            pep_trimList_expanded = np.expand_dims(pep_trimList, axis=1)
+            cds_trimList = (pep_trimList_expanded * np.array([3]) + np.array([0, 1, 2])).flatten()
             msa_array = np.delete(msa_array, cds_trimList, axis=1)
 
     return MultipleSeqAlignment(
