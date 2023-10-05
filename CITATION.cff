@@ -43,7 +43,7 @@ abstract: >-
 
   The assumptions in this approach are that the markers are
   generally single copy in genomes and taking best hit is
-  sufficient first approximation for identifying orthologs. 
+  sufficient first approximation for identifying orthologs.
 keywords:
   - phylogenomics
 license: MIT
