@@ -134,6 +134,19 @@ class msa_generator:
         self._sequences = pyhmmer.easel.SequenceFile(concat_stream, digital=True).read_block()
         # Use the concatenated fasta in order to retrieve sequences by index later
 
+        if self._sequences.alphabet.is_dna():
+            error_idx_list = []
+            for idx, seq in enumerate(self._sequences):
+                try:
+                    seq.translate()
+                except ValueError:
+                    error_idx_list.append(idx)
+            idx_pointer = 0
+            for idx in error_idx_list:
+                self._sequences.pop(idx - idx_pointer)
+                idx_pointer += 1
+            logging.warning(f"There are {len(error_idx_list)} cds sequences that have invalid length.")
+
         # Create dict for sequence retrieval later
         self._kh = pyhmmer.easel.KeyHash()
         self._fastastrip_re = re.compile(r"(\.(aa|pep|cds|fna|faa))?\.(fasta|fas|faa|fna|seq|fa)(\.gz)?")
