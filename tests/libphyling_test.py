@@ -4,6 +4,8 @@ import pytest
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+from clipkit.msa import MSA
+from clipkit.modes import TrimmingMode
 
 from phyling.libphyling import bp_mrtrans, dict_merge, msa_generator, trim_gaps
 
@@ -129,3 +131,15 @@ class Testtrimgaps:
         pep_msa = create_msa(["-MG--A", "M-GT-C"])
         with pytest.raises(ValueError):
             trim_gaps(pep_msa, gaps=1.5)
+
+    def test_metainfo_handling(self):
+        records = ["-MG--A", "M-GT-C", "MMGTG-"]
+        ids = ["Species_A", "Species_B", "Species_C"]
+        bio_msa = MultipleSeqAlignment([SeqRecord(Seq(rec), id=id, description=id) for rec, id in zip(records, ids)])
+        clipkit_msa = MSA.from_bio_msa(bio_msa)
+        new_bio_msa = clipkit_msa.to_bio_msa()
+        assert str(new_bio_msa[0].id) == "Species_A"
+        assert str(new_bio_msa[1].id) == "Species_B"
+        assert str(new_bio_msa[2].id) == "Species_C"
+
+
