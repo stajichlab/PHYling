@@ -158,7 +158,7 @@ class msa_generator:
                 seq.description = self._fastastrip_re.sub(r"", sample.name).encode()
                 # Use a KeyHash to store seq.name/index pairs which can be used to retrieve
                 # ortholog sequences by SequenceObject[kh[seq.name]]
-                self._kh.add(seq.name)
+                self._kh.add(seq.description + b"-" + seq.name)
 
         # Check the inputs are peptide or dna sequences
         if self._sequences.alphabet.is_amino():
@@ -213,7 +213,7 @@ class msa_generator:
             for hit in hits:
                 if (cutoffs and hit.score < cutoffs[cog]) or (not cutoffs and hit.evalue > evalue):
                     continue
-                results.setdefault(cog, hit.name)
+                results.setdefault(cog, f'{self._fastastrip_re.sub(r"", sample)}-'.encode() + hit.name)
                 break  # The first hit in hits is the best hit
         logging.info(f"hmmsearch on {sample} done")
         return results
