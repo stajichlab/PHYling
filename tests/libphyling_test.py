@@ -148,8 +148,8 @@ class TestMSAGenerator:
             msa_instance.filter_orthologs()
 
 
-def create_msa(records):
-    return MultipleSeqAlignment([SeqRecord(Seq(rec)) for rec in records])
+def create_msa(records, ids):
+    return MultipleSeqAlignment([SeqRecord(Seq(rec), id=id) for rec, id in zip(records, ids)])
 
 
 class Testdictmerge:
@@ -179,13 +179,13 @@ class Testdictmerge:
 
 
 class Testbpmrtrans:
-    pep_msa = create_msa(["-MSLR-L-", "-M-LRQL-", "-MS--QL-"])
+    pep_msa = create_msa(["-MSLR-L-", "-M-LRQL-", "-MS--QL-"], ["Species_A", "Species_B", "Species_C"])
 
     def test_bp_mrtrans_basic(self):
         cds_seqs = [
-            SeqRecord(Seq("ATGTCATTGCGACTA")),
-            SeqRecord(Seq("ATGTTGCGACAACTA")),
-            SeqRecord(Seq("ATGTCACAACTA")),
+            SeqRecord(Seq("ATGTCATTGCGACTA"), id="Species_A"),
+            SeqRecord(Seq("ATGTTGCGACAACTA"), id="Species_B"),
+            SeqRecord(Seq("ATGTCACAACTA"), id="Species_C"),
         ]
         results = bp_mrtrans(pep_msa=self.pep_msa, cds_seqs=cds_seqs)
         assert str(results[0].seq) == "---ATGTCATTGCGA---CTA---"
@@ -203,40 +203,66 @@ class Testbpmrtrans:
         assert str(results[1].seq) == "---ATG---TTGCGACAACTA---"
         assert str(results[2].seq) == "---ATGTCA------CAACTA---"
 
+    def test_bp_mrtrans_with_cds_msa_id(self):
+        cds_seqs = [
+            SeqRecord(Seq("ATGTCATTGCGACTA"), id="Species_A_cds"),
+            SeqRecord(Seq("ATGTTGCGACAACTA"), id="Species_B_cds"),
+            SeqRecord(Seq("ATGTCACAACTA"), id="Species_C_cds"),
+        ]
+        results = bp_mrtrans(pep_msa=self.pep_msa, cds_seqs=cds_seqs)
+        assert str(results[0].id) == "Species_A_cds"
+        assert str(results[1].id) == "Species_B_cds"
+        assert str(results[2].id) == "Species_C_cds"
+
+    # def test_bp_mrtrans_wo_cds_msa_id(self):
+    #     cds_seqs = [
+    #         SeqRecord(Seq("ATGTCATTGCGACTA")),
+    #         SeqRecord(Seq("ATGTTGCGACAACTA")),
+    #         SeqRecord(Seq("ATGTCACAACTA")),
+    #     ]
+    #     results = bp_mrtrans(pep_msa=self.pep_msa, cds_seqs=cds_seqs)
+    #     assert str(results[0].id) == "Species_A"
+    #     assert str(results[1].id) == "Species_B"
+    #     assert str(results[2].id) == "Species_C"
+
 
 class Testtrimgaps:
+    pep_msa1 = create_msa(["-MG--A", "M-GT-C", "MMGTG-"], ["Species_A", "Species_B", "Species_C"])
+    pep_msa2 = create_msa(["MTG--A", "M-GT-C"], ["Species_A", "Species_B"])
+
     def test_trim_gaps_basic(self):
-        pep_msa = create_msa(["-MG--A", "M-GT-C", "MMGTG-"])
-        result_msa = trim_gaps(pep_msa, gaps=0.5)
+        result_msa = trim_gaps(self.pep_msa1, gaps=0.5)
         assert len(result_msa) == 3
         assert str(result_msa[0].seq) == "-MG-A"
         assert str(result_msa[1].seq) == "M-GTC"
         assert str(result_msa[2].seq) == "MMGT-"
 
     def test_trim_gaps_with_cds_msa(self):
-        pep_msa = create_msa(["MTG--A", "M-GT-C"])
-        cds_msa = create_msa(["ATGACTGGA------GCT", "ATG---GCTACT---TGT"])
-        result_msa = trim_gaps(pep_msa, cds_msa, gaps=0.5)
+        cds_msa = create_msa(["ATGACTGGA------GCT", "ATG---GCTACT---TGT"], ["Species_A", "Species_B"])
+        result_msa = trim_gaps(self.pep_msa2, cds_msa, gaps=0.5)
         assert len(result_msa) == 2
         assert str(result_msa[0].seq) == "ATGGGAGCT"
         assert str(result_msa[1].seq) == "ATGGCTTGT"
 
     def test_trim_gaps_at_threshold_boundary(self):
-        pep_msa = create_msa(["MG--A", "M-GTC"])
-        result_msa = trim_gaps(pep_msa, gaps=0.5)
+        result_msa = trim_gaps(self.pep_msa2, gaps=0.5)
         assert len(result_msa) == 2
-        assert str(result_msa[0].seq) == "MA"
-        assert str(result_msa[1].seq) == "MC"
+        assert str(result_msa[0].seq) == "MGA"
+        assert str(result_msa[1].seq) == "MGC"
 
     def test_trim_gaps_no_trim(self):
-        pep_msa = create_msa(["MG--A", "M-GTC"])
-        result_msa = trim_gaps(pep_msa, gaps=0.51)
+        result_msa = trim_gaps(self.pep_msa2, gaps=0.51)
         assert len(result_msa) == 2
-        assert str(result_msa[0].seq) == "MG--A"
+        assert str(result_msa[0].seq) == "MTG-A"
         assert str(result_msa[1].seq) == "M-GTC"
 
     def test_trim_gaps_invalid_gaps_value(self):
-        pep_msa = create_msa(["-MG--A", "M-GT-C"])
         with pytest.raises(ValueError):
-            trim_gaps(pep_msa, gaps=1.5)
+            trim_gaps(self.pep_msa2, gaps=1.5)
 
+    def test_trim_gaps_msa_metadata(self):
+        result_msa = trim_gaps(self.pep_msa1, gaps=0.5)
+        assert len(result_msa) == 3
+        assert str(result_msa[0].id) == "Species_A"
+        assert str(result_msa[1].id) == "Species_B"
+        assert str(result_msa[2].id) == "Species_C"
