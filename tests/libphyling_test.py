@@ -10,6 +10,13 @@ from phyling.libphyling import bp_mrtrans, dict_merge, msa_generator, trim_gaps
 
 class TestMSAGenerator:
     test_inputs = [x for x in (Path("example") / "pep").iterdir()]
+    inputs_with_duplicates = [Path(x) for x in ["Species_A.fasta.gz", "Species_A.fasta", "Species_B.fasta.gz"]]
+
+    def test_msa_generator(self):
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            msa_generator(self.inputs_with_duplicates)
+        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.value.code == 1
 
     @pytest.fixture
     def msa_instance(self):
