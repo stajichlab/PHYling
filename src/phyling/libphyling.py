@@ -137,17 +137,7 @@ class msa_generator:
         # Use the concatenated fasta in order to retrieve sequences by index later
 
         if self._sequences.alphabet.is_dna():
-            error_idx_list = []
-            for idx, seq in enumerate(self._sequences):
-                try:
-                    seq.translate()
-                except ValueError:
-                    error_idx_list.append(idx)
-            idx_pointer = 0
-            for idx in error_idx_list:
-                self._sequences.pop(idx - idx_pointer)
-                idx_pointer += 1
-            logging.warning(f"There are {len(error_idx_list)} cds sequences that have invalid length.")
+            self._check_problematic_cds()
 
         # Create dict for sequence retrieval later
         self._kh = pyhmmer.easel.KeyHash()
@@ -174,6 +164,39 @@ class msa_generator:
                 "Inputs are rna sequences, which are not a supported format. Please convert them to DNA first"
             )
             sys.exit(1)
+
+    def _check_problematic_cds(self):
+        """Check whether the cds fasta contains invalid length which cannot be divided by 3."""
+        error_idx_list = []
+        for idx, seq in enumerate(self._sequences):
+            try:
+                seq.translate()
+            except ValueError:
+                error_idx_list.append(idx)
+        idx_pointer = 0
+        for idx in error_idx_list:
+            self._sequences.pop(idx - idx_pointer)
+            idx_pointer += 1
+
+        # Put index into corresponding file groups
+        groups = {idx_range: [] for idx_range in self._seq_count}
+        for idx in error_idx_list:
+            for idx_range in self._seq_count:
+                if idx_range[0] <= idx < idx_range[1]:
+                    groups[idx_range].append(idx)
+                    break
+
+        # Process seq_count
+        seq_count = [list(seq) for seq in self._seq_count]
+        index_pointer = 0
+        for idx, v in enumerate(groups.values()):
+            index_pointer += len(v)
+            seq_count[idx][1] -= index_pointer
+            if idx < len(groups) - 1:
+                seq_count[idx + 1][0] = seq_count[idx][1]
+        self._seq_count = [tuple(seq) for seq in seq_count]
+
+        logging.warning(f"There are {len(error_idx_list)} cds sequences that have invalid length.")
 
     def _inputs_basename_check(self):
         """Check whether inputs share the same basename."""
@@ -243,11 +266,11 @@ class msa_generator:
 
         if threads < 8:
             # Single process mode
+            logging.debug(f"Run in single process mode with {threads} threads")
             search_res = []
             for idx, sample in enumerate(self._inputs):
                 # Select the sequences of each sample
                 pep_seqs = self._pep_seqs[self._seq_count[idx][0] : self._seq_count[idx][1]]
-                logging.debug(f"Run in single process mode with {threads} threads")
                 search_res.append(self._run_hmmsearch(sample.name, pep_seqs, cutoffs, evalue, threads))
         else:
             # Multi processes mode
