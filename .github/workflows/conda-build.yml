@@ -2,10 +2,10 @@ name: Conda build
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dev"]
     paths: ["**.py", "environment.yml"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "dev"]
     paths: ["**.py", "environment.yml"]
   workflow_dispatch:
 

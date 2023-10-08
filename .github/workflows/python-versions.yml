@@ -2,10 +2,10 @@ name: Python versions
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dev"]
     paths: ["**.py", "requirements.txt"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "dev"]
     paths: ["**.py", "requirements.txt"]
   workflow_dispatch:
 
