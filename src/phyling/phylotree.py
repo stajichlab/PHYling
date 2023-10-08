@@ -26,7 +26,7 @@ class tree_generator:
         self._threads = threads
         if method == "ft" and not shutil.which("VeryFastTree"):
             logging.error(
-                'VeryFastTree not found. Please install it through "conda install -c bioconda veryfasttree>=4.0.2" '
+                'VeryFastTree not found. Please install it through "conda install -c bioconda veryfasttree" '
                 "or build from the source following the instruction on https://github.com/citiususc/veryfasttree"
             )
             sys.exit(1)

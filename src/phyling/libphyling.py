@@ -15,49 +15,13 @@ from pathlib import Path
 
 import numpy as np
 import pyhmmer
+from pyhmmer.easel import DigitalSequenceBlock
 from Bio import AlignIO, SeqIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 import phyling.config
-
-
-def concat_Bytes_streams(files: list) -> tuple[BytesIO, list]:
-    """Create a in-memory BytesIO to hold the concatenated fasta files.
-
-    Attributes
-    ----------
-    files : list
-        A list of fasta files.
-
-    Return
-    ------
-    BytesIO
-        A BytesIO object that can use as a regular bytes stream.
-    list
-        A list that includes a tuple of start and end index of each fasta file.
-    """
-    concat_stream = BytesIO()
-    seq_count = []
-    count = 0
-    for file in files:
-        start_idx = count
-        f = open(file, "rb")
-        if f.read(2) == b"\x1f\x8b":
-            f.close()
-            f = gzip.open(file, "rb")
-        else:
-            f.seek(0)
-        for line in f.readlines():
-            concat_stream.write(line)
-            if line.startswith(b">"):
-                count += 1
-        concat_stream.write(b"\n")
-        f.close()
-        seq_count.append((start_idx, count))
-    concat_stream.seek(0)  # Change the stream position to the start of the stream
-    return concat_stream, seq_count
 
 
 def dict_merge(dicts_list: list[dict]) -> dict:
@@ -128,80 +92,241 @@ class msa_generator:
     """Generate a multiple sequence alignment using hmmer or muscle."""
 
     def __init__(self, inputs: list[Path]):
-        """Initialize the MSA generator object."""
+        """Initialize the MSA generator object and perform sequence check and preprocessing."""
         self._inputs = inputs
         self._fastastrip_re = re.compile(r"(\.(aa|pep|cds|fna|faa))?\.(fasta|fas|faa|fna|seq|fa)(\.gz)?")
         self._inputs_basename_check()
-        concat_stream, self._seq_count = concat_Bytes_streams(inputs)
-        self._sequences = pyhmmer.easel.SequenceFile(concat_stream, digital=True).read_block()
-        # Use the concatenated fasta in order to retrieve sequences by index later
-
-        if self._sequences.alphabet.is_dna():
-            self._check_problematic_cds()
-
-        # Create dict for sequence retrieval later
+        # Create a dict to retrieve the sequence later
         self._kh = pyhmmer.easel.KeyHash()
-        for idx, sample in enumerate(self._inputs):
-            # Select the sequences of each sample
-            sub_sequences = self._sequences[self._seq_count[idx][0] : self._seq_count[idx][1]]
-            for seq in sub_sequences:
-                # Replace description to taxon name
-                seq.description = self._fastastrip_re.sub(r"", sample.name).encode()
-                # Use a KeyHash to store seq.name/index pairs which can be used to retrieve
-                # ortholog sequences by SequenceObject[kh[seq.name]]
-                self._kh.add(seq.description + b"-" + seq.name)
 
-        # Check the inputs are peptide or dna sequences
-        if self._sequences.alphabet.is_amino():
-            logging.info("Inputs are peptide sequences")
-            self._pep_seqs = self._sequences
-        elif self._sequences.alphabet.is_dna():
-            logging.info("Inputs are dna sequences")
-            self._pep_seqs = self._sequences.translate()
-            self._cds_seqs = self._sequences
+        self._seq_count = [self._sequence_preprocess(input=input) for input in self._inputs]
+
+    def search(self, markerset: Path, evalue: float, threads: int) -> None:
+        """
+        Search a database of proteins with a set of HMMs to find matching protein sequences.
+
+        The function first loads the hmm profiles and get the cutoff if there has one. Next, it will determine whether to run
+        hmmsearch in multiprocess manner. If we have N threads and N < 8, the hmmsearch will not be parallelized and all N
+        threads will be used for each round. If N >= 8, there will be N // 4 jobs being launched parallelly and each use 4
+        threads.
+
+        After the hmmsearch, all the results will be rearrange to a dictionary with dict["hmm", ["sample"]].
+        """
+        self._markerset = markerset
+        self._hmms = self._load_hmms()
+        cutoffs = self._get_cutoffs()
+
+        if threads < 8:
+            # Single process mode
+            logging.debug(f"Run in single process mode with {threads} threads")
+            search_res = []
+            for input in self._inputs:
+                # Select the sequences of each sample
+                pep_seqs = self._pep_seqs
+                search_res.append(self._run_hmmsearch(input.name, pep_seqs, cutoffs, evalue, threads))
         else:
-            logging.error(
-                "Inputs are rna sequences, which are not a supported format. Please convert them to DNA first"
+            # Multi processes mode
+            processes = threads // 4
+            logging.debug(f"Run in multiprocesses mode. {processes} jobs with 4 threads for each are run concurrently")
+            with Pool(processes) as pool:
+                search_res = pool.starmap(
+                    self._run_hmmsearch,
+                    [
+                        (
+                            input.name,
+                            self._pep_seqs[self._seq_count[idx][0] : self._seq_count[idx][1]],
+                            cutoffs,
+                            evalue,
+                        )
+                        for idx, input in enumerate(self._inputs)
+                    ],
+                )
+        self.orthologs = dict_merge(search_res)
+
+    def filter_orthologs(self) -> None:
+        """Filter the found sequence hits from an HMM search. Orthlogs with fewer than 3 hits will be discarded."""
+        if hasattr(self, "orthologs"):
+            self.orthologs = dict(filter(lambda item: len(item[1]) >= 3, self.orthologs.items()))
+            logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples")
+        else:
+            raise AttributeError(
+                "No orthologs dictionary found. Please make sure the search function was run successfully"
             )
-            sys.exit(1)
 
-    def _check_problematic_cds(self):
-        """Check whether the cds fasta contains invalid length which cannot be divided by 3."""
-        error_idx_list = []
-        for idx, seq in enumerate(self._sequences):
+    def align(self, output: Path, method: str, non_trim: bool, concat: bool, threads: int) -> None:
+        """
+        Align a set of identify orthologous proteins.
+
+        First the sequences that have been identified as ortholog will be aligned through hmmalign or muscle. Next, do the dna to
+        peptide back translation if self._cds_seqs is found (which means the inputs are cds fasta). Next, run the trimming to
+        remove uninformative regions (can be switch off). Fianlly, do fill_missing_taxon and concatenate all the MSA results if
+        the concat mode is enable. Otherwise output each MSA results in separate files.
+        """
+        # Parallelize the MSA step
+        logging.info(f"Use {method} for peptide MSA")
+        logging.info(f"Use {threads} threads to parallelize MSA")
+        with Pool(threads) as pool:
+            if method == "muscle":
+                pep_msa_List = pool.map(self._run_muscle, self.orthologs.values())
+            else:
+                pep_msa_List = pool.starmap(self._run_hmmalign, self.orthologs.items())
+            logging.info("Peptide MSA done")
+
+            if hasattr(self, "_cds_seqs"):
+                logging.info("cds found. Processing cds sequences...")
+                cds_seqs_stream = pool.starmap(
+                    self._get_ortholog_seqs, [(hits, self._cds_seqs) for hits in self.orthologs.values()]
+                )
+                cds_seqs_List = pool.map(
+                    lambda x: [record for record in SeqIO.parse(StringIO(x.read().decode()), "fasta")], cds_seqs_stream
+                )
+                cds_msa_List = pool.starmap(bp_mrtrans, zip(pep_msa_List, cds_seqs_List))
+                logging.info("Back translate complete")
+
+            if not non_trim:
+                if hasattr(self, "_cds_seqs"):
+                    cds_msa_List = pool.starmap(trim_gaps, zip(pep_msa_List, cds_msa_List))
+                else:
+                    pep_msa_List = pool.map(trim_gaps, pep_msa_List)
+                logging.info("Trimming done")
+
+            if hasattr(self, "_cds_seqs"):
+                alignmentList = cds_msa_List
+            else:
+                alignmentList = pep_msa_List
+
+            if concat:
+                concat_alignments = MultipleSeqAlignment([])
+                for input in self._inputs:
+                    # strip the filename extension from name so that this resembles sp name
+                    sample = self._fastastrip_re.sub(r"", input.name)
+                    concat_alignments.append(SeqRecord(Seq(""), id=sample, description=""))
+                concat_alignments.sort()
+                alignmentList = pool.starmap(
+                    self._fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
+                )
+                logging.info("Filling missing taxon done")
+
+        for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
+            output_aa = output / f"{hmm}.{phyling.config.protein_ext}"
+            alignment.sort()
+            if concat:
+                concat_alignments += alignment
+            else:
+                with open(output_aa, "w") as f:
+                    SeqIO.write(alignment, f, format="fasta")
+
+        if concat:
+            output_concat = output / f"concat_alignments.{phyling.config.prot_aln_ext}"
+            with open(output_concat, "w") as f:
+                SeqIO.write(concat_alignments, f, format="fasta")
+            logging.info(f"Output concatenated fasta to {output_concat}")
+        else:
+            logging.info(f"Output individual fasta to folder {output}")
+
+    def _sequence_preprocess(self, input: Path) -> tuple(int, int):
+        """
+        Process the sequence, concatenate all the processed sequences and return the start and end indices.
+
+        When accepting the first input (both self._pep_seqs and self._cds_seqs have not yet created), the function determines the
+        input type (peptide or DNA) based on the first input.
+
+        For the following rounds, it checks whether the input have the same data type as determined in the first round.
+
+        All the inputs will be processed by the the following steps:
+        1. If the input is a peptide fasta, all the seqs will be appended to the self._pep_seqs. A corresponding entry will be
+        added to the self._kh.
+        2. If the input is a dna fasta, all the seqs will underwent a valid length check and converted to peptide seq. the dna
+        and peptide sequence will be appended to self._pep_seqs and self._cds_seqs, respectively. A corresponding entry will also
+        be added to the self._kh.
+        3. Finally the function will return a tuple representing the start and end indices of the current file. The indices can
+        be used to retrieve the sequences for each sample.
+        """
+        seqblock = pyhmmer.easel.SequenceFile(input, digital=True).read_block()
+        sample = self._fastastrip_re.sub(r"", input.name)
+
+        if not (hasattr(self, "_pep_seqs") or hasattr(self, "_cds_seqs")):
+            # If this is the first fasta, do the following check
+            if seqblock.alphabet.is_amino():
+                logging.info("Inputs are peptide sequences")
+                self._pep_seqs = seqblock
+                [self._add_to_keyhash(sample, seq) for seq in seqblock]
+            elif seqblock.alphabet.is_dna():
+                logging.info("Inputs are dna sequences")
+                self._cds_translation(input, seqblock)
+            else:
+                logging.error("Inputs are rna sequences, which are not supported. Please convert them to DNA first")
+                sys.exit(1)
+            start_idx = 0  # The start idx of the first round is 0
+        else:
+            # From the second round, check whether the input data type is consistent with the seq data already in record
+            # First record the current seq length to be the start idx of the next fasta
+            start_idx = len(self._pep_seqs)
+            if seqblock.alphabet.is_amino() and not hasattr(self, "_cds_seqs"):
+                # cds also create pep_seqs, so need to check whether _cds_seqs is not exist
+                for seq in seqblock:
+                    self._add_to_keyhash(sample, seq)
+                    self._pep_seqs.append(seq)
+            elif seqblock.alphabet.is_dna() and hasattr(self, "_cds_seqs"):
+                self._cds_translation(input, seqblock)
+            else:
+                logging.error(
+                    "Detect both peptide and DNA fasta in inputs. Mix types of inputs are not allowed. Aborted"
+                )
+                sys.exit(1)
+        return (start_idx, len(self._pep_seqs))
+
+    def _add_to_keyhash(self, sample: str, seq: pyhmmer.easel.DigitalSequence) -> None:
+        """Assign the sample name to the pyhmmer.easel.DigitalSequence object and add an entry to keyhash."""
+        # Replace description to taxon name
+        seq.description = sample.encode()
+        # Use a KeyHash to store seq.name/index pairs which can be used to retrieve
+        # ortholog sequences by SequenceObject[kh[seq.name]]
+        self._kh.add(seq.description + "-".encode() + seq.name)
+
+    def _cds_translation(self, input: Path, cds_seqblock: DigitalSequenceBlock) -> None:
+        """Check whether the cds fasta contains invalid length which cannot be divided by 3.
+
+        Pop the each cds sequence from the seqblock and translate into peptide. The cds and peptide sequences of that is
+        successful translated will be appended to the self._pep_seqs and self._cds_seqs respectively and record in self._kh.
+        The number of invalid sequence as well their sequence name will be printed to the log.
+        """
+        if not cds_seqblock.alphabet.is_dna:
+            logging.critical("Internal error: the msa_generator._cds_translation only take dna DigitalSequenceBlock.")
+        if not hasattr(self, "_cds_seqs"):
+            self._cds_seqs = DigitalSequenceBlock(pyhmmer.easel.Alphabet.dna(), [])
+        if not hasattr(self, "_pep_seqs"):
+            self._pep_seqs = DigitalSequenceBlock(pyhmmer.easel.Alphabet.amino(), [])
+        sample = self._fastastrip_re.sub(r"", input.name)
+
+        problematic_seqs_name = []
+        original_size = len(cds_seqblock)
+        while cds_seqblock:
+            cds_seq = cds_seqblock.pop(0)
+            cds_seq.description = sample.encode()
             try:
-                seq.translate()
+                self._pep_seqs.append(cds_seq.translate())
+                self._cds_seqs.append(cds_seq)
+                self._kh.add(cds_seq.description + "-".encode() + cds_seq.name)
             except ValueError:
-                error_idx_list.append(idx)
-        idx_pointer = 0
-        for idx in error_idx_list:
-            self._sequences.pop(idx - idx_pointer)
-            idx_pointer += 1
+                problematic_seqs_name.append(cds_seq.name.decode())
 
-        # Put index into corresponding file groups
-        groups = {idx_range: [] for idx_range in self._seq_count}
-        for idx in error_idx_list:
-            for idx_range in self._seq_count:
-                if idx_range[0] <= idx < idx_range[1]:
-                    groups[idx_range].append(idx)
-                    break
+        if problematic_seqs_name:
+            problematic_seqs_size = len(problematic_seqs_name)
+            problematic_seqs_name = ", ".join(problematic_seqs_name)
+            logging.warning(
+                f"In the file {input.name}, {problematic_seqs_size}/{original_size} seqs has invalid length. "
+                "The seq names are listed below:"
+            )
+            logging.warning(problematic_seqs_name)
 
-        # Process seq_count
-        seq_count = [list(seq) for seq in self._seq_count]
-        index_pointer = 0
-        for idx, v in enumerate(groups.values()):
-            index_pointer += len(v)
-            seq_count[idx][1] -= index_pointer
-            if idx < len(groups) - 1:
-                seq_count[idx + 1][0] = seq_count[idx][1]
-        self._seq_count = [tuple(seq) for seq in seq_count]
-
-        logging.warning(f"There are {len(error_idx_list)} cds sequences that have invalid length.")
-
-    def _inputs_basename_check(self):
+    def _inputs_basename_check(self) -> None:
         """Check whether inputs share the same basename."""
         check_dict = {}
-        [check_dict.setdefault(self._fastastrip_re.sub(r"", file.name), []).append(str(file)) for file in self._inputs]
+        [
+            check_dict.setdefault(self._fastastrip_re.sub(r"", input.name), []).append(str(input))
+            for input in self._inputs
+        ]
         if any(len(x) > 1 for x in check_dict.values()):
             logging.error("The following files share the same basename:")
             for x in check_dict.values():
@@ -209,7 +334,7 @@ class msa_generator:
                     logging.error(", ".join(x))
             sys.exit(1)
 
-    def _load_hmms(self) -> dict[pyhmmer.plan7.HMM]:
+    def _load_hmms(self) -> dict[bytes, pyhmmer.plan7.HMM]:
         """Run the pyhmmer steps for loading HMMs for search or alignment."""
         hmms = {}
         for hmm_path in list(self._markerset.iterdir()):
@@ -219,7 +344,7 @@ class msa_generator:
         logging.info(f"Found {len(hmms)} hmm markers")
         return hmms
 
-    def _get_cutoffs(self) -> dict:
+    def _get_cutoffs(self) -> dict[str, float]:
         """Retrieve the E-value cutoffs for each specific HMM to use in searching."""
         cutoffs = {}
         try:
@@ -231,11 +356,18 @@ class msa_generator:
             logging.info(f"Found {len(cutoffs)} hmm marker cutoffs")
         except FileNotFoundError:
             logging.warning("HMM cutoff file not found")
+
+        if len(cutoffs) == len(self._hmms):
+            logging.info("Use HMM cutoff file to determine cutoff")
+        else:
+            logging.info("Use evalue to determine cutoff")
+            cutoffs = None
+
         return cutoffs
 
     def _run_hmmsearch(
         self, sample: str, sequence: pyhmmer.easel.DigitalSequence, cutoffs: dict, evalue: float, threads: int = 4
-    ) -> dict:
+    ) -> dict[str, bytes]:
         """Run the hmmsearch process using the pyhmmer library.
 
         This supports multithreaded running. Empirical testing shows that efficiency drops off after more than
@@ -253,55 +385,7 @@ class msa_generator:
         logging.info(f"hmmsearch on {sample} done")
         return results
 
-    def search(self, markerset: Path, evalue: float, threads: int) -> None:
-        """Search a database of proteins with a set of HMMs to find matching protein sequences."""
-        self._markerset = markerset
-        self._hmms = self._load_hmms()
-        cutoffs = self._get_cutoffs()
-        if len(cutoffs) == len(self._hmms):
-            logging.info("Use HMM cutoff file to determine cutoff")
-        else:
-            logging.info("Use evalue to determine cutoff")
-            cutoffs = None
-
-        if threads < 8:
-            # Single process mode
-            logging.debug(f"Run in single process mode with {threads} threads")
-            search_res = []
-            for idx, sample in enumerate(self._inputs):
-                # Select the sequences of each sample
-                pep_seqs = self._pep_seqs[self._seq_count[idx][0] : self._seq_count[idx][1]]
-                search_res.append(self._run_hmmsearch(sample.name, pep_seqs, cutoffs, evalue, threads))
-        else:
-            # Multi processes mode
-            processes = threads // 4
-            logging.debug(f"Run in multiprocesses mode. {processes} jobs with 4 threads for each are run concurrently")
-            with Pool(processes) as pool:
-                search_res = pool.starmap(
-                    self._run_hmmsearch,
-                    [
-                        (
-                            sample.name,
-                            self._pep_seqs[self._seq_count[idx][0] : self._seq_count[idx][1]],
-                            cutoffs,
-                            evalue,
-                        )
-                        for idx, sample in enumerate(self._inputs)
-                    ],
-                )
-        self.orthologs = dict_merge(search_res)
-
-    def filter_orthologs(self):
-        """Filter the found sequence hits from an HMM search."""
-        if hasattr(self, "orthologs"):
-            self.orthologs = dict(filter(lambda item: len(item[1]) >= 3, self.orthologs.items()))
-            logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples")
-        else:
-            raise AttributeError(
-                "No orthologs dictionary found. Please make sure the search function was run successfully"
-            )
-
-    def _get_ortholog_seqs(self, hits: set, seqs: pyhmmer.easel.DigitalSequenceBlock) -> BytesIO:
+    def _get_ortholog_seqs(self, hits: set, seqs: DigitalSequenceBlock) -> BytesIO:
         stream = BytesIO()
         for hit in hits:
             pep_seq = seqs[self._kh[hit]].copy()
@@ -363,70 +447,6 @@ class msa_generator:
                 )
             )
         return alignment
-
-    def align(self, output: Path, method: str, non_trim: bool, concat: bool, threads: int) -> None:
-        """Align a set of identify orthologous proteins."""
-        # Parallelize the MSA step
-        logging.info(f"Use {method} for peptide MSA")
-        logging.info(f"Use {threads} threads to parallelize MSA")
-        with Pool(threads) as pool:
-            if method == "muscle":
-                pep_msa_List = pool.map(self._run_muscle, self.orthologs.values())
-            else:
-                pep_msa_List = pool.starmap(self._run_hmmalign, self.orthologs.items())
-            logging.info("Peptide MSA done")
-
-            if hasattr(self, "_cds_seqs"):
-                logging.info("cds found. Processing cds sequences...")
-                cds_seqs_stream = pool.starmap(
-                    self._get_ortholog_seqs, [(hits, self._cds_seqs) for hits in self.orthologs.values()]
-                )
-                cds_seqs_List = pool.map(
-                    lambda x: [record for record in SeqIO.parse(StringIO(x.read().decode()), "fasta")], cds_seqs_stream
-                )
-                cds_msa_List = pool.starmap(bp_mrtrans, zip(pep_msa_List, cds_seqs_List))
-                logging.info("Back translate complete")
-
-            if not non_trim:
-                if hasattr(self, "_cds_seqs"):
-                    cds_msa_List = pool.starmap(trim_gaps, zip(pep_msa_List, cds_msa_List))
-                else:
-                    pep_msa_List = pool.map(trim_gaps, pep_msa_List)
-                logging.info("Trimming done")
-
-            if hasattr(self, "_cds_seqs"):
-                alignmentList = cds_msa_List
-            else:
-                alignmentList = pep_msa_List
-
-            if concat:
-                concat_alignments = MultipleSeqAlignment([])
-                for sample in self._inputs:
-                    # strip the filename extension from name so that this resembles sp name
-                    seqid = self._fastastrip_re.sub(r"", sample.name)
-                    concat_alignments.append(SeqRecord(Seq(""), id=seqid, description=""))
-                concat_alignments.sort()
-                alignmentList = pool.starmap(
-                    self._fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
-                )
-                logging.info("Filling missing taxon done")
-
-        for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
-            output_aa = output / f"{hmm}.{phyling.config.protein_ext}"
-            alignment.sort()
-            if concat:
-                concat_alignments += alignment
-            else:
-                with open(output_aa, "w") as f:
-                    SeqIO.write(alignment, f, format="fasta")
-
-        if concat:
-            output_concat = output / f"concat_alignments.{phyling.config.prot_aln_ext}"
-            with open(output_concat, "w") as f:
-                SeqIO.write(concat_alignments, f, format="fasta")
-            logging.info(f"Output concatenated fasta to {output_concat}")
-        else:
-            logging.info(f"Output individual fasta to folder {output}")
 
 
 def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, threads, **kwargs):
