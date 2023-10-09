@@ -140,13 +140,20 @@ class msa_generator:
 
     def filter_orthologs(self) -> None:
         """Filter the found sequence hits from an HMM search. Orthlogs with fewer than 3 hits will be discarded."""
-        if hasattr(self, "orthologs"):
-            self.orthologs = dict(filter(lambda item: len(item[1]) >= 3, self.orthologs.items()))
-            logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples")
-        else:
+        if not hasattr(self, "orthologs"):
             raise AttributeError(
                 "No orthologs dictionary found. Please make sure the search function was run successfully"
             )
+
+        self.orthologs = dict(filter(lambda item: len(item[1]) >= 3, self.orthologs.items()))
+        logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples")
+
+        if not self.orthologs:
+            logging.error(
+                "All entries are gone after filtering. Please confirm whether the inputs contain an insufficient "
+                "number of sequences or if the correct HMM markers are being used."
+            )
+            sys.exit(1)
 
     def align(self, output: Path, method: str, non_trim: bool, concat: bool, threads: int) -> None:
         """

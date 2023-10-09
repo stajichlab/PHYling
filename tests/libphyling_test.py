@@ -5,7 +5,7 @@ from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from phyling.libphyling import bp_mrtrans, dict_merge, msa_generator, trim_gaps
+from phyling.libphyling import bp_mrtrans, msa_generator, trim_gaps
 
 
 class TestMSAGenerator:
@@ -35,7 +35,7 @@ class TestMSAGenerator:
         assert "hmm_4" not in msa_instance.orthologs
         assert len(msa_instance.orthologs["hmm_1"]) == 4  # Number of samples
 
-    def test_filter_orthologs_with_small_orthologs(self, msa_instance):
+    def test_filter_orthologs_with_insufficient_orthologs(self, msa_instance):
         # Simulate having small orthologs in the instance
         msa_instance.orthologs = {
             "hmm_1": {"species_1_gene_100", "species_2_gene_211"},
@@ -43,8 +43,11 @@ class TestMSAGenerator:
             "hmm_3": {"species_1_gene_155", "species_2_gene_253"},
             "hmm_4": {"species_3_gene_344", "species_4_gene_466"},
         }
-        msa_instance.filter_orthologs()
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            msa_instance.filter_orthologs()
         assert len(msa_instance.orthologs) == 0  # No orthologs should remain
+        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.value.code == 1
 
     def test_filter_orthologs_attribute_error(self, msa_instance):
         # Simulate not having orthologs attribute in the instance
@@ -54,32 +57,6 @@ class TestMSAGenerator:
 
 def create_msa(records, ids):
     return MultipleSeqAlignment([SeqRecord(Seq(rec), id=id) for rec, id in zip(records, ids)])
-
-
-class Testdictmerge:
-    def test_dict_merge_empty_input(self):
-        result = dict_merge([])
-        assert result == {}
-
-    def test_dict_merge_single_dict(self):
-        dicts_list = [{"a": 1, "b": 2}]
-        result = dict_merge(dicts_list)
-        assert result == {"a": {1}, "b": {2}}
-
-    def test_dict_merge_multiple_dicts(self):
-        dicts_list = [{"a": 1, "b": 2}, {"a": 3, "c": 4}]
-        result = dict_merge(dicts_list)
-        assert result == {"a": {1, 3}, "b": {2}, "c": {4}}
-
-    def test_dict_merge_duplicate_values(self):
-        dicts_list = [{"a": 1, "b": 2}, {"a": 1, "c": 3}]
-        result = dict_merge(dicts_list)
-        assert result == {"a": {1}, "b": {2}, "c": {3}}
-
-    def test_dict_merge_empty_dicts(self):
-        dicts_list = [{}, {}]
-        result = dict_merge(dicts_list)
-        assert result == {}
 
 
 class Testbpmrtrans:
