@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import csv
-import gzip
 import logging
 import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from io import BytesIO, StringIO
 from itertools import product
 from multiprocessing.dummy import Pool
@@ -15,11 +15,13 @@ from pathlib import Path
 
 import numpy as np
 import pyhmmer
-from pyhmmer.easel import DigitalSequenceBlock
 from Bio import AlignIO, SeqIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+from clipkit.modes import TrimmingMode
+from clipkit.msa import MSA
+from pyhmmer.easel import DigitalSequenceBlock
 
 import phyling.config
 
@@ -60,23 +62,23 @@ def trim_gaps(
     if gaps > 1 or gaps < 0:
         raise ValueError('The argument "gaps" should be a float between 0 to 1.')
     infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in pep_msa]
-    msa_array = np.array([list(rec) for rec in pep_msa])
-    gappyness = (msa_array == "-").mean(axis=0)
-    pep_trimList = np.where(gappyness >= gaps)[0]
-    if pep_trimList.size > 0:
-        msa_array = np.delete(msa_array, pep_trimList, axis=1)
 
-    if cds_msa:
+    clipkit_pep_msa = MSA.from_bio_msa(pep_msa, gap_chars="-")
+    clipkit_pep_msa.trim(mode=TrimmingMode.gappy, gap_threshold=gaps)
+    bio_msa = clipkit_pep_msa.to_bio_msa()
+
+    if clipkit_pep_msa._site_positions_to_trim.size > 0 and cds_msa:
         infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in cds_msa]
-        msa_array = np.array([list(rec) for rec in cds_msa])
-        if pep_trimList.size > 0:
-            pep_trimList_expanded = np.expand_dims(pep_trimList, axis=1)
-            cds_trimList = (pep_trimList_expanded * np.array([3]) + np.array([0, 1, 2])).flatten()
-            msa_array = np.delete(msa_array, cds_trimList, axis=1)
+        clipkit_cds_msa = MSA.from_bio_msa(cds_msa)
+        pep_trimList_expanded = np.expand_dims(clipkit_pep_msa._site_positions_to_trim, axis=1)
+        cds_site_positions_to_trim = (pep_trimList_expanded * np.array([3]) + np.array([0, 1, 2])).flatten()
+        clipkit_cds_msa.trim(site_positions_to_trim=cds_site_positions_to_trim)
+        bio_msa = clipkit_cds_msa.to_bio_msa()
 
-    return MultipleSeqAlignment(
-        [SeqRecord(Seq("".join(rec)), **info) for rec, info in zip(msa_array.tolist(), infoList)]
-    )
+    for new_rec, rec in zip(bio_msa, infoList):
+        new_rec.id, new_rec.name, new_rec.description = rec["id"], rec["name"], rec["description"]
+
+    return bio_msa
 
 
 class msa_generator:
@@ -161,7 +163,7 @@ class msa_generator:
 
         First the sequences that have been identified as ortholog will be aligned through hmmalign or muscle. Next, do the dna to
         peptide back translation if self._cds_seqs is found (which means the inputs are cds fasta). Next, run the trimming to
-        remove uninformative regions (can be switch off). Fianlly, do fill_missing_taxon and concatenate all the MSA results if
+        remove uninformative regions (can be switch off). Finally, do fill_missing_taxon and concatenate all the MSA results if
         the concat mode is enable. Otherwise output each MSA results in separate files.
         """
         # Parallelize the MSA step
@@ -284,7 +286,7 @@ class msa_generator:
         seq.description = sample.encode()
         # Use a KeyHash to store seq.name/index pairs which can be used to retrieve
         # ortholog sequences by SequenceObject[kh[seq.name]]
-        self._kh.add(seq.description + "-".encode() + seq.name)
+        self._kh.add(seq.description + b"-" + seq.name)
 
     def _cds_translation(self, input: Path, cds_seqblock: DigitalSequenceBlock) -> None:
         """Check whether the cds fasta contains invalid length which cannot be divided by 3.
@@ -309,7 +311,7 @@ class msa_generator:
             try:
                 self._pep_seqs.append(cds_seq.translate())
                 self._cds_seqs.append(cds_seq)
-                self._kh.add(cds_seq.description + "-".encode() + cds_seq.name)
+                self._kh.add(cds_seq.description + b"-" + cds_seq.name)
             except ValueError:
                 problematic_seqs_name.append(cds_seq.name.decode())
 
@@ -369,14 +371,12 @@ class msa_generator:
 
     def _run_hmmsearch(
         self, sample: str, sequence: pyhmmer.easel.DigitalSequence, cutoffs: dict, evalue: float, threads: int = 4
-    ) -> dict[str, bytes]:
+    ) -> Iterator[str, bytes]:
         """Run the hmmsearch process using the pyhmmer library.
 
         This supports multithreaded running. Empirical testing shows that efficiency drops off after more than
         four (4) CPU threads are used so the defaults are best here if applied.
-
         """
-
         for hits in pyhmmer.hmmsearch(self._hmms.values(), sequence, cpus=threads):
             hmm = hits.query_name.decode()
             for hit in hits:
