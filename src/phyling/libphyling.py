@@ -24,15 +24,6 @@ from Bio.SeqRecord import SeqRecord
 import phyling.config
 
 
-def dict_merge(dicts_list: list[dict]) -> dict:
-    """Merge dictionaries with this helper function."""
-    result = {}
-    for d in dicts_list:
-        for k, v in d.items():
-            result.setdefault(k, set()).add(v)
-    return result
-
-
 def bp_mrtrans(pep_msa: MultipleSeqAlignment, cds_seqs: list[SeqRecord]) -> MultipleSeqAlignment:
     """Implement a transformer of alignments from protein to mrna/cdna coordinates."""
     stop_codons = {"TAA", "TAG", "TGA"}
@@ -141,7 +132,11 @@ class msa_generator:
                         for idx, input in enumerate(self._inputs)
                     ],
                 )
-        self.orthologs = dict_merge(search_res)
+
+        self.orthologs = {}
+        for res in search_res:
+            for hmm, seqid in res:
+                self.orthologs.setdefault(hmm, set()).add(seqid)
 
     def filter_orthologs(self) -> None:
         """Filter the found sequence hits from an HMM search. Orthlogs with fewer than 3 hits will be discarded."""
@@ -374,16 +369,15 @@ class msa_generator:
         four (4) CPU threads are used so the defaults are best here if applied.
 
         """
-        results = {}
+
         for hits in pyhmmer.hmmsearch(self._hmms.values(), sequence, cpus=threads):
-            cog = hits.query_name.decode()
+            hmm = hits.query_name.decode()
             for hit in hits:
-                if (cutoffs and hit.score < cutoffs[cog]) or (not cutoffs and hit.evalue > evalue):
+                if (cutoffs and hit.score < cutoffs[hmm]) or (not cutoffs and hit.evalue > evalue):
                     continue
-                results.setdefault(cog, f'{self._fastastrip_re.sub(r"", sample)}-'.encode() + hit.name)
+                yield hmm, f'{self._fastastrip_re.sub(r"", sample)}-'.encode() + hit.name
                 break  # The first hit in hits is the best hit
         logging.info(f"hmmsearch on {sample} done")
-        return results
 
     def _get_ortholog_seqs(self, hits: set, seqs: DigitalSequenceBlock) -> BytesIO:
         stream = BytesIO()
