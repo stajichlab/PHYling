@@ -1,6 +1,6 @@
 [![Conda build](https://img.shields.io/github/actions/workflow/status/stajichlab/PHYling_unified/conda-build.yml?logo=github&label=conda%20build)](https://github.com/stajichlab/PHYling_unified/actions/workflows/conda-build.yml)
 [![Python build](https://img.shields.io/github/actions/workflow/status/stajichlab/PHYling_unified/python-versions.yml?logo=github&label=python%20build)](https://github.com/stajichlab/PHYling_unified/actions/workflows/python-versions.yml)
-[![Python](https://img.shields.io/badge/python-3.7_%7C_3.8_%7C_3.9_%7C_3.10_%7C_3.11-blue?logo=python)](https://github.com/stajichlab/PHYling_unified/actions/workflows/python-versions.yml)
+[![Python](https://img.shields.io/badge/python-3.9_%7C_3.10_%7C_3.11_%7C_3.12-blue?logo=python)](https://github.com/stajichlab/PHYling_unified/actions/workflows/python-versions.yml)
 [![License](https://img.shields.io/github/license/stajichlab/PHYling_unified?label=license)](https://github.com/stajichlab/PHYling_unified/blob/main/LICENSE)
 
 # PHYling tool
