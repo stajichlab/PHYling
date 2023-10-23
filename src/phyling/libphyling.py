@@ -196,8 +196,10 @@ class msa_generator:
 
             if hasattr(self, "_cds_seqs"):
                 alignmentList = cds_msa_List
+                ext = phyling.config.cds_aln_ext
             else:
                 alignmentList = pep_msa_List
+                ext = phyling.config.prot_aln_ext
 
             if concat:
                 concat_alignments = MultipleSeqAlignment([])
@@ -212,7 +214,7 @@ class msa_generator:
                 logging.info("Filling missing taxon done")
 
         for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
-            output_aa = output / f"{hmm}.{phyling.config.protein_ext}"
+            output_aa = output / f"{hmm}.{ext}"
             alignment.sort()
             if concat:
                 concat_alignments += alignment
@@ -221,7 +223,7 @@ class msa_generator:
                     SeqIO.write(alignment, f, format="fasta")
 
         if concat:
-            output_concat = output / f"concat_alignments.{phyling.config.prot_aln_ext}"
+            output_concat = output / f"concat_alignments.{ext}"
             with open(output_concat, "w") as f:
                 SeqIO.write(concat_alignments, f, format="fasta")
             logging.info(f"Output concatenated fasta to {output_concat}")

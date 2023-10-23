@@ -214,7 +214,7 @@ phyling tree -I align
 You can also use only part of the alignment results to build tree.
 
 ```
-phyling tree -i align/100957at4751.faa align/174653at4751.faa align/255412at4751.faa
+phyling tree -i align/100957at4751.aa.mfa align/174653at4751.aa.mfa align/255412at4751.aa.mfa
 ```
 
 Use VeryFastTree instead of the default UPGMA method for tree building and running with 16 threads.
