@@ -98,12 +98,6 @@ def parser_submodule(parser, parent_parser) -> None:
         help="Report non-trimmed alignment results",
     )
     p_aln.add_argument(
-        "-c",
-        "--concat",
-        action="store_true",
-        help="Report concatenated alignment results",
-    )
-    p_aln.add_argument(
         "-t",
         "--threads",
         type=int,
@@ -140,6 +134,12 @@ def parser_submodule(parser, parent_parser) -> None:
         choices=["upgma", "nj", "ft"],
         default="upgma",
         help='Algorithm used for tree building (default="upgma")',
+    )
+    p_tree.add_argument(
+        "-c",
+        "--concat",
+        action="store_true",
+        help="Concatenated alignment results",
     )
     p_tree.add_argument("-f", "--figure", action="store_true", help="Generate a matplotlib tree figure")
     p_tree.add_argument(

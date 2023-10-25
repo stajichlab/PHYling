@@ -1,17 +1,22 @@
 """Phylogenetic tree construction methods."""
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 import subprocess
 import sys
 from io import StringIO
+from itertools import product
 from multiprocessing.dummy import Pool
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from Bio import AlignIO, Phylo
+from Bio import AlignIO, Phylo, SeqIO
+from Bio.Align import MultipleSeqAlignment
 from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 import phyling.config
 
@@ -36,6 +41,17 @@ class tree_generator:
                 "Please build the C++ version from the source following the instruction on https://github.com/chaoszhang/ASTER"
             )
             sys.exit(1)
+
+    def get(self) -> Phylo.BaseTree.Tree:
+        """Run the phylogeny analysis and get the tree object list."""
+        if len(self._file) == 1:
+            final_tree = self._build(self._file[0], self._threads)
+        else:
+            logging.debug(f"Run in multiprocesses mode. {self._threads} jobs are run concurrently")
+            with Pool(self._threads) as pool:
+                trees = pool.map(self._build, self._file)
+            final_tree = run_astral(trees)
+        return final_tree
 
     def _with_VeryFastTree(self, file: Path, threads: int) -> Phylo.BaseTree.Tree:
         stream = StringIO()
@@ -72,16 +88,37 @@ class tree_generator:
         logging.debug(f"Tree building on {file.name} is done")
         return tree
 
-    def get(self) -> Phylo.BaseTree.Tree:
-        """Run the phylogeny analysis and get the tree object list."""
-        if len(self._file) == 1:
-            final_tree = self._build(self._file[0], self._threads)
-        else:
-            logging.debug(f"Run in multiprocesses mode. {self._threads} jobs are run concurrently")
-            with Pool(self._threads) as pool:
-                trees = pool.map(self._build, self._file)
-            final_tree = run_astral(trees)
-        return final_tree
+
+def concatenate_fasta(taxonList: list, alignmentList: list[MultipleSeqAlignment], threads: int) -> MultipleSeqAlignment:
+    """Concatenate multiple MSA results into a single fasta."""
+    concat_alignments = MultipleSeqAlignment([])
+    for sample in taxonList:
+        concat_alignments.append(SeqRecord(Seq(""), id=sample, description=""))
+    concat_alignments.sort()
+    with Pool(threads) as pool:
+        alignmentList = pool.starmap(
+            fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
+        )
+    logging.debug("Filling missing taxon done")
+    for alignment in alignmentList:
+        concat_alignments += alignment
+    logging.debug("Concatenate fasta done")
+    return concat_alignments
+
+
+def fill_missing_taxon(taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
+    """Include empty gap-only strings in alignment for taxa lacking an ortholog."""
+    missing = set(taxonList) - {seq.id for seq in alignment}
+    for sample in missing:
+        alignment.append(
+            SeqRecord(
+                Seq("-" * alignment.get_alignment_length()),
+                id=sample,
+                description="",
+            )
+        )
+        alignment.sort()
+    return alignment
 
 
 def run_astral(trees: list[Phylo.BaseTree.Tree]) -> Phylo.BaseTree.Tree:
@@ -98,12 +135,12 @@ def run_astral(trees: list[Phylo.BaseTree.Tree]) -> Phylo.BaseTree.Tree:
     return Phylo.read(StringIO(stdout), "newick")
 
 
-def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
+def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwargs):
     """
     Construct a phylogenetic tree based on the results of multiple sequence alignment (MSA).
 
-    If multiple MSA results are given, the consensus tree method will be employed, using a 50% cutoff to represent
-    the majority of all the trees.
+    By default the consensus tree method will be employed which use a 50% cutoff to represent the majority of all the
+    trees. You can use the -c/--concat option to concatenate the MSA and build a single tree instead.
 
     By default, the UPGMA algorithm is used for tree construction. Users can switch to the Neighbor Joining method by
     specifying the -m/--method nj.
@@ -115,16 +152,57 @@ def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
     method_dict = {"upgma": "UPGMA", "nj": "Neighbor Joining", "ft": "VeryFastTree"}
     logging.info(f"Algorithm choose for tree building: {method_dict[method]}")
     if input_dir:
-        inputs = list(Path(input_dir).glob(f"*.{phyling.config.aln_ext}"))
+        inputs = [file for file in Path(input_dir).glob(f"*.{phyling.config.aln_ext}")]
     else:
-        inputs = [Path(sample) for sample in inputs]
+        inputs = [Path(file) for file in inputs if file.endswith(phyling.config.aln_ext)]
+        input_dir = {file.parent for file in inputs}
+
+        if len(input_dir) > 1:
+            logging.error("Inputs do not came from the same folder. Cannot obtain the correct metadata.")
+            logging.error(input_dir)
+            sys.exit(1)
+        else:
+            input_dir = input_dir.pop()
+
     logging.info(f"Found {len(inputs)} MSA fasta")
-    if inputs[0].name == f"concat_alignments.{phyling.config.aln_ext}":
-        logging.info("Generate phylogenetic tree the on concatenated fasta")
-    else:
-        logging.info("Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree")
+
+    # Get the metadata under the inputs folder
+    input_dir = Path(input_dir)
+    metadata = input_dir / ".metadata.json"
+    if not metadata.exists():
+        logging.error("Cannot find the metadata. Aborted.")
+        sys.exit(1)
+    with open(metadata) as f:
+        metadata = json.load(f)
+    if len(metadata["sample"]) < 3:
+        logging.error(
+            "Something wrong with the metadata. It contains less than 3 taxa which is not valid for tree building."
+        )
+        sys.exit(1)
+
     output = Path(output)
     output.mkdir(exist_ok=True)
+
+    if concat and len(inputs) > 1:
+        # Get the concat_alignments
+        logging.info("Generate phylogenetic tree the on concatenated fasta")
+        alignmentList = []
+        for file in inputs:
+            alignmentList.append(AlignIO.read(file, format="fasta"))
+        concat_alignments = concatenate_fasta(list(metadata["sample"].keys()), alignmentList, threads=threads)
+        # Rename the sample
+        for seq in concat_alignments:
+            seq.name = seq.id = metadata["sample"][seq.id]
+            seq.description = ""
+
+        # Output the concatenated MSA to file
+        output_concat = output / f"concat_alignments.{phyling.config.aln_ext}"
+        with open(output_concat, "w") as f:
+            SeqIO.write(concat_alignments, f, format="fasta")
+        logging.info(f"Concatenated fasta is output to {output_concat}")
+        inputs = [output_concat]
+    else:
+        logging.info("Generate phylogenetic tree on all MSA fasta and conclude a majority consensus tree")
 
     tree_generator_obj = tree_generator(method, threads, *inputs)
     final_tree = tree_generator_obj.get()

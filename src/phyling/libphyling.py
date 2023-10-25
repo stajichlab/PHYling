@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import logging
 import re
 import shutil
@@ -9,7 +10,6 @@ import subprocess
 import sys
 from collections.abc import Iterator
 from io import BytesIO, StringIO
-from itertools import product
 from multiprocessing.dummy import Pool
 from pathlib import Path
 
@@ -86,7 +86,7 @@ class msa_generator:
 
     def __init__(self, inputs: list[Path]):
         """Initialize the MSA generator object and perform sequence check and preprocessing."""
-        self._inputs = inputs
+        self._inputs = sorted(inputs)
         self._fastastrip_re = re.compile(r"(\.(aa|pep|cds|fna|faa))?\.(fasta|fas|faa|fna|seq|fa)(\.gz)?")
         self._inputs_basename_check()
         # Create a dict to retrieve the sequence later
@@ -157,14 +157,13 @@ class msa_generator:
             )
             sys.exit(1)
 
-    def align(self, output: Path, method: str, non_trim: bool, concat: bool, threads: int) -> None:
+    def align(self, output: Path, method: str, non_trim: bool, threads: int) -> None:
         """
         Align a set of identify orthologous proteins.
 
         First the sequences that have been identified as ortholog will be aligned through hmmalign or muscle. Next, do the dna to
         peptide back translation if self._cds_seqs is found (which means the inputs are cds fasta). Next, run the trimming to
-        remove uninformative regions (can be switch off). Finally, do fill_missing_taxon and concatenate all the MSA results if
-        the concat mode is enable. Otherwise output each MSA results in separate files.
+        remove uninformative regions (can be switch off). Finally, output each MSA results in separate files.
         """
         # Parallelize the MSA step
         logging.info(f"Use {method} for peptide MSA")
@@ -201,34 +200,16 @@ class msa_generator:
                 alignmentList = pep_msa_List
                 ext = phyling.config.prot_aln_ext
 
-            if concat:
-                concat_alignments = MultipleSeqAlignment([])
-                for input in self._inputs:
-                    # strip the filename extension from name so that this resembles sp name
-                    sample = self._fastastrip_re.sub(r"", input.name)
-                    concat_alignments.append(SeqRecord(Seq(""), id=sample, description=""))
-                concat_alignments.sort()
-                alignmentList = pool.starmap(
-                    self._fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
-                )
-                logging.info("Filling missing taxon done")
-
+        logging.info(f"Output individual fasta to folder {output}")
         for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
-            output_aa = output / f"{hmm}.{ext}"
+            output_mfa = output / f"{hmm}.{ext}"
             alignment.sort()
-            if concat:
-                concat_alignments += alignment
-            else:
-                with open(output_aa, "w") as f:
-                    SeqIO.write(alignment, f, format="fasta")
+            with open(output_mfa, "w") as f:
+                SeqIO.write(alignment, f, format="fasta")
 
-        if concat:
-            output_concat = output / f"concat_alignments.{ext}"
-            with open(output_concat, "w") as f:
-                SeqIO.write(concat_alignments, f, format="fasta")
-            logging.info(f"Output concatenated fasta to {output_concat}")
-        else:
-            logging.info(f"Output individual fasta to folder {output}")
+        output_metadata = output / ".metadata.json"
+        with open(output_metadata, "w") as f:
+            json.dump(self._generate_metadata(), f)
 
     def _sequence_preprocess(self, input: Path) -> tuple(int, int):
         """
@@ -438,21 +419,17 @@ class msa_generator:
             seq.seq = Seq(re.sub(r"[ZzBbXx\*\.]", "-", str(seq.seq)))
         return alignment
 
-    def _fill_missing_taxon(self, taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
-        """Include empty gap-only strings in alignment for taxa lacking an ortholog."""
-        missing = set(taxonList) - {seq.id for seq in alignment}
-        for sample in missing:
-            alignment.append(
-                SeqRecord(
-                    Seq("-" * alignment.get_alignment_length()),
-                    id=sample,
-                    description="",
-                )
-            )
-        return alignment
+    def _generate_metadata(self) -> dict:
+        """Generate metadata for phylotree module."""
+        metadata = {"sample": {}}
+        for input in self._inputs:
+            sample = self._fastastrip_re.sub(r"", input.name)
+            metadata["sample"].setdefault(sample, sample)
+
+        return metadata
 
 
-def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat, threads, **kwargs):
+def main(inputs, input_dir, output, markerset, evalue, method, non_trim, threads, **kwargs):
     """
     Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
 
@@ -462,12 +439,9 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat,
     an evalue of 1e-10 will be used as the default cutoff.
 
     Sequences corresponding to orthologs found in more than 3 samples are extracted from each input. These sequences
-    then undergo MSA with hmmalign or muscle. The resulting alignment is further trimmed using clipkit by default. You
-    can use the -n/--non_trim option to skip the trimming step.
-
-    By default, the alignment results are output separately for each hmm marker. The consensus tree method is applying
-    by default to construct a phylogenetic tree. You can use the -c/--concat option to concatenate the aligned
-    sequences by sample and build a single tree afterward.
+    then undergo MSA with hmmalign or muscle. The resulting alignments are further trimmed using clipkit by default.
+    You can use the -n/--non_trim option to skip the trimming step. Finally, The alignment results are output
+    separately for each hmm marker.
     """
     # If args.input_dir is used to instead of args.inputs
     if input_dir:
@@ -503,4 +477,4 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, concat,
     msa = msa_generator(inputs)
     msa.search(markerset, evalue=evalue, threads=threads)
     msa.filter_orthologs()
-    msa.align(output, non_trim=non_trim, method=method, concat=concat, threads=threads)
+    msa.align(output, non_trim=non_trim, method=method, threads=threads)
