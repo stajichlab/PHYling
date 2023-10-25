@@ -119,7 +119,7 @@ def phylotree(inputs, input_dir, output, method, figure, threads, **kwargs):
     else:
         inputs = [Path(sample) for sample in inputs]
     logging.info(f"Found {len(inputs)} MSA fasta")
-    if inputs[0].name == f"concat_alignments.{phyling.config.prot_aln_ext}":
+    if inputs[0].name == f"concat_alignments.{phyling.config.aln_ext}":
         logging.info("Generate phylogenetic tree the on concatenated fasta")
     else:
         logging.info("Generate phylogenetic tree on all MSA fasta and conclude an majority consensus tree")
