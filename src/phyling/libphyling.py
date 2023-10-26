@@ -65,15 +65,19 @@ def trim_gaps(
 
     clipkit_pep_msa = MSA.from_bio_msa(pep_msa, gap_chars="-")
     clipkit_pep_msa.trim(mode=TrimmingMode.gappy, gap_threshold=gaps)
-    bio_msa = clipkit_pep_msa.to_bio_msa()
+    pep_msa = clipkit_pep_msa.to_bio_msa()
 
-    if clipkit_pep_msa._site_positions_to_trim.size > 0 and cds_msa:
-        infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in cds_msa]
-        clipkit_cds_msa = MSA.from_bio_msa(cds_msa)
-        pep_trimList_expanded = np.expand_dims(clipkit_pep_msa._site_positions_to_trim, axis=1)
-        cds_site_positions_to_trim = (pep_trimList_expanded * np.array([3]) + np.array([0, 1, 2])).flatten()
-        clipkit_cds_msa.trim(site_positions_to_trim=cds_site_positions_to_trim)
-        bio_msa = clipkit_cds_msa.to_bio_msa()
+    if cds_msa:
+        if clipkit_pep_msa._site_positions_to_trim.size > 0:
+            infoList = [{"id": rec.id, "name": rec.name, "description": rec.description} for rec in cds_msa]
+            clipkit_cds_msa = MSA.from_bio_msa(cds_msa)
+            pep_trimList_expanded = np.expand_dims(clipkit_pep_msa._site_positions_to_trim, axis=1)
+            cds_site_positions_to_trim = (pep_trimList_expanded * np.array([3]) + np.array([0, 1, 2])).flatten()
+            clipkit_cds_msa.trim(site_positions_to_trim=cds_site_positions_to_trim)
+            cds_msa = clipkit_cds_msa.to_bio_msa()
+        bio_msa = cds_msa
+    else:
+        bio_msa = pep_msa
 
     for new_rec, rec in zip(bio_msa, infoList):
         new_rec.id, new_rec.name, new_rec.description = rec["id"], rec["name"], rec["description"]

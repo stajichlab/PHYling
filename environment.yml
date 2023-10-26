@@ -5,6 +5,7 @@ channels:
   - defaults
 dependencies:
   - biopython>=1.81
+  - clipkit>=2.1.1
   - matplotlib>=3.5.3
   - muscle>=5.1
   - numpy

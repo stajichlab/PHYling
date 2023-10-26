@@ -108,42 +108,83 @@ class Testbpmrtrans:
 
 
 class Testtrimgaps:
-    pep_msa1 = create_msa(["-MG--A", "M-GT-C", "MMGTG-"], ["Species_A", "Species_B", "Species_C"])
-    pep_msa2 = create_msa(["MTG--A", "M-GT-C"], ["Species_A", "Species_B"])
+    pep_msa = create_msa(
+        [
+            "MI-T-C",
+            "M-AT-C",
+            "MI-TG-",
+            "M-GT-C",
+        ],
+        [
+            "Species_A",
+            "Species_B",
+            "Species_C",
+            "Species_D",
+        ],
+    )
+    cds_msa = create_msa(
+        [
+            "ATGATC---ACG---TGT",
+            "ATG---GCTACT---TGT",
+            "ATGATA---ACAGGA---",
+            "ATG---GGTACT---TGC",
+        ],
+        [
+            "Species_A",
+            "Species_B",
+            "Species_C",
+            "Species_D",
+        ],
+    )
 
-    def test_trim_gaps_basic(self):
-        result_msa = trim_gaps(self.pep_msa1, gaps=0.5)
-        assert len(result_msa) == 3
-        assert str(result_msa[0].seq) == "-MG-A"
-        assert str(result_msa[1].seq) == "M-GTC"
-        assert str(result_msa[2].seq) == "MMGT-"
+    def test_trim_gaps_with_peptide(self):
+        result_msa = trim_gaps(self.pep_msa, gaps=0.6)
+        assert len(result_msa) == 4
+        assert str(result_msa[0].seq) == "MI-TC"
+        assert str(result_msa[1].seq) == "M-ATC"
+        assert str(result_msa[2].seq) == "MI-T-"
+        assert str(result_msa[3].seq) == "M-GTC"
+
+    def test_trim_gaps_with_peptide_no_trim(self):
+        result_msa = trim_gaps(self.pep_msa, gaps=0.8)
+        assert len(result_msa) == 4
+        assert str(result_msa[0].seq) == "MI-T-C"
+        assert str(result_msa[1].seq) == "M-AT-C"
+        assert str(result_msa[2].seq) == "MI-TG-"
+        assert str(result_msa[3].seq) == "M-GT-C"
 
     def test_trim_gaps_with_cds_msa(self):
-        cds_msa = create_msa(["ATGACTGGA------GCT", "ATG---GCTACT---TGT"], ["Species_A", "Species_B"])
-        result_msa = trim_gaps(self.pep_msa2, cds_msa, gaps=0.5)
-        assert len(result_msa) == 2
-        assert str(result_msa[0].seq) == "ATGGGAGCT"
-        assert str(result_msa[1].seq) == "ATGGCTTGT"
+        result_msa = trim_gaps(self.pep_msa, self.cds_msa, gaps=0.6)
+        assert len(result_msa) == 4
+        assert str(result_msa[0].seq) == "ATGATC---ACGTGT"
+        assert str(result_msa[1].seq) == "ATG---GCTACTTGT"
+        assert str(result_msa[2].seq) == "ATGATA---ACA---"
+        assert str(result_msa[3].seq) == "ATG---GGTACTTGC"
+
+    def test_trim_gaps_with_cds_msa_no_trim(self):
+        result_msa = trim_gaps(self.pep_msa, self.cds_msa, gaps=0.8)
+        assert len(result_msa) == 4
+        assert str(result_msa[0].seq) == "ATGATC---ACG---TGT"
+        assert str(result_msa[1].seq) == "ATG---GCTACT---TGT"
+        assert str(result_msa[2].seq) == "ATGATA---ACAGGA---"
+        assert str(result_msa[3].seq) == "ATG---GGTACT---TGC"
 
     def test_trim_gaps_at_threshold_boundary(self):
-        result_msa = trim_gaps(self.pep_msa2, gaps=0.5)
-        assert len(result_msa) == 2
-        assert str(result_msa[0].seq) == "MGA"
-        assert str(result_msa[1].seq) == "MGC"
-
-    def test_trim_gaps_no_trim(self):
-        result_msa = trim_gaps(self.pep_msa2, gaps=0.51)
-        assert len(result_msa) == 2
-        assert str(result_msa[0].seq) == "MTG-A"
-        assert str(result_msa[1].seq) == "M-GTC"
+        result_msa = trim_gaps(self.pep_msa, gaps=0.5)
+        assert len(result_msa) == 4
+        assert str(result_msa[0].seq) == "MTC"
+        assert str(result_msa[1].seq) == "MTC"
+        assert str(result_msa[2].seq) == "MT-"
+        assert str(result_msa[3].seq) == "MTC"
 
     def test_trim_gaps_invalid_gaps_value(self):
         with pytest.raises(ValueError):
-            trim_gaps(self.pep_msa2, gaps=1.5)
+            trim_gaps(self.pep_msa, gaps=1.5)
 
     def test_trim_gaps_msa_metadata(self):
-        result_msa = trim_gaps(self.pep_msa1, gaps=0.5)
-        assert len(result_msa) == 3
+        result_msa = trim_gaps(self.pep_msa, gaps=0.5)
+        assert len(result_msa) == 4
         assert str(result_msa[0].id) == "Species_A"
         assert str(result_msa[1].id) == "Species_B"
         assert str(result_msa[2].id) == "Species_C"
+        assert str(result_msa[3].id) == "Species_D"

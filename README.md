@@ -235,6 +235,7 @@ phyling tree -I align -f
 - [Biopython](https://biopython.org/)
 - [pyhmmer], a HMMER3 implementation on python3.
 - [muscle] for alternative method for multiple sequence alignment. (Optional)
+- [ClipKIT] for removing sites that are poor of phylogenetic signal.
 - [VeryFastTree], use approximately maximum-likelihood to build trees. (Optional)
 - [ASTER], a C++ re-implementation of [ASTRAL] to resolve consensus among trees.
 
@@ -260,6 +261,7 @@ pip install .
 [Busco]: https://busco-data.ezlab.org/v5/data/lineages/
 [pyhmmer]: https://pyhmmer.readthedocs.io/en/stable/index.html
 [muscle]: https://drive5.com/muscle5/
+[ClipKIT]: https://jlsteenwyk.com/ClipKIT/
 [VeryFastTree]: https://github.com/citiususc/veryfasttree
 [ASTER]: https://github.com/chaoszhang/ASTER
 [ASTRAL]: https://github.com/smirarab/ASTRAL
