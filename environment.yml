@@ -9,6 +9,6 @@ dependencies:
   - matplotlib>=3.5.3
   - muscle>=5.1
   - numpy
-  - pyhmmer>=0.10.2
+  - pyhmmer>=0.10.4
   - python>=3.7.12
   - veryfasttree>=4.0.2

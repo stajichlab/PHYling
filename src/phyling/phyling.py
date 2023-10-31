@@ -92,10 +92,14 @@ def parser_submodule(parser, parent_parser) -> None:
         help='Program used for multiple sequence alignment (default="hmmalign")',
     )
     p_aln.add_argument(
-        "-n",
         "--non_trim",
         action="store_true",
         help="Report non-trimmed alignment results",
+    )
+    p_aln.add_argument(
+        "--from_checkpoint",
+        action="store_true",
+        help="Load previous hmmsearch results from .checkpoint.pkl in the output directory",
     )
     p_aln.add_argument(
         "-t",
