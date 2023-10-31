@@ -24,15 +24,14 @@ import phyling.config
 class tree_generator:
     """A phylogentic tree generator used in phyling."""
 
-    def __init__(self, method: str, threads: int, *file: Path):
+    def __init__(self, seqtype: str, method: str, *file: Path):
         """Initialize the tree generator object."""
         self._file = file
-        self.method = method
-        self._threads = threads
-        if method == "ft" and not shutil.which("VeryFastTree"):
+        self._seqtype = seqtype
+        self._method = method
+        if self._method == "ft" and not shutil.which("FastTree"):
             logging.error(
-                'VeryFastTree not found. Please install it through "conda install -c bioconda veryfasttree" '
-                "or build from the source following the instruction on https://github.com/citiususc/veryfasttree"
+                'FastTree not found. Please install it through "conda install -c bioconda fasttree"'
             )
             sys.exit(1)
         if len(self._file) > 1 and not shutil.which("astral"):
@@ -42,18 +41,34 @@ class tree_generator:
             )
             sys.exit(1)
 
-    def get(self) -> Phylo.BaseTree.Tree:
+    def get(self, threads: int) -> Phylo.BaseTree.Tree:
         """Run the phylogeny analysis and get the tree object list."""
+        logging.info("Start tree building...")
         if len(self._file) == 1:
-            final_tree = self._build(self._file[0], self._threads)
+            final_tree = self._build(self._file[0])
         else:
-            logging.debug(f"Run in multiprocesses mode. {self._threads} jobs are run concurrently")
-            with Pool(self._threads) as pool:
+            logging.debug(f"Run in multiprocesses mode. {threads} jobs are run concurrently")
+            with Pool(threads) as pool:
                 trees = pool.map(self._build, self._file)
             final_tree = run_astral(trees)
         return final_tree
 
-    def _with_VeryFastTree(self, file: Path, threads: int) -> Phylo.BaseTree.Tree:
+    def _build(self, file: Path) -> Phylo.BaseTree.Tree:
+        if self._method in ["upgma", "nj"]:
+            tree = self._with_phylo_module(file)
+        elif self._method == "ft":
+            tree = self._with_FastTree(file, self._seqtype)
+        logging.debug(f"Tree building on {file.name} is done")
+        return tree
+
+    def _with_phylo_module(self, file: Path) -> Phylo.BaseTree.Tree:
+        """Run the tree calculation using a simple distance method."""
+        MSA = AlignIO.read(file, format="fasta")
+        calculator = DistanceCalculator("identity")
+        constructor = DistanceTreeConstructor(calculator, self._method)
+        return constructor.build_tree(MSA)
+
+    def _with_VeryFastTree(self, file: Path, seqtype: str, threads: int) -> Phylo.BaseTree.Tree:
         stream = StringIO()
         with open(file) as f:
             for line in f.read().splitlines():
@@ -62,31 +77,50 @@ class tree_generator:
                 stream.write(line)
                 stream.write("\n")
         stream.seek(0)
+        if seqtype == "DNA":
+            cmd = ["FastTree", "-nt", "-gamma", "-threads", str(threads)]
+        else:
+            cmd = ["FastTree", "-lg", "-gamma", "-threads", str(threads)]
         p = subprocess.Popen(
-            ["VeryFastTree", "-lg", "-gamma", "-threads", str(threads)],
+            cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
-        tree, _ = p.communicate(stream.read())
+        tree, err = p.communicate(stream.read())
         stream.close()
+        if not tree:
+            print(err)
+            sys.exit(1)
         return Phylo.read(StringIO(tree), "newick")
 
-    def _with_phylo_module(self, file: Path) -> Phylo.BaseTree.Tree:
-        """Run the tree calculation using a simple distance method."""
-        MSA = AlignIO.read(file, format="fasta")
-        calculator = DistanceCalculator("identity")
-        constructor = DistanceTreeConstructor(calculator, self.method)
-        return constructor.build_tree(MSA)
-
-    def _build(self, file: Path, threads: int = 1) -> Phylo.BaseTree.Tree:
-        if self.method in ["upgma", "nj"]:
-            tree = self._with_phylo_module(file)
-        if self.method == "ft":
-            tree = self._with_VeryFastTree(file, threads)
-        logging.debug(f"Tree building on {file.name} is done")
-        return tree
+    def _with_FastTree(self, file: Path, seqtype: str) -> Phylo.BaseTree.Tree:
+        stream = StringIO()
+        with open(file) as f:
+            for line in f.read().splitlines():
+                if not line.startswith(">"):
+                    line = line.upper()
+                stream.write(line)
+                stream.write("\n")
+        stream.seek(0)
+        if seqtype == "DNA":
+            cmd = ["FastTree", "-nt", "-gamma"]
+        else:
+            cmd = ["FastTree", "-lg", "-gamma"]
+        p = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        tree, err = p.communicate(stream.read())
+        stream.close()
+        if not tree:
+            print(err)
+            sys.exit(1)
+        return Phylo.read(StringIO(tree), "newick")
 
 
 def fill_missing_taxon(taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
@@ -168,20 +202,22 @@ def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwar
 
     input_dir = Path(input_dir)
 
+    # Get the sample names from checkpoint file under the inputs folder
+    checkpoint = input_dir / ".checkpoint.pkl"
+    try:
+        with open(checkpoint, "rb") as f:
+            samples, _ = pickle.load(f)
+    except FileNotFoundError:
+        logging.error(
+            'Checkpoint file ".checkpoint.pkl" not found. Please rerun the align module again without --from_checkpoint.'
+        )
+    seqtype = tuple(samples.values())[0].seqtype
+    logging.info(f"Inputs are {seqtype} sequences.")
+
     output = Path(output)
     output.mkdir(exist_ok=True)
 
     if concat and len(inputs) > 1:
-        # Get the sample names from checkpoint file under the inputs folder
-        checkpoint = input_dir / ".checkpoint.pkl"
-        try:
-            with open(checkpoint, "rb") as f:
-                samples, _ = pickle.load(f)
-        except FileNotFoundError:
-            logging.error(
-                'Checkpoint file ".checkpoint.pkl" not found. Please rerun the align module again without --from_checkpoint.'
-            )
-
         # Get the concat_alignments
         logging.info("Generate phylogenetic tree the on concatenated fasta")
         alignmentList = []
@@ -198,8 +234,8 @@ def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwar
     else:
         logging.info("Generate phylogenetic tree on all MSA fasta and conclude a majority consensus tree")
 
-    tree_generator_obj = tree_generator(method, threads, *inputs)
-    final_tree = tree_generator_obj.get()
+    tree_generator_obj = tree_generator(seqtype, method, *inputs)
+    final_tree = tree_generator_obj.get(threads=threads)
     Phylo.draw_ascii(final_tree)
 
     output_tree = output / f"{method}_tree.nw"
