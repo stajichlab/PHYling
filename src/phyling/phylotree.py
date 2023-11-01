@@ -176,8 +176,8 @@ def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwar
     By default the consensus tree method will be employed which use a 50% cutoff to represent the majority of all the
     trees. You can use the -c/--concat option to concatenate the MSA and build a single tree instead.
 
-    By default, the UPGMA algorithm is used for tree construction. Users can switch to the Neighbor Joining method by
-    specifying the -m/--method nj.
+    By default, the UPGMA algorithm is used for tree construction. Users can switch to the Neighbor Joining or FastTree
+    by specifying the -m/--method nj/ft.
 
     Once the tree is built, an ASCII figure representing the tree will be displayed, and a treefile in Newick format
     will be generated as output. Additionally, users can choose to obtain a matplotlib-style figure using the

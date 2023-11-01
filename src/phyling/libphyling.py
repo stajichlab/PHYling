@@ -558,15 +558,18 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
     """
     Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
 
-    Initially, HMMsearch is used to match the samples against a given markerset and report the top hit of each sample
+    Initially, hmmsearch is used to match the samples against a given markerset and report the top hit of each sample
     for each hmm marker, representing "orthologs" across all samples. In order to build a tree, minimum of 3 samples
     should be used. If the bitscore cutoff file is present in the hmms folder, it will be used as the cutoff. Otherwise,
     an evalue of 1e-10 will be used as the default cutoff.
 
     Sequences corresponding to orthologs found in more than 3 samples are extracted from each input. These sequences
     then undergo MSA with hmmalign or muscle. The resulting alignments are further trimmed using clipkit by default.
-    You can use the -n/--non_trim option to skip the trimming step. Finally, The alignment results are output
-    separately for each hmm marker.
+    You can use the --non_trim option to skip the trimming step. Finally, The alignment results are output separately
+    for each hmm marker.
+
+    Note that a checkpoint file will be output after the hmmsearch step. You can add/remove taxon without rerun the
+    unchanged input entries by enabling --from_checkpoint option.
     """
     # If args.input_dir is used to instead of args.inputs
     if input_dir:
