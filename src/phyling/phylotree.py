@@ -183,7 +183,7 @@ def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwar
     will be generated as output. Additionally, users can choose to obtain a matplotlib-style figure using the
     -f/--figure option.
     """
-    method_dict = {"upgma": "UPGMA", "nj": "Neighbor Joining", "ft": "VeryFastTree"}
+    method_dict = {"upgma": "UPGMA", "nj": "Neighbor Joining", "ft": "FastTree"}
     logging.info(f"Algorithm choose for tree building: {method_dict[method]}")
     if input_dir:
         inputs = [file for file in Path(input_dir).glob(f"*.{phyling.config.aln_ext}")]
