@@ -1,4 +1,4 @@
-name: Conda build
+name: Conda build test
 
 on:
   push:
@@ -10,51 +10,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_ASTER:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Cache ASTER binary
-        uses: actions/cache@v3
-        with:
-          path: ~/.local/bin/astral
-          key: ASTER-Linux
-
-      - name: Install dependencies
-        run: |
-          if ! [ -f ~/.local/bin/astral ]; \
-            then sudo apt-get install build-essential cmake g++ wget unzip; \
-          fi
-
-      - name: Build ASTER
-        run: |
-          if ! [ -f ~/.local/bin/astral ]; \
-            then \
-            wget https://github.com/chaoszhang/ASTER/archive/refs/heads/Linux.zip; \
-            unzip Linux.zip; \
-            cd ASTER-Linux; \
-            make; \
-          fi
-
-      - name: Move Binary
-        run: |
-          if ! [ -f ~/.local/bin/astral ]; \
-            then \
-            mkdir -p ~/.local/bin; \
-            cp ASTER-Linux/bin/astral ~/.local/bin/; \
-            chmod +x ~/.local/bin/astral; \
-          fi
-        working-directory: ${{ github.workspace }}
-
-      - name: Export ASTER to PATH and verify
-        run: |
-          export PATH=$PATH:$HOME/.local/bin
-          which astral
+  call-build-aster:
+    uses: ./.github/workflows/build-aster.yml
 
   build-conda:
     runs-on: ubuntu-latest
 
-    needs: build_ASTER
+    needs: call-build-aster
 
     steps:
       - uses: actions/checkout@v3
@@ -75,17 +37,15 @@ jobs:
         shell: micromamba-shell {0}
 
       - name: Install package
-        run: |
-          pip install .
+        run: pip install .
         shell: micromamba-shell {0}
 
-      - name: Cache ASTER binary
+      - name: Cache ASTER
         uses: actions/cache@v3
         with:
           path: ~/.local/bin/astral
-          key: ASTER-Linux
+          key: ${{ runner.os }}-ASTER
 
       - name: Test with pytest
-        run: |
-          pytest
+        run: pytest
         shell: micromamba-shell {0}

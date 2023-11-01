@@ -1,0 +1,34 @@
+name: Build FastTree
+
+on: workflow_call
+
+jobs:
+  build_FastTree:
+    name: Build FastTree
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cache FastTree
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/bin/FastTree
+          key: ${{ runner.os }}-FastTree
+
+      - name: Download FastTree executable
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install wget
+          wget http://www.microbesonline.org/fasttree/FastTree
+
+      - name: Move executable
+        run: |
+          mkdir -p ~/.local/bin
+          cp FastTree ~/.local/bin/
+          chmod +x ~/.local/bin/FastTree
+        working-directory: ${{ github.workspace }}
+
+      - name: Export FastTree to PATH and verify
+        run: |
+          export PATH=$PATH:$HOME/.local/bin
+          which FastTree

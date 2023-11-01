@@ -1,0 +1,39 @@
+name: Build ASTER
+
+on: workflow_call
+
+jobs:
+  build_ASTER:
+    name: Build ASTER
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cache ASTER
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/bin/astral
+          key: ${{ runner.os }}-ASTER
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get install build-essential cmake g++ wget unzip
+
+      - name: Compile ASTER
+        run: |
+          wget https://github.com/chaoszhang/ASTER/archive/refs/heads/Linux.zip
+          unzip Linux.zip
+          cd ASTER-Linux
+          make
+
+      - name: Move executable
+        run: |
+          mkdir -p ~/.local/bin
+          cp ASTER-Linux/bin/astral ~/.local/bin/
+          chmod +x ~/.local/bin/astral
+          working-directory: ${{ github.workspace }}
+
+      - name: Export ASTER to PATH and verify
+        run: |
+          export PATH=$PATH:$HOME/.local/bin
+          which astral
