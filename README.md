@@ -26,7 +26,7 @@ The marker sets developed for this approach in fungi are available as part of th
 - Implement all stuff in python. The entire program will be more readable and maintainable.
 - Simplify some steps and reduce the intermediate files as much as possible.
 - [Muscle] is now available for alternative alignment method.
-- [VeryFastTree] is now available for tree construction.
+- [FastTree] is now available for tree construction.
 - [ASTER], a C++ version of [ASTRAL] is now integrated to resolve consensus among trees built upon individual genes.
 
 ## Usage
@@ -56,11 +56,12 @@ cd example
 
 In general, PHYling takes fasta as input. The gzipped fasta is also valid.
 
-All the search and alignment processes are done on peptide sequences.
 The folder `example/pep` includes 5 example peptide fasta which can be used for test run.
 
 In addition to the peptide sequences, PHYling can also takes DNA coding sequences as inputs to more accurately estimate the phylogeny of closely related species.
-If you're interested in testing the feature, there are also some example DNA sequences under the folder `example/cds`.
+When taking DNA coding sequences as inputs, DNA sequences will be translated into peptide sequences and all the hmmsearch/align are done on the peptide version.
+The final MSA results will be back-translated into DNA at the final stage.
+The example DNA sequences are placed under the folder `example/cds`.
 
 ### Download HMM markerset
 
@@ -103,8 +104,8 @@ Once the orthologs are identified, the sequences extracted from each sample unde
 By default, the alignment is performed using the _hmmalign_ method.
 However, users have the option to switch to using _muscle_ by specifying the `-M/--method muscle` flag.
 
-By default, each alignment result is output separately and is expected to resolve their phylogeny by consensus tree method.
-If you prefer to use concatenate strategy. You can concatenate all the alignment by passing `-c/--concat`.
+Finally, each alignment result is output separately.
+You can decide whether you want to concatenate them in the tree module.
 See all the options with `phyling align --help`.
 
 ```
@@ -123,8 +124,8 @@ options:
                         Hmmsearch reporting threshold (default=1e-10)
   -M {hmmalign,muscle}, --method {hmmalign,muscle}
                         Program used for multiple sequence alignment (default="hmmalign")
-  -n, --non_trim        Report non-trimmed alignment results
-  -c, --concat          Report concatenated alignment results
+  --non_trim            Report non-trimmed alignment results
+  --from_checkpoint     Load previous hmmsearch results from .checkpoint.pkl in the output directory
   -t THREADS, --threads THREADS
                         Threads for hmmsearch and the number of parallelized jobs in MSA step (default=1)
 ```
@@ -166,6 +167,10 @@ For the alignment step, 16 parallel jobs will be launched and each parallel job 
 
 Highly recommended if **muscle** is chosen for alignment. (**muscle** is much slower than **hmmalign**!!)
 
+A checkpoint file will be generated after the hmmsearch step.
+The `--from_checkpoint` option allow you to retrieve the already completed hmmsearch results on those inputs that don't have changes to save time.
+Only the newly added/changed inputs will do the hmmsearch when `--from_checkpoint` is enabled.
+
 #### Use coding sequence instead of peptide sequence
 
 In some circumstances, the highly shared peptide sequences make it difficult to resolve the relationship among closely related species.
@@ -179,13 +184,15 @@ phyling align -I cds -m HMM/fungi_odb10/hmms -t 16
 
 The CDS inputs will be translated into peptide sequences in the first steps.
 The translated peptide sequences will be used for hmmsearch and the alignment steps.
-The peptide alignment results will then being back translated according to the original CDS inputs.
+The peptide alignment results will then being back-translated according to the original CDS inputs.
 And the back-translated DNA version alignments will be output.
 
 ### Build tree on multiple sequence alignment results
 
 Finally, we can run the tree module to use the multiple sequence alignment results to build a phylogenetic tree.
-It support both _consensus tree_ (conclude the majority of trees which was built upon each single gene) and _concatenated alignment_ method.
+By default, it uses the _consensus tree_ strategy (conclude the majority of trees which was built upon each single gene)
+But you can choose to use _concatenated alignment_ strategy by specifying `-c/--concat`.
+Currently, 3 methods (upgma, Neighbor Joining and FastTree) are available for tree building.
 See all the options with `phyling tree --help`.
 
 ```
@@ -200,6 +207,7 @@ options:
                         Output directory of the newick treefile (default=".")
   -M {upgma,nj,ft}, --method {upgma,nj,ft}
                         Algorithm used for tree building (default="upgma")
+  -c, --concat          Concatenated alignment results
   -f, --figure          Generate a matplotlib tree figure
   -t THREADS, --threads THREADS
                         Threads for tree construction (default=1)
@@ -217,7 +225,7 @@ You can also use only part of the alignment results to build tree.
 phyling tree -i align/100957at4751.aa.mfa align/174653at4751.aa.mfa align/255412at4751.aa.mfa
 ```
 
-Use VeryFastTree instead of the default UPGMA method for tree building and running with 16 threads.
+Use FastTree instead of the default UPGMA method for tree building and running with 16 threads.
 
 ```
 phyling tree -I align -m ft -t 16
@@ -236,7 +244,7 @@ phyling tree -I align -f
 - [pyhmmer], a HMMER3 implementation on python3.
 - [muscle] for alternative method for multiple sequence alignment. (Optional)
 - [ClipKIT] for removing sites that are poor of phylogenetic signal.
-- [VeryFastTree], use approximately maximum-likelihood to build trees. (Optional)
+- [FastTree], use approximately maximum-likelihood to build trees. (Optional)
 - [ASTER], a C++ re-implementation of [ASTRAL] to resolve consensus among trees.
 
 ## Install
@@ -262,6 +270,6 @@ pip install .
 [pyhmmer]: https://pyhmmer.readthedocs.io/en/stable/index.html
 [muscle]: https://drive5.com/muscle5/
 [ClipKIT]: https://jlsteenwyk.com/ClipKIT/
-[VeryFastTree]: https://github.com/citiususc/veryfasttree
+[FastTree]: http://www.microbesonline.org/fasttree/
 [ASTER]: https://github.com/chaoszhang/ASTER
 [ASTRAL]: https://github.com/smirarab/ASTRAL
