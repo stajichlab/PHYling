@@ -4,4 +4,3 @@
 .gitattributes export-ignore
 .gitignore export-ignore
 .pre-commit-config.yaml export-ignore
-README.md export-ignore

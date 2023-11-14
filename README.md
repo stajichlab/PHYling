@@ -1,7 +1,7 @@
-[![Conda build](https://img.shields.io/github/actions/workflow/status/stajichlab/PHYling_unified/conda-build.yml?logo=github&label=conda%20build)](https://github.com/stajichlab/PHYling_unified/actions/workflows/conda-build.yml)
-[![Python build](https://img.shields.io/github/actions/workflow/status/stajichlab/PHYling_unified/python-versions.yml?logo=github&label=python%20build)](https://github.com/stajichlab/PHYling_unified/actions/workflows/python-versions.yml)
-[![Python](https://img.shields.io/badge/python-3.9_%7C_3.10_%7C_3.11_%7C_3.12-blue?logo=python)](https://github.com/stajichlab/PHYling_unified/actions/workflows/python-versions.yml)
-[![License](https://img.shields.io/github/license/stajichlab/PHYling_unified?label=license)](https://github.com/stajichlab/PHYling_unified/blob/main/LICENSE)
+[![Conda build](https://img.shields.io/github/actions/workflow/status/stajichlab/PHYling/conda-build.yml?logo=github&label=conda%20build)](https://github.com/stajichlab/PHYling/actions/workflows/conda-build.yml)
+[![Python build](https://img.shields.io/github/actions/workflow/status/stajichlab/PHYling/python-versions.yml?logo=github&label=python%20build)](https://github.com/stajichlab/PHYling/actions/workflows/python-versions.yml)
+[![Python](https://img.shields.io/badge/python-3.9_%7C_3.10_%7C_3.11_%7C_3.12-blue?logo=python)](https://github.com/stajichlab/PHYling/actions/workflows/python-versions.yml)
+[![License](https://img.shields.io/github/license/stajichlab/PHYling?label=license)](https://github.com/stajichlab/PHYling/blob/main/LICENSE)
 
 # PHYling tool
 
@@ -167,9 +167,12 @@ For the alignment step, 16 parallel jobs will be launched and each parallel job 
 
 Highly recommended if **muscle** is chosen for alignment. (**muscle** is much slower than **hmmalign**!!)
 
+#### Checkpoint for quick rerun
+
 A checkpoint file will be generated after the hmmsearch step.
-The `--from_checkpoint` option allow you to retrieve the already completed hmmsearch results on those inputs that don't have changes to save time.
+The `--from_checkpoint` option allow you to retrieve already completed hmmsearch results on those inputs that don't have changes to save time.
 Only the newly added/changed inputs will do the hmmsearch when `--from_checkpoint` is enabled.
+Meanwhile, the samples not specified in the command with `--from_checkpoint` will be removed from the checkpoint file.
 
 #### Use coding sequence instead of peptide sequence
 
@@ -249,13 +252,18 @@ phyling tree -I align -f
 
 ## Install
 
-Use the environment.yml to install all the required packages
+Please download the source code from the [latest release](https://github.com/stajichlab/PHYling/releases/latest) and decompress it or `git clone` the main branch.
+
+Go into the PHYling folder.
+To avoid messing around the base environment, consider installing it in a conda environment.
+Please use the environment.yml to create environment and install all the required packages.
 
 ```
+cd PHYling-2.0.0-beta
 conda env create -f environment.yml
 ```
 
-Go into the phyling folder and install the package through pip
+Install the package through pip in the PHYling folder.
 
 ```
 pip install .
