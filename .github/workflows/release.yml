@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - v[0-9]+.[0-9]+.[0-9]+*
+  workflow_dispatch:
 
 jobs:
   version_check:
@@ -14,36 +15,52 @@ jobs:
         with:
           sparse-checkout: |
             README.md
+            pyproject.toml
           sparse-checkout-cone-mode: false
           fetch-tags: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: master
+          ref: main
 
-      - name: Capture version in README.md
-        id: file
+      - name: Get repo name
+        id: repo
         run: |
           repo_name=$(basename "$GITHUB_REPOSITORY")
-          cap=$(grep -oP "${repo_name}-v\K\d\.\d\.\d[^\s]*" README.md)
-          echo "version=$cap" >> "$GITHUB_OUTPUT"
           echo "repo_name=$repo_name" >> "$GITHUB_OUTPUT"
 
       - name: Capture version in latest tag
         id: tag
-        run: echo "version=$(git tag --sort=committerdate -l "v*" | tail -n1 | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+
+      - name: Check version in README.md
+        id: readme
+        run: |
+          cap=$(grep -oP "${{ steps.repo.outputs.repo_name }}-\K\d+\.\d+\.\d+[^\s]*" README.md)
+          echo "version=$cap" >> "$GITHUB_OUTPUT"
+
+      - name: Check version in pyproject.toml
+        id: pyproject
+        run: |
+          cap=$(grep -oP '^version = "\K\d+\.\d+\.\d+[^"]*' pyproject.toml)
+          echo "version=$cap" >> "$GITHUB_OUTPUT"
 
       - name: Substitute version in README.md
-        id: sub
-        if: ${{ steps.file.outputs.version != steps.tag.outputs.version }}
-        run: sed -i 's/${{ steps.file.outputs.repo_name}}-${{ steps.file.outputs.version }}/${{ steps.file.outputs.repo_name}}-${{ steps.tag.outputs.version }}/g' README.md
+        if: ${{ steps.readme.outputs.version != steps.tag.outputs.version }}
+        id: sub_readme
+        run: sed -i 's/${{ steps.repo.outputs.repo_name }}-${{ steps.readme.outputs.version }}/${{ steps.repo.outputs.repo_name }}-${{ steps.tag.outputs.version }}/g' README.md
+
+      - name: Substitute version in pyproject.toml
+        if: ${{ steps.pyproject.outputs.version != steps.tag.outputs.version }}
+        id: sub_pyproject
+        run: sed -i 's/^version = "${{ steps.pyproject.outputs.version }}"/version = "${{ steps.tag.outputs.version }}"/' pyproject.toml
 
       - name: Push changes
-        if: steps.sub.conclusion == 'success'
+        if: steps.sub_readme.conclusion == 'success' && steps.sub_pyproject.conclusion == 'success'
         run: |
           git config author.name Cheng-Hung Tsai
           git config author.email chenghung.tsai@email.ucr.edu
           git config committer.name GitHub Actions
           git config committer.email actions@github.com
-          git add README.md
+          git add .
           git commit -m "Update version in README.md"
           git tag --annotate v${{ steps.tag.outputs.version }} -m "Version bump to v${{ steps.tag.outputs.version }}" --force
           git push
@@ -56,7 +73,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: main
 
       - name: Release
         uses: docker://antonyurchenko/git-release:v5
