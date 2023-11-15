@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0-beta] - 2023-11/14
+## [2.0.0-beta] - 2023-11-14
 
 ### Added
 
@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix the Python logger issue.
 
-## [2.0.0-alpha] - 2023/10/04
+## [2.0.0-alpha] - 2023-10-04
 
 ### Added
 
@@ -47,5 +47,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Implement back-translation to convert the peptide MSA results to DNA counterpart when receiving coding sequence fasta as inputs.
 
-[2.0.0-beta]: https://github.com/stajichlab/PHYling/compare/v2.0.0-beta...v2.0.0-alpha
+[2.0.0-beta]: https://github.com/stajichlab/PHYling/compare/v2.0.0-alpha...v2.0.0-beta
 [2.0.0-alpha]: https://github.com/stajichlab/PHYling/releases/tag/v2.0.0-alpha
