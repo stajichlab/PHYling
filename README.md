@@ -231,7 +231,7 @@ phyling tree -i align/100957at4751.aa.mfa align/174653at4751.aa.mfa align/255412
 Use FastTree instead of the default UPGMA method for tree building and running with 16 threads.
 
 ```
-phyling tree -I align -m ft -t 16
+phyling tree -I align -M ft -t 16
 ```
 
 Use matplotlib to generate a tree figure.
