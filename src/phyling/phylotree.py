@@ -219,7 +219,7 @@ def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwar
 
     if concat and len(inputs) > 1:
         # Get the concat_alignments
-        logging.info("Generate phylogenetic tree the on concatenated fasta")
+        logging.info("Generate phylogenetic tree on the concatenated fasta")
         alignmentList = []
         for file in inputs:
             alignmentList.append(AlignIO.read(file, format="fasta"))
