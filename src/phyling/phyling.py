@@ -7,7 +7,6 @@ import logging
 import sys
 import textwrap
 from pathlib import Path
-from types import SimpleNamespace
 
 try:
     from importlib.metadata import version
@@ -34,13 +33,6 @@ def parser_submodule(parser, parent_parser) -> None:
         description=textwrap.dedent(download.__doc__),
     )
     p_download.add_argument("markerset", metavar='HMM markerset or "list"', help="Name of the HMM markerset")
-    p_download.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=f"./{phyling.config.default_HMM}",
-        help=f'Output directory to save HMM markerset (default="./{phyling.config.default_HMM}")',
-    )
     p_download.set_defaults(func=download)
 
     p_aln = subparsers.add_parser(
@@ -166,16 +158,9 @@ def main():
     """
     logging.basicConfig(format=f"%(asctime)s {main.__name__} %(levelname)s %(message)s", level="INFO", force=True)
     logger = logging.getLogger()
-    # Create namespace object conf
-    args = dict()
-
-    args["script_path"] = Path(__file__).resolve().parent
-    args["database"] = "https://busco-data.ezlab.org/v5/data"
-    args["cfg_dir"] = Path.home() / ".phyling"
-    args = SimpleNamespace(**args)
 
     # Create config folder in $HOME/.phyling
-    args.cfg_dir.mkdir(exist_ok=True)
+    phyling.config.cfg_dir.mkdir(exist_ok=True)
 
     # Implement shared arguments between sub-menu, reference from
     # https://stackoverflow.com/questions/33645859/how-to-add-common-arguments-to-argparse-subcommands
@@ -200,7 +185,7 @@ def main():
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    parser.parse_args(namespace=args)
+    args = parser.parse_args()
 
     if args.verbose:
         logger.setLevel("DEBUG")

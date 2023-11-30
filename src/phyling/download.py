@@ -12,6 +12,8 @@ from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
+import phyling.config
+
 
 class Data_updater(ABC):
     """Store, update and retrieve BUSCO markers."""
@@ -92,11 +94,11 @@ class Metadata_updater(Data_updater):
     dataset names for downloading BUSCO markers.
     """
 
-    def __init__(self, database_url, cfg_dir):
+    def __init__(self, database_url):
         """Initialize metadata object and local db file."""
         super().__init__(database_url)
         self._filetype = "metadata"
-        self._data = cfg_dir / "metadata.pickle"
+        self._data = phyling.config.cfg_dir / "metadata.pickle"
         self._data_url = f"{database_url}/file_versions.tsv"
         self._metadata_md5_url = f"{database_url}/file_versions.tsv.hash"
 
@@ -189,17 +191,17 @@ class HMM_markerset_updater(Data_updater):
 #     return hasher.hexdigest()
 
 
-def download(database, cfg_dir, markerset, output, **kwargs) -> None:
+def download(markerset, **kwargs) -> None:
     """
     Help to download/update BUSCO v5 markerset to a local folder.
 
-    First it check whether the ~/.phyling/metadata.pickle is exist. A missing or outdated file will trigger the module
-    to update the metadata.
+    First it checks whether the metadata file is exist under the config folder ~/.phyling. A missing or outdated file
+    will trigger the module to download/update the metadata.
 
     Passing "list" to markerset argument will list all the available markersets. Passing a valid name to the markerset
     argument will download the markerset to the given output path.
     """
-    metadata_updater = Metadata_updater(database_url=database, cfg_dir=cfg_dir)
+    metadata_updater = Metadata_updater(database_url=phyling.config.database)
     markerset_dict = metadata_updater.updater()
 
     if markerset == "list":
@@ -211,7 +213,7 @@ def download(database, cfg_dir, markerset, output, **kwargs) -> None:
         # Adjust databases display according to the terminal size
         width, _ = shutil.get_terminal_size((80, 24))
         col = width // 40
-        url_list = [url_list[x: x + col] for x in range(0, len(url_list), col)]
+        url_list = [url_list[x : x + col] for x in range(0, len(url_list), col)]
         col_width = max(len(word) for row in url_list for word in row) + 3  # padding
         for row in url_list:
             # Print the database list
@@ -219,8 +221,8 @@ def download(database, cfg_dir, markerset, output, **kwargs) -> None:
 
     else:
         hmm_markerset_updater = HMM_markerset_updater(
-            database_url=database,
-            output_dir=output,
+            database_url=phyling.config.database,
+            output_dir=Path(phyling.config.cfg_dir, phyling.config.default_HMM),
             metadata=markerset_dict,
             name=markerset,
         )

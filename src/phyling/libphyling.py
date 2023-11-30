@@ -600,9 +600,10 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
         sys.exit(1)
 
     if not markerset.exists():
-        markerset = Path(phyling.config.default_HMM, markerset, "hmms")
+        markerset = Path(phyling.config.cfg_dir, phyling.config.default_HMM, markerset, "hmms")
     else:
         markerset = Path(markerset)
+    logging.info(f"Loading markerset from {markerset}")
 
     if not markerset.exists():
         logging.error(f"Markerset folder does not exist {markerset} - did you download BUSCO?")
