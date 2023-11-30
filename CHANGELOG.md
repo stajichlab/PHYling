@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `phyling download list` now will also print out the markersets that have already been downloaded.
+
+### Removed
+
+- Output option in download module. Now all the BUSCO datasets will be saved in the config folder `~/.phyling/HMM`.
+
+### Changed
+
+- Change the align module -m/--markerset behavior. It firstly searches against the given path and the config folder `~/.phyling/HMM` if
+the path doesn't exist. Users can also directly specify the markerset name that has already been downloaded and saved in the config folder.
+
 ## [2.0.0-beta] - 2023-11-14
 
 ### Added

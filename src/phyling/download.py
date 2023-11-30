@@ -198,8 +198,8 @@ def download(markerset, **kwargs) -> None:
     First it checks whether the metadata file is exist under the config folder ~/.phyling. A missing or outdated file
     will trigger the module to download/update the metadata.
 
-    Passing "list" to markerset argument will list all the available markersets. Passing a valid name to the markerset
-    argument will download the markerset to the given output path.
+    Passing "list" to markerset argument will list all the available/already downloaded markersets. Passing a valid
+    name to the markerset argument will download the markerset to the config folder ~/.phyling/HMM.
     """
     metadata_updater = Metadata_updater(database_url=phyling.config.database)
     markerset_dict = metadata_updater.updater()
@@ -208,6 +208,11 @@ def download(markerset, **kwargs) -> None:
         # Get the dictionary with database as key and convert it into a list
         url_list = [hmm_markerset for hmm_markerset in markerset_dict.keys()]
         url_list.sort()
+        exist_markerset = []
+        for markerset in Path(phyling.config.cfg_dir, phyling.config.default_HMM).iterdir():
+            if markerset.name in url_list and markerset.is_dir():
+                exist_markerset.append(markerset.name)
+        exist_markerset.sort()
         print("Available datasets:\n")
 
         # Adjust databases display according to the terminal size
@@ -219,6 +224,12 @@ def download(markerset, **kwargs) -> None:
             # Print the database list
             print(" ".join(word.ljust(col_width) for word in row))
 
+        print()
+        print("Downloaded datasets:\n")
+        exist_markerset = [exist_markerset[x : x + col] for x in range(0, len(exist_markerset), col)]
+        for row in exist_markerset:
+            # Print the database list
+            print(" ".join(word.ljust(col_width) for word in row))
     else:
         hmm_markerset_updater = HMM_markerset_updater(
             database_url=phyling.config.database,
