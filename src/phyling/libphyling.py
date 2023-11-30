@@ -247,7 +247,7 @@ class InputSeqs:
 class msa_generator:
     """Generate a multiple sequence alignment using hmmer or muscle."""
 
-    def __init__(self, inputs: list[Path], checkpoint=None):
+    def __init__(self, inputs: list[Path]):
         """Initialize the MSA generator object and perform sequence check."""
         inputs = sorted([InputSeqs(input) for input in inputs])
         self._check_inputs_seqtype(inputs)
