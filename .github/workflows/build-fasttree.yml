@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Cache FastTree
         id: cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.local/bin/FastTree
           key: ${{ runner.os }}-FastTree

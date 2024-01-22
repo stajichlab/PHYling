@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Cache ASTER
         id: cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.local/bin/astral
           key: ${{ runner.os }}-ASTER
