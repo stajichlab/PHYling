@@ -526,7 +526,7 @@ class msa_generator:
         temp.seek(0)
         alignment = AlignIO.read(StringIO(temp.read().decode()), "fasta")
         for seq in alignment:
-            seq.seq = Seq(re.sub(r"[ZzBbXx\*\.]", "-", str(seq.seq)))
+            seq.seq = self._substitute_ambiguous_seq(seq)
         return alignment
 
     def _run_muscle(self, hits: set[tuple[str, bytes]]) -> MultipleSeqAlignment:
@@ -550,8 +550,12 @@ class msa_generator:
         stdout, _ = p.communicate(seqs_stream.read())
         alignment = AlignIO.read(StringIO(stdout.decode()), "fasta")
         for seq in alignment:
-            seq.seq = Seq(re.sub(r"[ZzBbXx\*\.]", "-", str(seq.seq)))
+            seq.seq = self._substitute_ambiguous_seq(seq)
         return alignment
+
+    def _substitute_ambiguous_seq(self, seq):
+        """Substitute ambiguous character in the sequence and make it all uppercase."""
+        return Seq(re.sub(r"[ZzBbXx\*\.]", "-", str(seq.seq))).upper()
 
 
 def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_checkpoint, threads, **kwargs):
