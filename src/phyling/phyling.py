@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import shutil
 import sys
 import textwrap
 from pathlib import Path
@@ -19,7 +20,13 @@ from phyling.libphyling import main as search_align
 from phyling.phylotree import phylotree
 
 
-def parser_submodule(parser, parent_parser) -> None:
+def description_formatter(string, wrapper):
+    """Customized formatter for docstring."""
+    paragraphs = [textwrap.dedent(line).strip("\n").replace("\n", " ") for line in string.split("\n\n") if line != ""]
+    return "\n\n".join([wrapper.fill(paragraph) for paragraph in paragraphs])
+
+
+def parser_submodule(parser, parent_parser, wrapper) -> None:
     """Parser for command line inputs."""
     subparsers = parser.add_subparsers()
 
@@ -30,7 +37,7 @@ def parser_submodule(parser, parent_parser) -> None:
         parents=[parent_parser],
         formatter_class=argparse.RawDescriptionHelpFormatter,
         help="Download HMM markers",
-        description=textwrap.dedent(download.__doc__),
+        description=description_formatter(download.__doc__, wrapper),
     )
     p_download.add_argument("markerset", metavar='HMM markerset or "list"', help="Name of the HMM markerset")
     p_download.set_defaults(func=download)
@@ -38,9 +45,9 @@ def parser_submodule(parser, parent_parser) -> None:
     p_aln = subparsers.add_parser(
         "align",
         parents=[parent_parser],
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=argparse.RawTextHelpFormatter,
         help="Run multiple sequence alignments against orthologs found among samples",
-        description=textwrap.dedent(search_align.__doc__),
+        description=description_formatter(search_align.__doc__, wrapper),
     )
     input_type = p_aln.add_mutually_exclusive_group(required=True)
     input_type.add_argument(
@@ -105,9 +112,9 @@ def parser_submodule(parser, parent_parser) -> None:
     p_tree = subparsers.add_parser(
         "tree",
         parents=[parent_parser],
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=argparse.RawTextHelpFormatter,
         help="Build a phylogenetic tree based on multiple sequence alignment results",
-        description=textwrap.dedent(phylotree.__doc__),
+        description=description_formatter(phylotree.__doc__, wrapper),
     )
     input_type = p_tree.add_mutually_exclusive_group(required=True)
     input_type.add_argument("-i", "--inputs", nargs="+", help="Multiple sequence alignment fasta")
@@ -166,6 +173,7 @@ def main():
     # https://stackoverflow.com/questions/33645859/how-to-add-common-arguments-to-argparse-subcommands
     # Build parent_parser which contains shared arguments, and do not use it directly
     parent_parser = argparse.ArgumentParser(add_help=False)
+    wrapper = textwrap.TextWrapper(width=shutil.get_terminal_size((80, 24))[0])
 
     parent_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode for debug")
 
@@ -173,13 +181,13 @@ def main():
     parser = argparse.ArgumentParser(
         prog=main.__name__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent(main.__doc__),
-        epilog=textwrap.dedent(main._epilog),
+        description=description_formatter(main.__doc__, wrapper),
+        epilog=description_formatter(main._epilog, wrapper),
     )
 
     parser.add_argument("-V", "--version", action="version", version=version("phyling"))
 
-    parser_submodule(parser, parent_parser)
+    parser_submodule(parser, parent_parser, wrapper)
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
