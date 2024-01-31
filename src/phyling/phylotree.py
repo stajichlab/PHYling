@@ -69,18 +69,10 @@ class tree_generator:
         return constructor.build_tree(MSA)
 
     def _with_VeryFastTree(self, file: Path, seqtype: str, threads: int) -> Phylo.BaseTree.Tree:
-        stream = StringIO()
-        with open(file) as f:
-            for line in f.read().splitlines():
-                if not line.startswith(">"):
-                    line = line.upper()
-                stream.write(line)
-                stream.write("\n")
-        stream.seek(0)
         if seqtype == "DNA":
-            cmd = ["FastTree", "-nt", "-gamma", "-threads", str(threads)]
+            cmd = ["VeryFastTree", "-nt", "-gamma", "-threads", str(threads), file]
         else:
-            cmd = ["FastTree", "-lg", "-gamma", "-threads", str(threads)]
+            cmd = ["VeryFastTree", "-lg", "-gamma", "-threads", str(threads), file]
         p = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -88,26 +80,17 @@ class tree_generator:
             stderr=subprocess.PIPE,
             text=True,
         )
-        tree, err = p.communicate(stream.read())
-        stream.close()
+        tree, err = p.communicate()
         if not tree:
             print(err)
             sys.exit(1)
         return Phylo.read(StringIO(tree), "newick")
 
     def _with_FastTree(self, file: Path, seqtype: str) -> Phylo.BaseTree.Tree:
-        stream = StringIO()
-        with open(file) as f:
-            for line in f.read().splitlines():
-                if not line.startswith(">"):
-                    line = line.upper()
-                stream.write(line)
-                stream.write("\n")
-        stream.seek(0)
         if seqtype == "DNA":
-            cmd = ["FastTree", "-nt", "-gamma"]
+            cmd = ["FastTree", "-nt", "-gamma", file]
         else:
-            cmd = ["FastTree", "-lg", "-gamma"]
+            cmd = ["FastTree", "-lg", "-gamma", file]
         p = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -115,8 +98,7 @@ class tree_generator:
             stderr=subprocess.PIPE,
             text=True,
         )
-        tree, err = p.communicate(stream.read())
-        stream.close()
+        tree, err = p.communicate()
         if not tree:
             print(err)
             sys.exit(1)
@@ -145,7 +127,9 @@ def concatenate_fasta(taxonList: list, alignmentList: list[MultipleSeqAlignment]
         concat_alignments.append(SeqRecord(Seq(""), id=sample, description=""))
     concat_alignments.sort()
     with Pool(threads) as pool:
-        alignmentList = pool.starmap(fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList))
+        alignmentList = pool.starmap(
+            fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
+        )
     logging.debug("Filling missing taxon done")
     for alignment in alignmentList:
         concat_alignments += alignment
