@@ -29,10 +29,10 @@ class tree_generator:
         self._file = file
         self._seqtype = seqtype
         self._method = method
+        if self._method not in phyling.config.avail_tree_methods:
+            logging.error(f"Only the following methods is available: {phyling.config.avail_tree_methods}")
         if self._method == "ft" and not shutil.which("FastTree"):
-            logging.error(
-                'FastTree not found. Please install it through "conda install -c bioconda fasttree"'
-            )
+            logging.error('FastTree not found. Please install it through "conda install -c bioconda fasttree"')
             sys.exit(1)
         if len(self._file) > 1 and not shutil.which("astral"):
             logging.error(
@@ -58,6 +58,8 @@ class tree_generator:
             tree = self._with_phylo_module(file)
         elif self._method == "ft":
             tree = self._with_FastTree(file, self._seqtype)
+        else:
+            logging.error(f"{phyling.config.avail_tree_methods[self._method]} is not implemented yet.")
         logging.debug(f"Tree building on {file.name} is done")
         return tree
 
@@ -167,8 +169,7 @@ def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwar
     will be generated as output. Additionally, users can choose to obtain a matplotlib-style figure using the
     -f/--figure option.
     """
-    method_dict = {"upgma": "UPGMA", "nj": "Neighbor Joining", "ft": "FastTree"}
-    logging.info(f"Algorithm choose for tree building: {method_dict[method]}")
+    logging.info(f"Algorithm choose for tree building: {phyling.config.avail_tree_methods[method]}")
     if input_dir:
         inputs = [file for file in Path(input_dir).glob(f"*.{phyling.config.aln_ext}")]
     else:

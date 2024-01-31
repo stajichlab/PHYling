@@ -134,9 +134,11 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
     p_tree.add_argument(
         "-M",
         "--method",
-        choices=["upgma", "nj", "ft"],
+        choices=phyling.config.avail_tree_methods.keys(),
         default="upgma",
-        help='Algorithm used for tree building (default="upgma")',
+        help='Algorithm used for tree building. (default="upgma")\n'
+        + "Available options:\n"
+        + "\n".join(f"{value}: {key}" for key, value in phyling.config.avail_tree_methods.items()),
     )
     p_tree.add_argument(
         "-c",
