@@ -26,6 +26,7 @@ from clipkit.msa import MSA
 from pyhmmer.easel import DigitalSequenceBlock
 
 import phyling.config
+import phyling.error
 
 
 def bp_mrtrans(pep_msa: MultipleSeqAlignment, cds_seqs: list[SeqRecord]) -> MultipleSeqAlignment:
@@ -597,11 +598,10 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
             file.unlink()
 
     if method == "muscle" and not shutil.which("muscle"):
-        logging.error(
+        raise phyling.BinaryNotFoundError(
             'muscle not found. Please install it through "conda install -c bioconda muscle>=5.1" '
             "or build from the source following the instruction on https://github.com/rcedgar/muscle"
         )
-        sys.exit(1)
 
     if not markerset.exists():
         markerset = Path(phyling.config.cfg_dir, phyling.config.default_HMM, markerset, "hmms")
