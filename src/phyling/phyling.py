@@ -117,12 +117,12 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
         description=description_formatter(phylotree.__doc__, wrapper),
     )
     input_type = p_tree.add_mutually_exclusive_group(required=True)
-    input_type.add_argument("-i", "--inputs", nargs="+", help="Multiple sequence alignment fasta")
+    input_type.add_argument("-i", "--inputs", nargs="+", help="Multiple sequence alignment fasta of the markers")
     input_type.add_argument(
         "-I",
         "--input_dir",
         type=Path,
-        help="Directory containing multiple sequence alignment fasta",
+        help="Directory containing multiple sequence alignment fasta of the markers",
     )
     p_tree.add_argument(
         "-o",
@@ -145,6 +145,14 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
         "--concat",
         action="store_true",
         help="Concatenated alignment results",
+    )
+    p_tree.add_argument(
+        "-n",
+        "--top_n_toverr",
+        type=int,
+        default=50,
+        help="Select the top n markers based on their treeness/RCV for final tree building "
+        + "(default=50, specify 0 to use all the markers)",
     )
     p_tree.add_argument("-f", "--figure", action="store_true", help="Generate a matplotlib tree figure")
     p_tree.add_argument(

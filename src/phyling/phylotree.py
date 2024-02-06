@@ -10,101 +10,202 @@ from io import StringIO
 from itertools import product
 from multiprocessing.dummy import Pool
 from pathlib import Path
+from typing import Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 from Bio import AlignIO, Phylo, SeqIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+from phykit.services.alignment.base import Alignment as Phykit_alignment
+from phykit.services.tree.base import Tree as Phykit_tree
 
 import phyling.config
+import phyling.error
 
 
-class tree_generator:
+class MFA2Tree:
+    """Convert peptide/DNA multiple sequence alignment to Biopython Tree object and calculate the treeness/RCV of it."""
+
+    def __init__(self, mfa: Path, seqtype: str):
+        """Initialize the MFA2Tree object."""
+        self._mfa = mfa
+        supported_seqtype = ["peptide", "DNA"]
+        if seqtype not in supported_seqtype:
+            raise KeyError(f'argument "seqtype" not falls in {supported_seqtype}')
+        self._seqtype = seqtype
+
+    @property
+    def mfa(self) -> Path:
+        """Return the mfa path."""
+        return self._mfa
+
+    def build(self, method: str) -> None:
+        """Run tree building step and return the Biopython Tree object."""
+        if method not in phyling.config.avail_tree_methods.keys():
+            raise KeyError(f'argument "method" not falls in {phyling.config.avail_tree_methods.keys()}')
+        if method in ["upgma", "nj"]:
+            tree = self._with_phylo_module(method=method)
+        elif method == "ft":
+            if not shutil.which("FastTree"):
+                raise phyling.error.BinaryNotFoundError(
+                    'FastTree not found. Please install it through "conda install -c bioconda fasttree"'
+                )
+            tree = self._with_FastTree(self._seqtype)
+        else:
+            raise NotImplementedError(f"{phyling.config.avail_tree_methods[method]} is not implemented yet.")
+        logging.debug(f"Tree building on {self._mfa.name} is done")
+        self._tree = tree
+
+    @property
+    def tree(self) -> Phylo.BaseTree.Tree:
+        """Return the Biopython tree object."""
+        if not hasattr(self, "_tree"):
+            raise AttributeError("No self._tree found. Please make sure the build function was run successfully")
+        return self._tree
+
+    def treeness_over_rcv(self) -> float:
+        """Calculate the treeness/RCV of the tree by PhyKIT implementation."""
+        # calculate treeness
+        treeness = Phykit_tree().calculate_treeness(tree=self._tree)
+
+        # calculate rcv
+        aln = Phykit_alignment(alignment_file_path=self._mfa)
+        relative_composition_variability = aln.calculate_rcv()
+
+        # calculate treeness/rcv
+        self._toverr = round(treeness / relative_composition_variability, 4)
+        return self._toverr
+
+    def _with_phylo_module(self, method) -> Phylo.BaseTree.Tree:
+        """Run the tree calculation using a simple distance method."""
+        MSA = AlignIO.read(self._mfa, format="fasta")
+        calculator = DistanceCalculator("identity")
+        constructor = DistanceTreeConstructor(calculator, method)
+        return constructor.build_tree(MSA)
+
+    def _with_VeryFastTree(self, seqtype: str, threads: int) -> Phylo.BaseTree.Tree:
+        """Run the tree calculation using VeryFastTree."""
+        if seqtype == "DNA":
+            cmd = ["VeryFastTree", "-nt", "-gamma", "-threads", str(threads), self._mfa]
+        else:
+            cmd = ["VeryFastTree", "-lg", "-gamma", "-threads", str(threads), self._mfa]
+        p = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        tree, err = p.communicate()
+        if not tree:
+            print(err)
+            sys.exit(1)
+        return Phylo.read(StringIO(tree), "newick")
+
+    def _with_FastTree(self, seqtype: str) -> Phylo.BaseTree.Tree:
+        """Run the tree calculation using FastTree."""
+        if seqtype == "DNA":
+            cmd = ["FastTree", "-nt", "-gamma", self._mfa]
+        else:
+            cmd = ["FastTree", "-lg", "-gamma", self._mfa]
+        p = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        tree, err = p.communicate()
+        if not tree:
+            print(err)
+            sys.exit(1)
+        return Phylo.read(StringIO(tree), "newick")
+
+
+class TreesGenerator:
     """A phylogentic tree generator used in phyling."""
 
-    def __init__(self, seqtype: str, method: str, *file: Path):
+    def __init__(self, seqtype: str, *mfas: Path):
         """Initialize the tree generator object."""
-        self._file = file
-        self._seqtype = seqtype
-        self._method = method
-        if self._method not in phyling.config.avail_tree_methods:
-            logging.error(f"Only the following methods is available: {phyling.config.avail_tree_methods}")
-        if self._method == "ft" and not shutil.which("FastTree"):
-            logging.error('FastTree not found. Please install it through "conda install -c bioconda fasttree"')
-            sys.exit(1)
-        if len(self._file) > 1 and not shutil.which("astral"):
-            logging.error(
-                "Astral not found. "
-                "Please build the C++ version from the source following the instruction on https://github.com/chaoszhang/ASTER"
-            )
-            sys.exit(1)
+        self._mfa2tree_obj_list = [MFA2Tree(mfa, seqtype=seqtype) for mfa in mfas]
 
-    def get(self, threads: int) -> Phylo.BaseTree.Tree:
-        """Run the phylogeny analysis and get the tree object list."""
+    def build(self, method: str, threads: int) -> None:
+        """Run the tree building step for each MFA2Tree object."""
         logging.info("Start tree building...")
-        if len(self._file) == 1:
-            final_tree = self._build(self._file[0])
+        if len(self._mfa2tree_obj_list) == 1 or threads == 1:
+            logging.debug("Run in single thread mode.")
+            self._trees = []
+            for mfa2tree_obj in self._mfa2tree_obj_list:
+                self._trees.append(self._build_helper(mfa2tree_obj, method=method))
         else:
             logging.debug(f"Run in multiprocesses mode. {threads} jobs are run concurrently")
             with Pool(threads) as pool:
-                trees = pool.map(self._build, self._file)
-            final_tree = run_astral(trees)
-        return final_tree
+                _ = pool.starmap(self._build_helper, ((mfa2tree_obj, method) for mfa2tree_obj in self._mfa2tree_obj_list))
 
-    def _build(self, file: Path) -> Phylo.BaseTree.Tree:
-        if self._method in ["upgma", "nj"]:
-            tree = self._with_phylo_module(file)
-        elif self._method == "ft":
-            tree = self._with_FastTree(file, self._seqtype)
+    def treeness_over_rcv(self, threads: int) -> None:
+        """Calculate the treeness/RCV for each MFA2Tree object and sort the MFA2Tree object by the values."""
+        logging.info("Calculating treeness/RCV...")
+        if len(self._mfa2tree_obj_list) == 1 or threads == 1:
+            logging.debug("Run in single thread mode.")
+            self._toverr = []
+            for mfa2tree_obj in self._mfa2tree_obj_list:
+                self._toverr.append(self._toverr_helper(mfa2tree_obj))
         else:
-            logging.error(f"{phyling.config.avail_tree_methods[self._method]} is not implemented yet.")
-        logging.debug(f"Tree building on {file.name} is done")
-        return tree
+            logging.debug(f"Run in multiprocesses mode. {threads} jobs are run concurrently")
+            with Pool(threads) as pool:
+                self._toverr = pool.map(self._toverr_helper, self._mfa2tree_obj_list)
+        self._sort_by_toverr()
 
-    def _with_phylo_module(self, file: Path) -> Phylo.BaseTree.Tree:
-        """Run the tree calculation using a simple distance method."""
-        MSA = AlignIO.read(file, format="fasta")
-        calculator = DistanceCalculator("identity")
-        constructor = DistanceTreeConstructor(calculator, self._method)
-        return constructor.build_tree(MSA)
+    def get_tree(self, n: int = 0) -> Union(Phylo.BaseTree.Tree, list[Phylo.BaseTree.Tree]):
+        """Get the top n trees based on treeness/RCV."""
+        n = self._get_helper(n)
+        if n == 1:
+            return self._mfa2tree_obj_list[0].tree
+        return [mfa2tree_obj.tree for mfa2tree_obj in self._mfa2tree_obj_list[:n]]
 
-    def _with_VeryFastTree(self, file: Path, seqtype: str, threads: int) -> Phylo.BaseTree.Tree:
-        if seqtype == "DNA":
-            cmd = ["VeryFastTree", "-nt", "-gamma", "-threads", str(threads), file]
-        else:
-            cmd = ["VeryFastTree", "-lg", "-gamma", "-threads", str(threads), file]
-        p = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        tree, err = p.communicate()
-        if not tree:
-            print(err)
-            sys.exit(1)
-        return Phylo.read(StringIO(tree), "newick")
+    def get_mfa(self, n: int = 0) -> Union(Path, list[Path]):
+        """Get the mfa paths of the top n trees based on treeness/RCV."""
+        n = self._get_helper(n)
+        if n == 1:
+            return self._mfa2tree_obj_list[0].mfa
+        return [mfa2tree_obj.mfa for mfa2tree_obj in self._mfa2tree_obj_list[:n]]
 
-    def _with_FastTree(self, file: Path, seqtype: str) -> Phylo.BaseTree.Tree:
-        if seqtype == "DNA":
-            cmd = ["FastTree", "-nt", "-gamma", file]
-        else:
-            cmd = ["FastTree", "-lg", "-gamma", file]
-        p = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        tree, err = p.communicate()
-        if not tree:
-            print(err)
-            sys.exit(1)
-        return Phylo.read(StringIO(tree), "newick")
+    def get_toverr(self, n: int = 0) -> Union(float, list[float]):
+        """Get the top n treeness/RCVs."""
+        n = self._get_helper(n)
+        if n == 1:
+            return self._toverr[0]
+        return self._toverr[:n]
+
+    def _sort_by_toverr(self) -> None:
+        """Sort the trees/mfas by treeness/RCV."""
+        sorted_idx = np.argsort(self._toverr)[::-1]
+        self._toverr = [self._toverr[idx] for idx in sorted_idx]
+        self._mfa2tree_obj_list = [self._mfa2tree_obj_list[idx] for idx in sorted_idx]
+
+    def _build_helper(self, mfa2tree_obj: MFA2Tree, method: str) -> Phylo.BaseTree.Tree:
+        """Helper function to run the MFA2tree build method."""
+        return mfa2tree_obj.build(method=method)
+
+    def _toverr_helper(self, mfa2tree_obj: MFA2Tree) -> float:
+        """Helper function to run the MFA2tree treeness_over_rcv method."""
+        return mfa2tree_obj.treeness_over_rcv()
+
+    def _get_helper(self, n: int) -> int:
+        """Validate whether the given n is within the range."""
+        if n:
+            if not hasattr(self, "_toverr"):
+                raise AttributeError("Need to run the function treeness_over_rcv first when specifying argument n")
+        if not 0 < n <= len(self._mfa2tree_obj_list):
+            if n == 0:
+                logging.debug("By default use all trees")
+            else:
+                logging.warning("Argument --top_n_toverr/-n is larger the existing trees. Use all trees")
+            n = len(self._mfa2tree_obj_list)
+        return n
 
 
 def fill_missing_taxon(taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
@@ -129,9 +230,7 @@ def concatenate_fasta(taxonList: list, alignmentList: list[MultipleSeqAlignment]
         concat_alignments.append(SeqRecord(Seq(""), id=sample, description=""))
     concat_alignments.sort()
     with Pool(threads) as pool:
-        alignmentList = pool.starmap(
-            fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList)
-        )
+        alignmentList = pool.starmap(fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList))
     logging.debug("Filling missing taxon done")
     for alignment in alignmentList:
         concat_alignments += alignment
@@ -143,6 +242,11 @@ def concatenate_fasta(taxonList: list, alignmentList: list[MultipleSeqAlignment]
 
 def run_astral(trees: list[Phylo.BaseTree.Tree]) -> Phylo.BaseTree.Tree:
     """Run astral to get consensus tree."""
+    if not shutil.which("astral"):
+        raise phyling.BinaryNotFoundError(
+            "Astral not found. "
+            "Please build the C++ version from the source following the instruction on https://github.com/chaoszhang/ASTER"
+        )
     logging.info("Run ASTRAL to resolve consensus among multiple trees")
     temp = StringIO()
     Phylo.write(trees, temp, "newick")
@@ -155,7 +259,7 @@ def run_astral(trees: list[Phylo.BaseTree.Tree]) -> Phylo.BaseTree.Tree:
     return Phylo.read(StringIO(stdout), "newick")
 
 
-def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwargs):
+def phylotree(inputs, input_dir, output, method, figure, concat, top_n_toverr, threads, **kwargs):
     """
     Construct a phylogenetic tree based on the results of multiple sequence alignment (MSA).
 
@@ -202,25 +306,44 @@ def phylotree(inputs, input_dir, output, method, figure, concat, threads, **kwar
     output = Path(output)
     output.mkdir(exist_ok=True)
 
-    if concat and len(inputs) > 1:
-        # Get the concat_alignments
-        logging.info("Generate phylogenetic tree the on concatenated fasta")
+    if top_n_toverr or len(inputs) == 1:
+        logging.info("Generate phylogenetic tree on MSA fasta")
+        tree_generator_obj = TreesGenerator(seqtype, *inputs)
+        tree_generator_obj.build(method=method, threads=threads)
+        if len(inputs) == 1:
+            tree_generator_obj.get_trees()
+        elif top_n_toverr:
+            tree_generator_obj.treeness_over_rcv(threads=threads)
+            trees = tree_generator_obj.get_tree(n=top_n_toverr)
+            inputs = tree_generator_obj.get_mfa(n=top_n_toverr)
+            toverrs = tree_generator_obj.get_toverr(n=top_n_toverr)
+            # Output the name of the selected MSA
+            output_selected_trees = output / "top_toverr_trees.tsv"
+            with open(output_selected_trees, "w") as f:
+                for input, toverr in zip(inputs, toverrs):
+                    print(input, toverr, sep="\t", file=f)
+            logging.info(f"File name of the selected markers is output to {output_selected_trees}")
+
+    if concat:
+        logging.info("Concatenate selected MSAs...")
         alignmentList = []
         for file in inputs:
             alignmentList.append(AlignIO.read(file, format="fasta"))
         concat_alignments = concatenate_fasta(list(samples.keys()), alignmentList, threads=threads)
-
         # Output the concatenated MSA to file
         output_concat = output / f"concat_alignments.{phyling.config.aln_ext}"
         with open(output_concat, "w") as f:
             SeqIO.write(concat_alignments, f, format="fasta")
-        logging.info(f"Concatenated fasta output to {output_concat}")
+        logging.info(f"Concatenated fasta is output to {output_concat}")
         inputs = [output_concat]
+        logging.info("Use the concatednated fasta to generate final tree")
+        tree_generator_obj = TreesGenerator(seqtype, *inputs)
+        tree_generator_obj.build(method=method, threads=threads)
+        final_tree = tree_generator_obj.get_tree()
     else:
-        logging.info("Generate phylogenetic tree on all MSA fasta and conclude a majority consensus tree")
+        logging.info("Generate trees on selected MSAs and conclude a majority consensus tree")
+        final_tree = run_astral(trees)
 
-    tree_generator_obj = tree_generator(seqtype, method, *inputs)
-    final_tree = tree_generator_obj.get(threads=threads)
     Phylo.draw_ascii(final_tree)
 
     output_tree = output / f"{method}_tree.nw"
