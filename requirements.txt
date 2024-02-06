@@ -1,6 +1,7 @@
 biopython>=1.81
 clipkit>=2.1.1
 importlib-metadata; python_version<"3.8"
+phykit>=1.12.5
 pyhmmer>=0.10.2
 matplotlib>=3.5.3
 numpy
