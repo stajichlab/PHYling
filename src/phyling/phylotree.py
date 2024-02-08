@@ -10,7 +10,6 @@ from io import StringIO
 from itertools import product
 from multiprocessing.dummy import Pool
 from pathlib import Path
-from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -159,21 +158,21 @@ class TreesGenerator:
                 self._toverr = pool.map(self._toverr_helper, self._mfa2tree_obj_list)
         self._sort_by_toverr()
 
-    def get_tree(self, n: int = 0) -> Union(Phylo.BaseTree.Tree, list[Phylo.BaseTree.Tree]):
+    def get_tree(self, n: int = 0) -> Phylo.BaseTree.Tree | list[Phylo.BaseTree.Tree]:
         """Get the top n trees based on treeness/RCV."""
         n = self._get_helper(n)
         if n == 1:
             return self._mfa2tree_obj_list[0].tree
         return [mfa2tree_obj.tree for mfa2tree_obj in self._mfa2tree_obj_list[:n]]
 
-    def get_mfa(self, n: int = 0) -> Union(Path, list[Path]):
+    def get_mfa(self, n: int = 0) -> Path | list[Path]:
         """Get the mfa paths of the top n trees based on treeness/RCV."""
         n = self._get_helper(n)
         if n == 1:
             return self._mfa2tree_obj_list[0].mfa
         return [mfa2tree_obj.mfa for mfa2tree_obj in self._mfa2tree_obj_list[:n]]
 
-    def get_toverr(self, n: int = 0) -> Union(float, list[float]):
+    def get_toverr(self, n: int = 0) -> float | list[float]:
         """Get the top n treeness/RCVs."""
         n = self._get_helper(n)
         if n == 1:
@@ -206,6 +205,60 @@ class TreesGenerator:
                 logging.warning("Argument --top_n_toverr/-n is larger the existing trees. Use all trees")
             n = len(self._mfa2tree_obj_list)
         return n
+
+
+def mfa_to_finaltree(
+    inputs: list,
+    output: Path,
+    method: str,
+    seqtype: str,
+    samples: list,
+    concat: bool = False,
+    top_n_toverr: int = 50,
+    threads: int = 1,
+) -> Phylo.BaseTree.Tree:
+    """Pipeline that generate the final single tree (by either concatenate or consensus methods) from MFAs."""
+    output = Path(output)
+    output.mkdir(exist_ok=True)
+
+    if top_n_toverr or len(inputs) == 1:
+        logging.info("Generate phylogenetic tree on MSA fasta")
+        tree_generator_obj = TreesGenerator(seqtype, *inputs)
+        tree_generator_obj.build(method=method, threads=threads)
+        if len(inputs) == 1:
+            tree_generator_obj.get_tree()
+        elif top_n_toverr:
+            tree_generator_obj.treeness_over_rcv(threads=threads)
+            trees = tree_generator_obj.get_tree(n=top_n_toverr)
+            inputs = tree_generator_obj.get_mfa(n=top_n_toverr)
+            toverrs = tree_generator_obj.get_toverr(n=top_n_toverr)
+            # Output the name of the selected MSA
+            output_selected_trees = output / "top_toverr_trees.tsv"
+            with open(output_selected_trees, "w") as f:
+                for input, toverr in zip(inputs, toverrs):
+                    print(input, toverr, sep="\t", file=f)
+            logging.info(f"File name of the selected markers is output to {output_selected_trees}")
+
+    if concat:
+        logging.info("Concatenate selected MSAs...")
+        alignmentList = []
+        for file in inputs:
+            alignmentList.append(AlignIO.read(file, format="fasta"))
+        concat_alignments = concatenate_fasta(samples, alignmentList, threads=threads)
+        # Output the concatenated MSA to file
+        output_concat = output / f"concat_alignments.{phyling.config.aln_ext}"
+        with open(output_concat, "w") as f:
+            SeqIO.write(concat_alignments, f, format="fasta")
+        logging.info(f"Concatenated fasta is output to {output_concat}")
+        inputs = [output_concat]
+        logging.info("Use the concatednated fasta to generate final tree")
+        tree_generator_obj = TreesGenerator(seqtype, *inputs)
+        tree_generator_obj.build(method=method, threads=threads)
+        final_tree = tree_generator_obj.get_tree()
+    else:
+        logging.info("Generate trees on selected MSAs and conclude a majority consensus tree")
+        final_tree = run_astral(trees)
+    return final_tree
 
 
 def fill_missing_taxon(taxonList: list, alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
@@ -303,46 +356,16 @@ def phylotree(inputs, input_dir, output, method, figure, concat, top_n_toverr, t
     seqtype = tuple(samples.values())[0].seqtype
     logging.info(f"Inputs are {seqtype} sequences.")
 
-    output = Path(output)
-    output.mkdir(exist_ok=True)
-
-    if top_n_toverr or len(inputs) == 1:
-        logging.info("Generate phylogenetic tree on MSA fasta")
-        tree_generator_obj = TreesGenerator(seqtype, *inputs)
-        tree_generator_obj.build(method=method, threads=threads)
-        if len(inputs) == 1:
-            tree_generator_obj.get_trees()
-        elif top_n_toverr:
-            tree_generator_obj.treeness_over_rcv(threads=threads)
-            trees = tree_generator_obj.get_tree(n=top_n_toverr)
-            inputs = tree_generator_obj.get_mfa(n=top_n_toverr)
-            toverrs = tree_generator_obj.get_toverr(n=top_n_toverr)
-            # Output the name of the selected MSA
-            output_selected_trees = output / "top_toverr_trees.tsv"
-            with open(output_selected_trees, "w") as f:
-                for input, toverr in zip(inputs, toverrs):
-                    print(input, toverr, sep="\t", file=f)
-            logging.info(f"File name of the selected markers is output to {output_selected_trees}")
-
-    if concat:
-        logging.info("Concatenate selected MSAs...")
-        alignmentList = []
-        for file in inputs:
-            alignmentList.append(AlignIO.read(file, format="fasta"))
-        concat_alignments = concatenate_fasta(list(samples.keys()), alignmentList, threads=threads)
-        # Output the concatenated MSA to file
-        output_concat = output / f"concat_alignments.{phyling.config.aln_ext}"
-        with open(output_concat, "w") as f:
-            SeqIO.write(concat_alignments, f, format="fasta")
-        logging.info(f"Concatenated fasta is output to {output_concat}")
-        inputs = [output_concat]
-        logging.info("Use the concatednated fasta to generate final tree")
-        tree_generator_obj = TreesGenerator(seqtype, *inputs)
-        tree_generator_obj.build(method=method, threads=threads)
-        final_tree = tree_generator_obj.get_tree()
-    else:
-        logging.info("Generate trees on selected MSAs and conclude a majority consensus tree")
-        final_tree = run_astral(trees)
+    final_tree = mfa_to_finaltree(
+        inputs=inputs,
+        output=output,
+        method=method,
+        seqtype=seqtype,
+        samples=list(samples.keys()),
+        concat=concat,
+        top_n_toverr=top_n_toverr,
+        threads=threads,
+    )
 
     Phylo.draw_ascii(final_tree)
 
