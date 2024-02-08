@@ -1,6 +1,9 @@
 """Phylogenetic tree construction methods."""
 from __future__ import annotations
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="numpy")
 import logging
 import pickle
 import shutil

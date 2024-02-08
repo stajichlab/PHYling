@@ -33,7 +33,7 @@ repos:
           - --max-line-length=456
           - --show-source
           - --statistics
-          - --ignore=E203,W503
+          - --ignore=E203,W503,E402
         exclude: ^tests/augustus*
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.3.1
@@ -46,7 +46,7 @@ repos:
     hooks:
       - id: isort
         args:
-          - -l=120
+          - -l=130
         exclude: ^tests
   - repo: https://github.com/pycqa/pydocstyle
     rev: 6.3.0
