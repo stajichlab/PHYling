@@ -161,7 +161,7 @@ class InputSeqs:
         elif target == "cds":
             return self.cds_seqs[self._kh[key]]
         else:
-            raise AttributeError('Argument target only allow "pep" and "cds".')
+            raise KeyError('Argument target only allow "pep" and "cds".')
 
     def _get_md5(self):
         """Compute md5 checksum of the file."""
