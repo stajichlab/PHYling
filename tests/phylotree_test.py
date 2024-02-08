@@ -1,10 +1,9 @@
 from pathlib import Path
 
 import pytest
-from Bio import AlignIO, Phylo, SeqIO
+from Bio import AlignIO, Phylo
 
-import phyling.config
-from phyling.phylotree import concatenate_fasta, tree_generator
+from phyling.phylotree import concatenate_fasta, mfa_to_finaltree
 
 samples = [
     "Actinomucor_elegans_CBS_100.09",
@@ -21,73 +20,107 @@ def shared_tmpdir(tmpdir_factory):
     yield Path(tmpdir)
 
 
-def concat(inputs, dir):
+def test_concatenate_fasta():
     alignmentList = []
+    inputs = list(Path("tests/pep_align").iterdir())
     for file in inputs:
         alignmentList.append(AlignIO.read(file, format="fasta"))
     concat_alignments = concatenate_fasta(samples, alignmentList, threads=1)
-
-    # Output the concatenated MSA to file
-    output_concat = dir / f"concat_alignments.{phyling.config.aln_ext}"
-    with open(output_concat, "w") as f:
-        SeqIO.write(concat_alignments, f, format="fasta")
-    inputs = [output_concat]
-    return inputs
+    assert len(concat_alignments) == len(samples)
 
 
-def test_on_pep_consensus():
+@pytest.mark.parametrize(
+    "method, seqtype, concat",
+    [
+        ("upgma", "peptide", True),
+        ("nj", "peptide", True),
+        ("ft", "peptide", True),
+        ("upgma", "peptide", False),
+        ("nj", "peptide", False),
+        ("ft", "peptide", False),
+    ],
+)
+def test_mfa_to_finaltree_peptide(method, seqtype, concat, shared_tmpdir):
     inputs = list(Path("tests/pep_align").iterdir())
-    tree_generator_obj = tree_generator("peptide", "upgma", *inputs)
-    tree = tree_generator_obj.get(threads=1)
-    assert isinstance(tree, Phylo.BaseTree.Tree) is True
+    final_tree = mfa_to_finaltree(
+        inputs=inputs,
+        output=shared_tmpdir,
+        method=method,
+        seqtype=seqtype,
+        samples=samples,
+        concat=concat,
+        top_n_toverr=2,
+        threads=1,
+    )
+    assert isinstance(final_tree, Phylo.BaseTree.Tree) is True
 
 
-def test_on_cds_consensus():
-    inputs = list(Path("tests/cds_align").iterdir())
-    tree_generator_obj = tree_generator("DNA", "upgma", *inputs)
-    tree = tree_generator_obj.get(threads=1)
-    assert isinstance(tree, Phylo.BaseTree.Tree) is True
-
-
-def test_on_pep_concat(tmp_path):
+def test_mfa_to_finaltree_top_n_toverr_out_of_range(shared_tmpdir):
     inputs = list(Path("tests/pep_align").iterdir())
-    inputs = concat(inputs, tmp_path)
-    tree_generator_obj = tree_generator("peptide", "upgma", *inputs)
-    tree = tree_generator_obj.get(threads=1)
-    assert isinstance(tree, Phylo.BaseTree.Tree) is True
+    final_tree = mfa_to_finaltree(
+        inputs=inputs,
+        output=shared_tmpdir,
+        method="upgma",
+        seqtype="peptide",
+        samples=samples,
+        concat=True,
+        top_n_toverr=8,
+        threads=1,
+    )
+    assert isinstance(final_tree, Phylo.BaseTree.Tree) is True
 
 
-def test_on_cds_concat(shared_tmpdir):
+def test_mfa_to_finaltree_seqtype_KeyError(shared_tmpdir):
+    inputs = list(Path("tests/pep_align").iterdir())
+    with pytest.raises(KeyError):
+        mfa_to_finaltree(
+            inputs=inputs,
+            output=shared_tmpdir,
+            method="upgma",
+            seqtype="RNA",
+            samples=samples,
+            concat=True,
+            top_n_toverr=2,
+            threads=1,
+        )
+
+
+def test_mfa_to_finaltree_method_KeyError(shared_tmpdir):
+    inputs = list(Path("tests/pep_align").iterdir())
+    with pytest.raises(KeyError):
+        mfa_to_finaltree(
+            inputs=inputs,
+            output=shared_tmpdir,
+            method="not_implemented_method",
+            seqtype="peptide",
+            samples=samples,
+            concat=True,
+            top_n_toverr=2,
+            threads=1,
+        )
+
+
+@pytest.mark.parametrize(
+    "method, seqtype, concat",
+    [
+        ("upgma", "DNA", True),
+        ("nj", "DNA", True),
+        ("ft", "DNA", True),
+        ("upgma", "DNA", False),
+        ("nj", "DNA", False),
+        ("ft", "DNA", False),
+    ],
+)
+def test_mfa_to_finaltree_cds(method, seqtype, concat, shared_tmpdir):
     inputs = list(Path("tests/cds_align").iterdir())
-    inputs = concat(inputs, shared_tmpdir)
-    tree_generator_obj = tree_generator("DNA", "upgma", *inputs)
-    tree = tree_generator_obj.get(threads=1)
-    assert isinstance(tree, Phylo.BaseTree.Tree) is True
-
-
-def test_nj_consensus():
-    inputs = list(Path("tests/cds_align").iterdir())
-    tree_generator_obj = tree_generator("DNA", "nj", *inputs)
-    tree = tree_generator_obj.get(threads=1)
-    assert isinstance(tree, Phylo.BaseTree.Tree) is True
-
-
-def test_nj_concat(shared_tmpdir):
-    inputs = [shared_tmpdir / "concat_alignments.mfa"]
-    tree_generator_obj = tree_generator("DNA", "nj", *inputs)
-    tree = tree_generator_obj.get(threads=1)
-    assert isinstance(tree, Phylo.BaseTree.Tree) is True
-
-
-def test_fasttree_consensus():
-    inputs = list(Path("tests/cds_align").iterdir())
-    tree_generator_obj = tree_generator("DNA", "ft", *inputs)
-    tree = tree_generator_obj.get(threads=1)
-    assert isinstance(tree, Phylo.BaseTree.Tree) is True
-
-
-def test_fasttree_concat(shared_tmpdir):
-    inputs = [shared_tmpdir / "concat_alignments.mfa"]
-    tree_generator_obj = tree_generator("DNA", "ft", *inputs)
-    tree = tree_generator_obj.get(threads=1)
-    assert isinstance(tree, Phylo.BaseTree.Tree) is True
+    final_tree = mfa_to_finaltree(
+        inputs=inputs,
+        output=shared_tmpdir,
+        method=method,
+        seqtype=seqtype,
+        samples=samples,
+        concat=concat,
+        top_n_toverr=2,
+        threads=1,
+    )
+    assert isinstance(final_tree, Phylo.BaseTree.Tree) is True
