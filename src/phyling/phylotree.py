@@ -362,10 +362,15 @@ def phylotree(inputs, input_dir, output, method, figure, concat, top_n_toverr, t
     Construct a phylogenetic tree based on the results of multiple sequence alignment (MSA).
 
     By default the consensus tree method will be employed which use a 50% cutoff to represent the majority of all the
-    trees. You can use the -c/--concat option to concatenate the MSA and build a single tree instead.
+    trees. You can use the -c/--concat option to concatenate the MSA and build a single tree instead. Note that enable the
+    -c/--concat option will also output a partition file that compatible to RAxML and IQTree.
 
-    By default, the UPGMA algorithm is used for tree construction. Users can switch to the Neighbor Joining or FastTree
+    For the tree building algorithm, the UPGMA will be used by default. Users can switch to the Neighbor Joining or FastTree
     by specifying the -m/--method nj/ft.
+
+    The align step usually report a lot of markers but many of them are uninformative or susceptible to composition bias.
+    The Treeness/RCV value computed by PhyKIT is used to estimate how informative the markers are. By default the
+    -n/--top_n_toverr is set to 50 to select only the top 50 markers.
 
     Once the tree is built, an ASCII figure representing the tree will be displayed, and a treefile in Newick format
     will be generated as output. Additionally, users can choose to obtain a matplotlib-style figure using the
