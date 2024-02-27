@@ -1,5 +1,20 @@
 """Some project specific configuration parameters."""
+
+import time
 from pathlib import Path
+
+
+def runtime(start_time: float):
+    """Measure the runtime of a process by given the start time."""
+    elapsed_sec = time.monotonic() - start_time
+    hours = int(elapsed_sec // 3600)
+    mins = int((elapsed_sec // 60) % 60)
+    secs = elapsed_sec % 60
+    msg = f"{secs:.3f} seconds"
+    msg = f"{mins} minutes " + msg if mins > 0 else msg
+    msg = f"{hours} hours " + msg if hours > 0 else msg
+    return msg
+
 
 database = "https://busco-data.ezlab.org/v5/data"
 cfg_dir = Path.home() / ".phyling"

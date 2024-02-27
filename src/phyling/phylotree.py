@@ -1,4 +1,5 @@
 """Phylogenetic tree construction methods."""
+
 from __future__ import annotations
 
 import warnings
@@ -9,6 +10,7 @@ import pickle
 import shutil
 import subprocess
 import sys
+import time
 from io import StringIO
 from itertools import product
 from multiprocessing.dummy import Pool
@@ -225,16 +227,21 @@ def mfa_to_finaltree(
     output.mkdir(exist_ok=True)
 
     if top_n_toverr or len(inputs) == 1:
-        logging.info("Generate phylogenetic tree on MSA fasta")
+        func_start = time.monotonic()
         tree_generator_obj = TreesGenerator(seqtype, *inputs)
         tree_generator_obj.build(method=method, threads=threads)
+        logging.debug(
+            f"Tree building with {phyling.config.avail_tree_methods[method]} was finished in {phyling.config.runtime(func_start)}."
+        )
         if len(inputs) == 1:
             tree_generator_obj.get_tree()
         elif top_n_toverr:
+            func_start = time.monotonic()
             tree_generator_obj.treeness_over_rcv(threads=threads)
             trees = tree_generator_obj.get_tree(n=top_n_toverr)
             inputs = tree_generator_obj.get_mfa(n=top_n_toverr)
             toverrs = tree_generator_obj.get_toverr(n=top_n_toverr)
+            logging.debug(f"Treeness estimation and filtering was finished in {phyling.config.runtime(func_start)}.")
             # Output the name of the selected MSA
             output_selected_trees = output / "top_toverr_trees.tsv"
             with open(output_selected_trees, "w") as f:
@@ -244,6 +251,7 @@ def mfa_to_finaltree(
 
     if concat:
         logging.info("Concatenate selected MSAs...")
+        func_start = time.monotonic()
         alignmentList = []
         for file in inputs:
             alignment = AlignIO.read(file, format="fasta")
@@ -251,16 +259,23 @@ def mfa_to_finaltree(
             alignment.annotations["seqname"] = file.name
             alignmentList.append(alignment)
         concat_alignments = concatenate_fasta(samples, alignmentList, threads=threads)
+        logging.debug(f"Fasta concatenation was finished in {phyling.config.runtime(func_start)}.")
         # Output the concatenated MSA to file
         concat_file, _ = output_concat_file(output, concat_alignments)
         inputs = [concat_file]
         logging.info("Use the concatednated fasta to generate final tree.")
+        func_start = time.monotonic()
         tree_generator_obj = TreesGenerator(seqtype, *inputs)
         tree_generator_obj.build(method=method, threads=threads)
+        logging.debug(
+            f"Tree building with {phyling.config.avail_tree_methods[method]} was finished in {phyling.config.runtime(func_start)}."
+        )
         final_tree = tree_generator_obj.get_tree()
     else:
-        logging.info("Generate trees on selected MSAs and conclude a majority consensus tree")
+        func_start = time.monotonic()
         final_tree = run_astral(trees)
+        logging.debug(f"Consensus tree estimation with ASTRAL was finished in {phyling.config.runtime(func_start)}.")
+
     return final_tree
 
 
@@ -353,7 +368,8 @@ def phylotree(inputs, input_dir, output, method, figure, concat, top_n_toverr, t
     will be generated as output. Additionally, users can choose to obtain a matplotlib-style figure using the
     -f/--figure option.
     """
-    logging.info(f"Algorithm choose for tree building: {phyling.config.avail_tree_methods[method]}")
+    module_start = time.monotonic()
+
     if input_dir:
         inputs = [file for file in Path(input_dir).glob(f"*.{phyling.config.aln_ext}")]
     else:
@@ -406,3 +422,5 @@ def phylotree(inputs, input_dir, output, method, figure, concat, top_n_toverr, t
         output_fig = output / f"{method}_tree.png"
         Phylo.draw(final_tree, axes=ax)
         fig.savefig(output_fig)
+
+    logging.debug(f"Tree module finished in {phyling.config.runtime(module_start)}.")

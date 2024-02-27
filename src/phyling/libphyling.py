@@ -1,4 +1,5 @@
 """Library of routines for supporting PHYling process."""
+
 from __future__ import annotations
 
 import csv
@@ -10,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Iterator
 from io import BytesIO, StringIO
 from multiprocessing.dummy import Pool
@@ -311,6 +313,7 @@ class msa_generator:
         cutoffs = self._get_cutoffs()
         inputs = [input for input in self._inputs.values() if not input.scanned]
 
+        func_start = time.monotonic()
         if threads < 8:
             # Single process mode
             logging.debug(f"Run in single process mode with {threads} threads")
@@ -342,6 +345,7 @@ class msa_generator:
         for res in search_res:
             for hmm, seqid in res:
                 self.orthologs.setdefault(hmm, set()).add(seqid)
+        logging.debug(f"Ortholog search was finished in {phyling.config.runtime(func_start)}.")
 
     def save_checkpoint(self, output: Path) -> None:
         """
@@ -383,30 +387,31 @@ class msa_generator:
             raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully")
 
         # Parallelize the MSA step
-        logging.info(f"Use {method} for peptide MSA")
-        logging.info(f"Use {threads} threads to parallelize MSA")
+        func_start = time.monotonic()
         with Pool(threads) as pool:
             if method == "muscle":
                 pep_msa_List = pool.map(self._run_muscle, self.orthologs.values())
             else:
                 pep_msa_List = pool.starmap(self._run_hmmalign, self.orthologs.items())
-            logging.info("Peptide MSA done")
+            logging.debug(f"MSA with {method} was finished in {phyling.config.runtime(func_start)}.")
 
             if self._seqtype == "DNA":
                 logging.info("cds found. Processing cds sequences...")
+                func_start = time.monotonic()
                 cds_seqs_stream = pool.starmap(self._get_ortholog_seqs, [(hits, "cds") for hits in self.orthologs.values()])
                 cds_seqs_List = pool.map(
                     lambda x: [record for record in SeqIO.parse(StringIO(x.read().decode()), "fasta")], cds_seqs_stream
                 )
                 cds_msa_List = pool.starmap(bp_mrtrans, zip(pep_msa_List, cds_seqs_List))
-                logging.info("Back translate complete")
+                logging.debug(f"Back translate was finished in {phyling.config.runtime(func_start)}.")
 
             if not non_trim:
+                func_start = time.monotonic()
                 if self._seqtype == "DNA":
                     cds_msa_List = pool.starmap(trim_gaps, zip(pep_msa_List, cds_msa_List))
                 else:
                     pep_msa_List = pool.map(trim_gaps, pep_msa_List)
-                logging.info("Trimming done")
+                logging.debug(f"Trimming was finished in {phyling.config.runtime(func_start)}.")
 
         self.pep_msa_List = pep_msa_List
         if self._seqtype == "DNA":
@@ -576,6 +581,8 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
     Note that a checkpoint file will be output after the hmmsearch step. You can add/remove taxon without rerun the
     unchanged input entries by enabling --from_checkpoint option.
     """
+    module_start = time.monotonic()
+
     # If args.input_dir is used to instead of args.inputs
     if input_dir:
         inputs = list(Path(input_dir).iterdir())
@@ -621,3 +628,5 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
     msa.filter_orthologs()
     msa.align(method=method, non_trim=non_trim, threads=threads)
     msa.output_msa(output=output)
+
+    logging.debug(f"Align module finished in {phyling.config.runtime(module_start)}.")
