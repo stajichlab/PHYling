@@ -247,17 +247,14 @@ def mfa_to_finaltree(
         alignmentList = []
         for file in inputs:
             alignment = AlignIO.read(file, format="fasta")
-            alignment.annotations["septype"] = seqtype
+            alignment.annotations["seqtype"] = seqtype
             alignment.annotations["seqname"] = file.name
             alignmentList.append(alignment)
         concat_alignments = concatenate_fasta(samples, alignmentList, threads=threads)
         # Output the concatenated MSA to file
-        output_concat = output / f"concat_alignments.{phyling.config.aln_ext}"
-        with open(output_concat, "w") as f:
-            SeqIO.write(concat_alignments, f, format="fasta")
-        logging.info(f"Concatenated fasta is output to {output_concat}")
-        inputs = [output_concat]
-        logging.info("Use the concatednated fasta to generate final tree")
+        concat_file, _ = output_concat_file(output, concat_alignments)
+        inputs = [concat_file]
+        logging.info("Use the concatednated fasta to generate final tree.")
         tree_generator_obj = TreesGenerator(seqtype, *inputs)
         tree_generator_obj.build(method=method, threads=threads)
         final_tree = tree_generator_obj.get_tree()
@@ -292,23 +289,36 @@ def concatenate_fasta(taxonList: list, alignmentList: list[MultipleSeqAlignment]
         alignmentList = pool.starmap(fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList))
     logging.debug("Filling missing taxon done")
     end = 0
+    partition_info = []
     for alignment in alignmentList:
         start = end + 1
         end += alignment.get_alignment_length()
-        alignment.annotations["partition"] = f"{start}-{end}"
+        if "seqtype" in alignment.annotations:
+            partition_info.append(f'{alignment.annotations["seqtype"]}, {alignment.annotations["seqname"]}={start}-{end}')
         concat_alignments += alignment
+    if "seqtype" in alignment.annotations:
+        concat_alignments.annotations["partition"] = partition_info
     for seq in concat_alignments:
         seq.description = ""
     logging.debug("Concatenate fasta done")
     return concat_alignments
 
 
-# def output_concat_file(output: Path) -> None:
-#     """Output the concatenated fasta and partition file."""
-#     concat_file = output / f"concat_alignments.{phyling.config.aln_ext}"
-#     with open(concat_file, "w") as f:
-#         SeqIO.write(concat_alignments, f, format="fasta")
-#     logging.info(f"Concatenated fasta is output to {output_concat}")
+def output_concat_file(output: Path, concat_alignments: MultipleSeqAlignment) -> tuple[Path, Path]:
+    """Output the concatenated fasta and partition file."""
+    concat_file = output / f"concat_alignments.{phyling.config.aln_ext}"
+    with open(concat_file, "w") as f:
+        SeqIO.write(concat_alignments, f, format="fasta")
+    if "partition" in concat_alignments.annotations:
+        partition_file = output / f"concat_alignments.{phyling.config.partition_ext}"
+        with open(partition_file, "w") as f:
+            [print(line, file=f) for line in concat_alignments.annotations["partition"]]
+        logging.info(f"Concatenated fasta and partition file is output to {concat_file} and {partition_file}")
+    else:
+        partition_file = None
+        logging.info("The concat_alignments object doesn't have partition info. No partition file output.")
+    return concat_file, partition_file
+
 
 def run_astral(trees: list[Phylo.BaseTree.Tree]) -> Phylo.BaseTree.Tree:
     """Run astral to get consensus tree."""
