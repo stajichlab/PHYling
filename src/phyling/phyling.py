@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import argparse
 import logging
-import shutil
 import sys
 import textwrap
+import time
 from pathlib import Path
 
 try:
@@ -20,13 +20,30 @@ from phyling.libphyling import main as search_align
 from phyling.phylotree import phylotree
 
 
-def description_formatter(string, wrapper):
-    """Customized formatter for docstring."""
-    paragraphs = [textwrap.dedent(line).strip("\n").replace("\n", " ") for line in string.split("\n\n") if line != ""]
-    return "\n\n".join([wrapper.fill(paragraph) for paragraph in paragraphs])
+class _CustomHelpFormatter(argparse.HelpFormatter):
+    def _fill_text(self, text, width, indent):
+        text = [self._whitespace_matcher.sub(" ", line).strip() for line in text.split("\n\n") if line != ""]
+        return "\n\n".join([textwrap.fill(line, width) for line in text])
+
+    def _split_lines(self, text, width):
+        text = [self._whitespace_matcher.sub(" ", line).strip() for line in text.split("\n") if line != ""]
+        formatted_text = []
+        [formatted_text.extend(textwrap.wrap(line, width)) for line in text]
+        # The textwrap module is used only for formatting help.
+        # Delay its import for speeding up the common usage of argparse.
+        return formatted_text
+
+    def _get_help_string(self, action):
+        help = action.help
+        if "%(default)" not in action.help:
+            if action.default not in [argparse.SUPPRESS, None, False]:
+                defaulting_nargs = [argparse.OPTIONAL, argparse.ZERO_OR_MORE]
+                if action.option_strings or action.nargs in defaulting_nargs:
+                    help += " (default: %(default)s)"
+        return help
 
 
-def parser_submodule(parser, parent_parser, wrapper) -> None:
+def parser_submodule(parser, parent_parser) -> None:
     """Parser for command line inputs."""
     subparsers = parser.add_subparsers()
 
@@ -35,9 +52,9 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
     p_download = subparsers.add_parser(
         "download",
         parents=[parent_parser],
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=_CustomHelpFormatter,
         help="Download HMM markers",
-        description=description_formatter(download.__doc__, wrapper),
+        description=download.__doc__,
     )
     p_download.add_argument("markerset", metavar='HMM markerset or "list"', help="Name of the HMM markerset")
     p_download.set_defaults(func=download)
@@ -45,33 +62,37 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
     p_aln = subparsers.add_parser(
         "align",
         parents=[parent_parser],
-        formatter_class=argparse.RawTextHelpFormatter,
+        formatter_class=_CustomHelpFormatter,
         help="Run multiple sequence alignments against orthologs found among samples",
-        description=description_formatter(search_align.__doc__, wrapper),
+        description=search_align.__doc__,
     )
     input_type = p_aln.add_mutually_exclusive_group(required=True)
     input_type.add_argument(
         "-i",
         "--inputs",
+        metavar=("file", "files"),
         nargs="+",
         help="Query pepetide/cds fasta or gzipped fasta",
     )
     input_type.add_argument(
         "-I",
         "--input_dir",
+        metavar="directory",
         type=Path,
         help="Directory containing query pepetide/cds fasta or gzipped fasta",
     )
     p_aln.add_argument(
         "-o",
         "--output",
+        metavar="directory",
         type=Path,
-        default="./align",
-        help='Output directory of the alignment results (default="./align")',
+        default=f'phyling-align-{time.strftime("%Y%m%d-%H%M%S%z", time.localtime())}',
+        help="Output directory of the alignment results (default: %(default)s [current timestamp])",
     )
     p_aln.add_argument(
         "-m",
         "--markerset",
+        metavar="directory",
         type=Path,
         required=True,
         help="Directory of the HMM markerset",
@@ -79,16 +100,17 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
     p_aln.add_argument(
         "-E",
         "--evalue",
+        metavar="float",
         type=float,
         default=1e-10,
-        help="Hmmsearch reporting threshold (default=1e-10)",
+        help="Hmmsearch reporting threshold",
     )
     p_aln.add_argument(
         "-M",
         "--method",
         choices=["hmmalign", "muscle"],
         default="hmmalign",
-        help='Program used for multiple sequence alignment (default="hmmalign")',
+        help="Program used for multiple sequence alignment",
     )
     p_aln.add_argument(
         "--non_trim",
@@ -105,46 +127,49 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
         "--threads",
         type=int,
         default=1,
-        help="Threads for hmmsearch and the number of parallelized jobs in MSA step (default=1)",
+        help="Threads for hmmsearch and the number of parallelized jobs in MSA step. "
+        + "Better be multiple of 4 if using more than 8 threads",
     )
     p_aln.set_defaults(func=search_align)
 
     p_tree = subparsers.add_parser(
         "tree",
         parents=[parent_parser],
-        formatter_class=argparse.RawTextHelpFormatter,
+        formatter_class=_CustomHelpFormatter,
         help="Build a phylogenetic tree based on multiple sequence alignment results",
-        description=description_formatter(phylotree.__doc__, wrapper),
+        description=phylotree.__doc__,
     )
     input_type = p_tree.add_mutually_exclusive_group(required=True)
-    input_type.add_argument("-i", "--inputs", nargs="+", help="Multiple sequence alignment fasta of the markers")
+    input_type.add_argument(
+        "-i",
+        "--inputs",
+        metavar=("file", "files"),
+        nargs="+",
+        help="Multiple sequence alignment fasta of the markers",
+    )
     input_type.add_argument(
         "-I",
         "--input_dir",
+        metavar="directory",
         type=Path,
         help="Directory containing multiple sequence alignment fasta of the markers",
     )
     p_tree.add_argument(
         "-o",
         "--output",
+        metavar="directory",
         type=Path,
-        default=".",
-        help='Output directory of the newick treefile (default=".")',
+        default=f'phyling-tree-{time.strftime("%Y%m%d-%H%M%S%z", time.localtime())}',
+        help="Output directory of the newick treefile (default: %(default)s [current timestamp])",
     )
     p_tree.add_argument(
         "-M",
         "--method",
         choices=phyling.config.avail_tree_methods.keys(),
         default="upgma",
-        help='Algorithm used for tree building. (default="upgma")\n'
+        help="Algorithm used for tree building. (default: %(default)s)\n"
         + "Available options:\n"
         + "\n".join(f"{value}: {key}" for key, value in phyling.config.avail_tree_methods.items()),
-    )
-    p_tree.add_argument(
-        "-c",
-        "--concat",
-        action="store_true",
-        help="Concatenated alignment results",
     )
     p_tree.add_argument(
         "-n",
@@ -152,7 +177,13 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
         type=int,
         default=50,
         help="Select the top n markers based on their treeness/RCV for final tree building "
-        + "(default=50, specify 0 to use all the markers)",
+        + "(default: %(default)s. Specify 0 to use all markers)",
+    )
+    p_tree.add_argument(
+        "-c",
+        "--concat",
+        action="store_true",
+        help="Concatenated alignment results",
     )
     p_tree.add_argument("-f", "--figure", action="store_true", help="Generate a matplotlib tree figure")
     p_tree.add_argument(
@@ -160,7 +191,7 @@ def parser_submodule(parser, parent_parser, wrapper) -> None:
         "--threads",
         type=int,
         default=1,
-        help="Threads for tree construction (default=1)",
+        help="Threads for tree construction",
     )
     p_tree.set_defaults(func=phylotree)
 
@@ -183,21 +214,20 @@ def main():
     # https://stackoverflow.com/questions/33645859/how-to-add-common-arguments-to-argparse-subcommands
     # Build parent_parser which contains shared arguments, and do not use it directly
     parent_parser = argparse.ArgumentParser(add_help=False)
-    wrapper = textwrap.TextWrapper(width=shutil.get_terminal_size((80, 24))[0])
 
     parent_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode for debug")
 
     # The real parser for user
     parser = argparse.ArgumentParser(
         prog=main.__name__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=description_formatter(main.__doc__, wrapper),
-        epilog=description_formatter(main._epilog, wrapper),
+        formatter_class=_CustomHelpFormatter,
+        description=main.__doc__,
+        epilog=main._epilog,
     )
 
     parser.add_argument("-V", "--version", action="version", version=version("phyling"))
 
-    parser_submodule(parser, parent_parser, wrapper)
+    parser_submodule(parser, parent_parser)
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
