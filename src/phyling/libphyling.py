@@ -154,7 +154,7 @@ class InputSeqs:
         if isinstance(value, bool):
             self._scanned = value
         else:
-            raise ValueError("Invalid value. The argument scanned only accept boolean value")
+            raise ValueError("Invalid value. The argument scanned only accept boolean value.")
 
     def get_seq_by_name(self, key, target="pep"):
         """Return the specific sequence by its name."""
@@ -199,7 +199,7 @@ class InputSeqs:
 
         if seqblock.alphabet.is_amino():
             self._seqtype = "peptide"
-            logging.debug(f"{self.basename} is peptide sequences")
+            logging.debug(f"{self.basename} is peptide sequences.")
             self._pep_seqs = DigitalSequenceBlock(pyhmmer.easel.Alphabet.amino(), [])
             for seq in seqblock:
                 seq.description = self.sample.encode()
@@ -208,11 +208,11 @@ class InputSeqs:
 
         elif seqblock.alphabet.is_dna():
             self._seqtype = "DNA"
-            logging.info(f"{self.basename} is DNA sequences")
+            logging.info(f"{self.basename} is DNA sequences.")
             self._cds_translation(seqblock)
 
         else:
-            logging.error(f"{self.basename} is rna sequences, which is not supported. Please convert them to DNA first")
+            logging.error(f"{self.basename} is rna sequences, which is not supported. Please convert them to DNA first.")
             sys.exit(1)
 
     def _cds_translation(self, cds_seqblock: DigitalSequenceBlock) -> None:
@@ -316,7 +316,7 @@ class msa_generator:
         func_start = time.monotonic()
         if threads < 8:
             # Single process mode
-            logging.debug(f"Run in single process mode with {threads} threads")
+            logging.debug(f"Run in single process mode with {threads} threads.")
             search_res = []
             for input in inputs:
                 # Select the sequences of each sample
@@ -325,7 +325,7 @@ class msa_generator:
             # Multi processes mode
             threads_per_process = 4
             processes = threads // threads_per_process
-            logging.debug(f"Run in multiprocesses mode. {processes} jobs with 4 threads for each are run concurrently")
+            logging.debug(f"Run in multiprocesses mode. {processes} jobs with 4 threads for each are run concurrently.")
             with Pool(processes) as pool:
                 search_res = pool.starmap(
                     self._run_hmmsearch,
@@ -354,7 +354,7 @@ class msa_generator:
         This should be run before filter_orthologs.
         """
         if not hasattr(self, "orthologs"):
-            raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully")
+            raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully.")
 
         checkpoint = output / ".checkpoint.pkl"
         with open(checkpoint, "wb") as f:
@@ -363,10 +363,10 @@ class msa_generator:
     def filter_orthologs(self) -> None:
         """Filter the found sequence hits from an HMM search. Orthlogs with fewer than 3 hits will be discarded."""
         if not hasattr(self, "orthologs"):
-            raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully")
+            raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully.")
 
         self.orthologs = dict(filter(lambda item: len(item[1]) >= 3, self.orthologs.items()))
-        logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples")
+        logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples.")
 
         if not self.orthologs:
             logging.error(
@@ -384,15 +384,18 @@ class msa_generator:
         remove uninformative regions (can be switch off).
         """
         if not hasattr(self, "orthologs"):
-            raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully")
+            raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully.")
 
         # Parallelize the MSA step
+        logging.info(f"Use {method} for peptide MSA.")
+        logging.info(f"Use {threads} threads to parallelize MSA.")
         func_start = time.monotonic()
         with Pool(threads) as pool:
             if method == "muscle":
                 pep_msa_List = pool.map(self._run_muscle, self.orthologs.values())
             else:
                 pep_msa_List = pool.starmap(self._run_hmmalign, self.orthologs.items())
+            logging.info("Peptide MSA done.")
             logging.debug(f"MSA with {method} was finished in {phyling.config.runtime(func_start)}.")
 
             if self._seqtype == "DNA":
@@ -403,6 +406,7 @@ class msa_generator:
                     lambda x: [record for record in SeqIO.parse(StringIO(x.read().decode()), "fasta")], cds_seqs_stream
                 )
                 cds_msa_List = pool.starmap(bp_mrtrans, zip(pep_msa_List, cds_seqs_List))
+                logging.info("Back translate complete.")
                 logging.debug(f"Back translate was finished in {phyling.config.runtime(func_start)}.")
 
             if not non_trim:
@@ -411,6 +415,7 @@ class msa_generator:
                     cds_msa_List = pool.starmap(trim_gaps, zip(pep_msa_List, cds_msa_List))
                 else:
                     pep_msa_List = pool.map(trim_gaps, pep_msa_List)
+                logging.info("Trimming done.")
                 logging.debug(f"Trimming was finished in {phyling.config.runtime(func_start)}.")
 
         self.pep_msa_List = pep_msa_List
@@ -420,7 +425,7 @@ class msa_generator:
     def output_msa(self, output: Path) -> None:
         """Output each MSA results in separate files."""
         if not hasattr(self, "pep_msa_List"):
-            raise AttributeError("No pep_msa_list found. Please make sure the align function was run successfully")
+            raise AttributeError("No pep_msa_list found. Please make sure the align function was run successfully.")
         if self._seqtype == "DNA":
             alignmentList = self.cds_msa_List
             ext = phyling.config.cds_aln_ext
@@ -428,7 +433,7 @@ class msa_generator:
             alignmentList = self.pep_msa_List
             ext = phyling.config.prot_aln_ext
 
-        logging.info(f"Output individual fasta to folder {output}")
+        logging.info(f"Output individual fasta to folder {output}...")
         for hmm, alignment in zip([hmm for hmm in self.orthologs.keys()], alignmentList):
             output_mfa = output / f"{hmm}.{ext}"
             alignment.sort()
@@ -467,7 +472,7 @@ class msa_generator:
             with pyhmmer.plan7.HMMFile(hmm_path) as hmm_file:
                 hmm = hmm_file.read()
             hmms[hmm.name.decode()] = hmm
-        logging.info(f"Found {len(hmms)} hmm markers")
+        logging.info(f"Found {len(hmms)} hmm markers.")
         return hmms
 
     def _get_cutoffs(self) -> dict[str, float]:
@@ -479,14 +484,14 @@ class msa_generator:
                     if line[0].startswith("#"):
                         continue
                     cutoffs[line[0]] = float(line[1])
-            logging.info(f"Found {len(cutoffs)} hmm marker cutoffs")
+            logging.info(f"Found {len(cutoffs)} hmm marker cutoffs.")
         except FileNotFoundError:
-            logging.warning("HMM cutoff file not found")
+            logging.warning("HMM cutoff file not found.")
 
         if len(cutoffs) == len(self._hmms):
-            logging.info("Use HMM cutoff file to determine cutoff")
+            logging.info("Use HMM cutoff file to determine cutoff.")
         else:
-            logging.info("Use evalue to determine cutoff")
+            logging.info("Use evalue to determine cutoff.")
             cutoffs = None
 
         return cutoffs
@@ -504,7 +509,7 @@ class msa_generator:
                     continue
                 yield hmm, (input.sample, hit.name)
                 break  # The first hit in hits is the best hit
-        logging.info(f"hmmsearch on {input.basename} done")
+        logging.info(f"hmmsearch on {input.basename} done.")
         input.scanned = True
 
     def _get_ortholog_seqs(self, hits: set, target="pep") -> BytesIO:
@@ -590,7 +595,7 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
         inputs = [Path(sample) for sample in inputs]
     # Check input files, terminate if less than 3 files
     if len(inputs) < 3:
-        logging.error("Should have at least 3 input files")
+        logging.error("Should have at least 3 input files.")
         sys.exit(1)
 
     output = Path(output)
@@ -598,23 +603,24 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
     # Check if output dir is empty
     old_mfa = [file for file in Path(output).glob(f"*.{phyling.config.aln_ext}")]
     if old_mfa and not from_checkpoint:
-        logging.warning(f"Output directory {output} is not empty and from_checkpoint option is not enabled. Aborted")
+        logging.warning(f"Output directory {output} is not empty and from_checkpoint option is not enabled. Aborted.")
         sys.exit(1)
     else:
         for file in old_mfa:
+            logging.info("Remove previous alignment files and update the alignment with current parameters.")
             file.unlink()
 
     if method == "muscle" and not shutil.which("muscle"):
         raise phyling.BinaryNotFoundError(
             'muscle not found. Please install it through "conda install -c bioconda muscle>=5.1" '
-            "or build from the source following the instruction on https://github.com/rcedgar/muscle"
+            "or build from the source following the instruction on https://github.com/rcedgar/muscle."
         )
 
     if not markerset.exists():
         markerset = Path(phyling.config.cfg_dir, phyling.config.default_HMM, markerset, "hmms")
     else:
         markerset = Path(markerset)
-    logging.info(f"Loading markerset from {markerset}")
+    logging.info(f"Loading markerset from {markerset}...")
 
     if not markerset.exists():
         logging.error(f"Markerset folder does not exist {markerset} - did you download BUSCO?")

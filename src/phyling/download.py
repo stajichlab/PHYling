@@ -1,4 +1,5 @@
 """Supporting routines for downloading data especially BUSCO markers."""
+
 from __future__ import annotations
 
 import hashlib
@@ -60,7 +61,7 @@ class Data_updater(ABC):
             with urlopen(url) as response:
                 content = response.read()
         except HTTPError:
-            logging.error("URL not found or currently unavailble")
+            logging.error("URL not found or currently unavailble.")
             sys.exit(1)
         return content
 
@@ -69,18 +70,17 @@ class Data_updater(ABC):
         logging.debug(f"Check {self._filetype} exist or not ...")
         if self._data.is_file():
             logging.debug(f"{self._filetype} exist ({self._data})")
-            logging.debug(f"Compare md5 checksums between the online latest record and the local {self._filetype}")
+            logging.debug(f"Compare md5 checksums between the online latest record and the local {self._filetype}.")
             if self._get_local_md5 == self._get_remote_md5:
-                logging.debug("md5 is the same. No need to update metadata")
+                logging.debug(f"md5 is the same. No need to update {self._filetype}.")
                 return self._load_data()
             else:
                 logging.info(
-                    f"The local {self._filetype} md5 is different from the online latest record. "
-                    f"Update {self._filetype}"
+                    f"The local {self._filetype} md5 is different from the online latest record. Update {self._filetype}."
                 )
         else:
-            logging.info(f"{self._filetype} not found")
-        logging.info(f"Download {self._filetype}")
+            logging.info(f"{self._filetype} not found.")
+        logging.info(f"Download {self._filetype}.")
         data = self.fetch_url(self._data_url)
         logging.debug(f"Write {self._filetype} to {self._data}")
         self._save_data(data)
@@ -170,7 +170,7 @@ class HMM_markerset_updater(Data_updater):
         logging.debug(f"Save to {output}.tar.gz")
         with open(f"{output}.tar.gz", "wb") as f:
             f.write(data)
-        logging.debug(f"Gunzip the {self._filetype} to {output}")
+        logging.debug(f"Gunzip the {self._filetype} to {output}.")
         with tarfile.open(f"{output}.tar.gz", "r:gz") as f:
             f.extractall(output.parent)
 

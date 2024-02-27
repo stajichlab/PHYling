@@ -60,14 +60,14 @@ class MFA2Tree:
             tree = self._with_FastTree(self._seqtype)
         else:
             raise NotImplementedError(f"{phyling.config.avail_tree_methods[method]} is not implemented yet.")
-        logging.debug(f"Tree building on {self._mfa.name} is done")
+        logging.debug(f"Tree building on {self._mfa.name} is done.")
         self._tree = tree
 
     @property
     def tree(self) -> Phylo.BaseTree.Tree:
         """Return the Biopython tree object."""
         if not hasattr(self, "_tree"):
-            raise AttributeError("No self._tree found. Please make sure the build function was run successfully")
+            raise AttributeError("No self._tree found. Please make sure the build function was run successfully.")
         return self._tree
 
     def treeness_over_rcv(self) -> float:
@@ -145,7 +145,7 @@ class TreesGenerator:
             for mfa2tree_obj in self._mfa2tree_obj_list:
                 self._trees.append(self._build_helper(mfa2tree_obj, method=method))
         else:
-            logging.debug(f"Run in multiprocesses mode. {threads} jobs are run concurrently")
+            logging.debug(f"Run in multiprocesses mode. {threads} jobs are run concurrently.")
             with Pool(threads) as pool:
                 _ = pool.starmap(self._build_helper, ((mfa2tree_obj, method) for mfa2tree_obj in self._mfa2tree_obj_list))
 
@@ -158,7 +158,7 @@ class TreesGenerator:
             for mfa2tree_obj in self._mfa2tree_obj_list:
                 self._toverr.append(self._toverr_helper(mfa2tree_obj))
         else:
-            logging.debug(f"Run in multiprocesses mode. {threads} jobs are run concurrently")
+            logging.debug(f"Run in multiprocesses mode. {threads} jobs are run concurrently.")
             with Pool(threads) as pool:
                 self._toverr = pool.map(self._toverr_helper, self._mfa2tree_obj_list)
         self._sort_by_toverr()
@@ -202,12 +202,12 @@ class TreesGenerator:
         """Validate whether the given n is within the range."""
         if n:
             if not hasattr(self, "_toverr"):
-                raise AttributeError("Need to run the function treeness_over_rcv first when specifying argument n")
+                raise AttributeError("Need to run the function treeness_over_rcv first when specifying argument n.")
         if not 0 < n <= len(self._mfa2tree_obj_list):
             if n == 0:
-                logging.debug("By default use all trees")
+                logging.debug("By default use all trees.")
             else:
-                logging.warning("Argument --top_n_toverr/-n is larger the existing trees. Use all trees")
+                logging.warning("Argument --top_n_toverr/-n is larger the existing trees. Use all trees.")
             n = len(self._mfa2tree_obj_list)
         return n
 
@@ -227,6 +227,7 @@ def mfa_to_finaltree(
     output.mkdir(exist_ok=True)
 
     if top_n_toverr or len(inputs) == 1:
+        logging.info("Generate phylogenetic tree on MSA fasta.")
         func_start = time.monotonic()
         tree_generator_obj = TreesGenerator(seqtype, *inputs)
         tree_generator_obj.build(method=method, threads=threads)
@@ -234,10 +235,11 @@ def mfa_to_finaltree(
             f"Tree building with {phyling.config.avail_tree_methods[method]} was finished in {phyling.config.runtime(func_start)}."
         )
         if len(inputs) == 1:
-            tree_generator_obj.get_tree()
+            return tree_generator_obj.get_tree()
         elif top_n_toverr:
             func_start = time.monotonic()
             tree_generator_obj.treeness_over_rcv(threads=threads)
+            logging.info(f"Use the mfa which the treeness within top {top_n_toverr} n for final tree building.")
             trees = tree_generator_obj.get_tree(n=top_n_toverr)
             inputs = tree_generator_obj.get_mfa(n=top_n_toverr)
             toverrs = tree_generator_obj.get_toverr(n=top_n_toverr)
@@ -247,7 +249,7 @@ def mfa_to_finaltree(
             with open(output_selected_trees, "w") as f:
                 for input, toverr in zip(inputs, toverrs):
                     print(input, toverr, sep="\t", file=f)
-            logging.info(f"File name of the selected markers is output to {output_selected_trees}")
+            logging.info(f"File name of the selected markers is output to {output_selected_trees}.")
 
     if concat:
         logging.info("Concatenate selected MSAs...")
@@ -272,6 +274,7 @@ def mfa_to_finaltree(
         )
         final_tree = tree_generator_obj.get_tree()
     else:
+        logging.info("Generate trees on selected MSAs and conclude a majority consensus tree.")
         func_start = time.monotonic()
         final_tree = run_astral(trees)
         logging.debug(f"Consensus tree estimation with ASTRAL was finished in {phyling.config.runtime(func_start)}.")
@@ -302,7 +305,7 @@ def concatenate_fasta(taxonList: list, alignmentList: list[MultipleSeqAlignment]
     concat_alignments.sort()
     with Pool(threads) as pool:
         alignmentList = pool.starmap(fill_missing_taxon, product([[seq.id for seq in concat_alignments]], alignmentList))
-    logging.debug("Filling missing taxon done")
+    logging.debug("Filling missing taxon done.")
     end = 0
     partition_info = []
     for alignment in alignmentList:
@@ -315,7 +318,7 @@ def concatenate_fasta(taxonList: list, alignmentList: list[MultipleSeqAlignment]
         concat_alignments.annotations["partition"] = partition_info
     for seq in concat_alignments:
         seq.description = ""
-    logging.debug("Concatenate fasta done")
+    logging.debug("Concatenate fasta done.")
     return concat_alignments
 
 
@@ -339,10 +342,10 @@ def run_astral(trees: list[Phylo.BaseTree.Tree]) -> Phylo.BaseTree.Tree:
     """Run astral to get consensus tree."""
     if not shutil.which("astral"):
         raise phyling.BinaryNotFoundError(
-            "Astral not found. "
+            "ASTRAL not found. "
             "Please build the C++ version from the source following the instruction on https://github.com/chaoszhang/ASTER"
         )
-    logging.info("Run ASTRAL to resolve consensus among multiple trees")
+    logging.info("Run ASTRAL to resolve consensus among multiple trees.")
     temp = StringIO()
     Phylo.write(trees, temp, "newick")
     temp.seek(0)
@@ -370,6 +373,7 @@ def phylotree(inputs, input_dir, output, method, figure, concat, top_n_toverr, t
     """
     module_start = time.monotonic()
 
+    logging.info(f"Algorithm choose for tree building: {phyling.config.avail_tree_methods[method]}.")
     if input_dir:
         inputs = [file for file in Path(input_dir).glob(f"*.{phyling.config.aln_ext}")]
     else:
@@ -383,7 +387,7 @@ def phylotree(inputs, input_dir, output, method, figure, concat, top_n_toverr, t
         else:
             input_dir = input_dir.pop()
 
-    logging.info(f"Found {len(inputs)} MSA fasta")
+    logging.info(f"Found {len(inputs)} MSA fasta.")
 
     input_dir = Path(input_dir)
 
@@ -420,6 +424,7 @@ def phylotree(inputs, input_dir, output, method, figure, concat, top_n_toverr, t
     if figure:
         fig, ax = plt.subplots(figsize=(20, 12))
         output_fig = output / f"{method}_tree.png"
+        logging.info(f"Output figure to {output_fig}")
         Phylo.draw(final_tree, axes=ax)
         fig.savefig(output_fig)
 
