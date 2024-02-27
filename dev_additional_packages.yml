@@ -1,0 +1,7 @@
+name: phyling
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - pre-commit>=3.4.0
