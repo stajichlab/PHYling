@@ -272,6 +272,11 @@ class msa_generator:
 
         # Replace the InputSeqs objects with the scanned ones if the md5sum are the same
         for sample in tuple(set(self._inputs).intersection(set(prev_inputs))):
+            if self._inputs[sample].seqtype != prev_inputs[sample].seqtype:
+                logging.warning(
+                    f"Sample seqtypes are different. Current: {self._inputs[sample].seqtype}; previous {prev_inputs[sample].seqtype}"
+                )
+                sys.exit()
             if self._inputs[sample].md5 != prev_inputs[sample].md5:
                 logging.info(f"Sample {self._inputs[sample]} has changes in its fasta file. Redo hmmsearch.")
             else:
@@ -605,10 +610,6 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
     if old_mfa and not from_checkpoint:
         logging.warning(f"Output directory {output} is not empty and from_checkpoint option is not enabled. Aborted.")
         sys.exit(1)
-    else:
-        for file in old_mfa:
-            logging.info("Remove previous alignment files and update the alignment with current parameters.")
-            file.unlink()
 
     if method == "muscle" and not shutil.which("muscle"):
         raise phyling.BinaryNotFoundError(
@@ -629,6 +630,9 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
     msa = msa_generator(inputs)
     if from_checkpoint:
         msa.load_checkpoint(output / ".checkpoint.pkl")
+        logging.info("Remove previous alignment files and update the alignment with current parameters.")
+        for file in old_mfa:
+            file.unlink()
     msa.search(markerset, evalue=evalue, threads=threads)
     msa.save_checkpoint(output=output)
     msa.filter_orthologs()
