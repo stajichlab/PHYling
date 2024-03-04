@@ -26,7 +26,7 @@ class TestFastaConcat:
         self.__class__.inputs = list(Path("tests/pep_align").iterdir())
         for file in self.inputs:
             alignment = AlignIO.read(file, format="fasta")
-            alignment.annotations["seqtype"] = "peptide"
+            alignment.annotations["model"] = "AUTO"
             alignment.annotations["seqname"] = file.name
             alignmentList.append(alignment)
         self.__class__.concat_alignments = concatenate_fasta(samples, alignmentList, threads=1)

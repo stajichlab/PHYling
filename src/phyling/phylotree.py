@@ -257,7 +257,8 @@ def mfa_to_finaltree(
         alignmentList = []
         for file in inputs:
             alignment = AlignIO.read(file, format="fasta")
-            alignment.annotations["seqtype"] = seqtype
+            # Assign model for raxml/iqtree compatible partition file
+            alignment.annotations["model"] = "DNA" if seqtype == "DNA" else "AUTO"
             alignment.annotations["seqname"] = file.name
             alignmentList.append(alignment)
         concat_alignments = concatenate_fasta(samples, alignmentList, threads=threads)
@@ -311,10 +312,10 @@ def concatenate_fasta(taxonList: list, alignmentList: list[MultipleSeqAlignment]
     for alignment in alignmentList:
         start = end + 1
         end += alignment.get_alignment_length()
-        if "seqtype" in alignment.annotations:
-            partition_info.append(f'{alignment.annotations["seqtype"]}, {alignment.annotations["seqname"]}={start}-{end}')
+        if "model" in alignment.annotations:
+            partition_info.append(f'{alignment.annotations["model"]}, {alignment.annotations["seqname"]}={start}-{end}')
         concat_alignments += alignment
-    if "seqtype" in alignment.annotations:
+    if "model" in alignment.annotations:
         concat_alignments.annotations["partition"] = partition_info
     for seq in concat_alignments:
         seq.description = ""
