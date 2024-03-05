@@ -244,6 +244,11 @@ def mfa_to_finaltree(
             inputs = tree_generator_obj.get_mfa(n=top_n_toverr)
             toverrs = tree_generator_obj.get_toverr(n=top_n_toverr)
             logging.debug(f"Treeness estimation and filtering was finished in {phyling.config.runtime(func_start)}.")
+            # Symlink to seletced MSAs
+            selected_msas_dir = output / "seleced_MSAs"
+            selected_msas_dir.mkdir(exist_ok=True)
+            for file in inputs:
+                (selected_msas_dir / file.name).symlink_to(file.absolute())
             # Output the name of the selected MSA
             output_selected_trees = output / "top_toverr_trees.tsv"
             with open(output_selected_trees, "w") as f:
