@@ -145,6 +145,7 @@ def parser_submodule(parser, parent_parser) -> None:
         "--inputs",
         metavar=("file", "files"),
         nargs="+",
+        type=Path,
         help="Multiple sequence alignment fasta of the markers",
     )
     input_type.add_argument(
@@ -166,7 +167,7 @@ def parser_submodule(parser, parent_parser) -> None:
         "-M",
         "--method",
         choices=phyling.config.avail_tree_methods.keys(),
-        default="upgma",
+        default="ft",
         help="Algorithm used for tree building. (default: %(default)s)\n"
         + "Available options:\n"
         + "\n".join(f"{value}: {key}" for key, value in phyling.config.avail_tree_methods.items()),
@@ -184,6 +185,13 @@ def parser_submodule(parser, parent_parser) -> None:
         "--concat",
         action="store_true",
         help="Concatenated alignment results",
+    )
+    p_tree.add_argument(
+        "-p",
+        "--partition",
+        choices=["seq", "codon", "seq+codon"],
+        help="Create a partition file by sequence or by codon position when --concat enabled. "
+        + '"codon" and "seq+codon" only work when inputs are DNA sequences',
     )
     p_tree.add_argument("-f", "--figure", action="store_true", help="Generate a matplotlib tree figure")
     p_tree.add_argument(

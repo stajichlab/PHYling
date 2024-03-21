@@ -258,7 +258,7 @@ class msa_generator:
 
     def load_checkpoint(self, checkpoint: Path):
         """
-        Load the checkpoint.pkl as intermediate to prevent redoing hmmsearch when adding new samples.
+        Load the checkpoint as intermediate to prevent redoing hmmsearch when adding new samples.
 
         This should be run before search.
         """
@@ -267,7 +267,8 @@ class msa_generator:
                 prev_inputs, self.orthologs = pickle.load(f)
         except FileNotFoundError:
             logging.error(
-                'Checkpoint file ".checkpoint.pkl" not found. Please rerun the align module again without --from_checkpoint.'
+                f'Checkpoint file "{phyling.config.libphyling_checkpoint}" not found. '
+                "Please rerun the align module again without --from_checkpoint."
             )
 
         # Replace the InputSeqs objects with the scanned ones if the md5sum are the same
@@ -361,7 +362,7 @@ class msa_generator:
         if not hasattr(self, "orthologs"):
             raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully.")
 
-        checkpoint = output / ".checkpoint.pkl"
+        checkpoint = output / phyling.config.libphyling_checkpoint
         with open(checkpoint, "wb") as f:
             pickle.dump((self._inputs, self.orthologs), f)
 
@@ -370,8 +371,8 @@ class msa_generator:
         if not hasattr(self, "orthologs"):
             raise AttributeError("No orthologs dictionary found. Please make sure the search function was run successfully.")
 
-        self.orthologs = dict(filter(lambda item: len(item[1]) >= 3, self.orthologs.items()))
-        logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 3 samples.")
+        self.orthologs = dict(filter(lambda item: len(item[1]) >= 4, self.orthologs.items()))
+        logging.info(f"Found {len(self.orthologs)} orthologs shared among at least 4 samples.")
 
         if not self.orthologs:
             logging.error(
@@ -579,11 +580,11 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
     Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
 
     Initially, hmmsearch is used to match the samples against a given markerset and report the top hit of each sample
-    for each hmm marker, representing "orthologs" across all samples. In order to build a tree, minimum of 3 samples
+    for each hmm marker, representing "orthologs" across all samples. In order to build a tree, minimum of 4 samples
     should be used. If the bitscore cutoff file is present in the hmms folder, it will be used as the cutoff. Otherwise,
     an evalue of 1e-10 will be used as the default cutoff.
 
-    Sequences corresponding to orthologs found in more than 3 samples are extracted from each input. These sequences
+    Sequences corresponding to orthologs found in more than 4 samples are extracted from each input. These sequences
     then undergo MSA with hmmalign or muscle. The resulting alignments are further trimmed using clipkit by default.
     You can use the --non_trim option to skip the trimming step. Finally, The alignment results are output separately
     for each hmm marker.
@@ -598,9 +599,9 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
         inputs = list(Path(input_dir).iterdir())
     else:
         inputs = [Path(sample) for sample in inputs]
-    # Check input files, terminate if less than 3 files
-    if len(inputs) < 3:
-        logging.error("Should have at least 3 input files.")
+    # Check input files, terminate if less than 4 files
+    if len(inputs) < 4:
+        logging.error("Should have at least 4 input files.")
         sys.exit(1)
 
     output = Path(output)
@@ -608,7 +609,7 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
     # Check if output dir is empty
     old_mfa = [file for file in Path(output).glob(f"*.{phyling.config.aln_ext}")]
     if old_mfa and not from_checkpoint:
-        logging.warning(f"Output directory {output} is not empty and from_checkpoint option is not enabled. Aborted.")
+        logging.error(f"Output directory {output} is not empty and from_checkpoint option is not enabled. Aborted.")
         sys.exit(1)
 
     if method == "muscle" and not shutil.which("muscle"):
@@ -629,7 +630,7 @@ def main(inputs, input_dir, output, markerset, evalue, method, non_trim, from_ch
 
     msa = msa_generator(inputs)
     if from_checkpoint:
-        msa.load_checkpoint(output / ".checkpoint.pkl")
+        msa.load_checkpoint(output / phyling.config.libphyling_checkpoint)
         logging.info("Remove previous alignment files and update the alignment with current parameters.")
         for file in old_mfa:
             file.unlink()
