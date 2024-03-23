@@ -198,8 +198,8 @@ class InputSeqs:
         seqblock = pyhmmer.easel.SequenceFile(self._input, digital=True).read_block()
 
         if seqblock.alphabet.is_amino():
-            self._seqtype = "peptide"
-            logging.debug(f"{self.basename} is peptide sequences.")
+            self._seqtype = phyling.config.seqtype_pep
+            logging.info(f"{self.basename} is {self._seqtype} sequences.")
             self._pep_seqs = DigitalSequenceBlock(pyhmmer.easel.Alphabet.amino(), [])
             for seq in seqblock:
                 seq.description = self.sample.encode()
@@ -207,8 +207,8 @@ class InputSeqs:
                 self._kh.add(seq.name)
 
         elif seqblock.alphabet.is_dna():
-            self._seqtype = "DNA"
-            logging.info(f"{self.basename} is DNA sequences.")
+            self._seqtype = phyling.config.seqtype_dna
+            logging.info(f"{self.basename} is {self._seqtype} sequences.")
             self._cds_translation(seqblock)
 
         else:
@@ -404,7 +404,7 @@ class msa_generator:
             logging.info("Peptide MSA done.")
             logging.debug(f"MSA with {method} was finished in {phyling.config.runtime(func_start)}.")
 
-            if self._seqtype == "DNA":
+            if self._seqtype == phyling.config.seqtype_dna:
                 logging.info("cds found. Processing cds sequences...")
                 func_start = time.monotonic()
                 cds_seqs_stream = pool.starmap(self._get_ortholog_seqs, [(hits, "cds") for hits in self.orthologs.values()])
@@ -417,7 +417,7 @@ class msa_generator:
 
             if not non_trim:
                 func_start = time.monotonic()
-                if self._seqtype == "DNA":
+                if self._seqtype == phyling.config.seqtype_dna:
                     cds_msa_List = pool.starmap(trim_gaps, zip(pep_msa_List, cds_msa_List))
                 else:
                     pep_msa_List = pool.map(trim_gaps, pep_msa_List)
@@ -425,14 +425,14 @@ class msa_generator:
                 logging.debug(f"Trimming was finished in {phyling.config.runtime(func_start)}.")
 
         self.pep_msa_List = pep_msa_List
-        if self._seqtype == "DNA":
+        if self._seqtype == phyling.config.seqtype_dna:
             self.cds_msa_List = cds_msa_List
 
     def output_msa(self, output: Path) -> None:
         """Output each MSA results in separate files."""
         if not hasattr(self, "pep_msa_List"):
             raise AttributeError("No pep_msa_list found. Please make sure the align function was run successfully.")
-        if self._seqtype == "DNA":
+        if self._seqtype == phyling.config.seqtype_dna:
             alignmentList = self.cds_msa_List
             ext = phyling.config.cds_aln_ext
         else:

@@ -42,7 +42,7 @@ class MFA2Tree:
         self._mfa = mfa
         if partition:
             self._partition = partition
-        supported_seqtype = ["peptide", "DNA"]
+        supported_seqtype = (phyling.config.seqtype_pep, phyling.config.seqtype_dna)
         if seqtype not in supported_seqtype:
             raise KeyError(f'argument "seqtype" not falls in {supported_seqtype}')
         self._seqtype = seqtype
@@ -98,7 +98,7 @@ class MFA2Tree:
 
     def _with_VeryFastTree(self, threads: int) -> Phylo.BaseTree.Tree:
         """Run the tree calculation using VeryFastTree."""
-        if self._seqtype == "DNA":
+        if self._seqtype == phyling.config.seqtype_dna:
             cmd = ["VeryFastTree", "-nt", "-gamma", "-threads", str(threads), self._mfa]
         else:
             cmd = ["VeryFastTree", "-lg", "-gamma", "-threads", str(threads), self._mfa]
@@ -131,7 +131,7 @@ class MFA2Tree:
             )
 
         cmd = [fasttree, "-gamma", str(self._mfa)]
-        if self._seqtype == "DNA":
+        if self._seqtype == phyling.config.seqtype_dna:
             cmd.insert(1, "-nt")
         else:
             cmd.insert(1, "-lg")
@@ -188,7 +188,7 @@ class MFA2Tree:
             "-w",
             str((output_raxml).absolute()),
         ]
-        if self._seqtype == "DNA":
+        if self._seqtype == phyling.config.seqtype_dna:
             seqtype = "cds"
             cmd.extend(["-m", "GTRCAT", "-n", seqtype])
         else:
@@ -267,16 +267,23 @@ class MFA2Tree:
             stderr=subprocess.PIPE,
             text=True,
         )
-        _, err = p.communicate()
-        if err:
+        stdout, stderr = p.communicate()
+        if stderr:
             print(str(self._mfa))
-            print(err)
+            print(stderr)
+            sys.exit(1)
+
+        try:
+            tree = Phylo.read(output_iqtree / "iqtree.treefile", "newick")
+        except FileNotFoundError:
+            print(str(self._mfa))
+            print(stdout)
             sys.exit(1)
 
         if output is None:
             shutil.rmtree(tempdir)
 
-        return Phylo.read(output_iqtree / "iqtree.treefile", "newick")
+        return tree
 
 
 class SingleTreeGenerator:
@@ -382,7 +389,7 @@ class TreesGenerator(SingleTreeGenerator):
         for mfa in mfas:
             alignment = AlignIO.read(mfa, format="fasta")
             # Assign model for raxml/iqtree compatible partition file
-            alignment.annotations["model"] = "DNA" if self._seqtype == "DNA" else "AUTO"
+            alignment.annotations["model"] = "DNA" if self._seqtype == phyling.config.seqtype_dna else "AUTO"
             alignment.annotations["seqname"] = mfa.name
             alignmentList.append(alignment)
         # Sort by MSA length, since shorter MSA might have higher chances to have missing states
@@ -470,7 +477,7 @@ class TreesGenerator(SingleTreeGenerator):
             if n == 0:
                 logging.debug("By default use all trees.")
             else:
-                logging.debug("Argument --top_n_toverr/-n is larger the existing trees. Use all trees.")
+                logging.debug("Argument --top_n_toverr/-n is more than available mfas. Use all mfas.")
             n = len(self._mfa2tree_obj_list)
         return n
 
@@ -570,12 +577,12 @@ class TreesGenerator(SingleTreeGenerator):
 
     def _output_concat_file(self, output: Path, concat_alignments: MultipleSeqAlignment) -> tuple[Path, Path]:
         """Output the concatenated fasta and partition file."""
-        concat_file = output / f"concat_alignments.{phyling.config.aln_ext}"
+        concat_file = output / f"{phyling.config.concat_file_basename}.{phyling.config.aln_ext}"
         with open(concat_file, "w") as f:
             SeqIO.write(concat_alignments, f, format="fasta")
             logging.info(f"Concatenated fasta is output to {concat_file}")
         if "partition" in concat_alignments.annotations:
-            partition_file = output / f"concat_alignments.{phyling.config.partition_ext}"
+            partition_file = output / f"{phyling.config.concat_file_basename}.{phyling.config.partition_ext}"
             with open(partition_file, "w") as f:
                 [print(line, file=f) for line in concat_alignments.annotations["partition"]]
             logging.info(f"Partition file is output to {partition_file}")
@@ -593,14 +600,12 @@ def mfa_to_finaltree(
     samples: list,
     concat: bool = False,
     top_n_toverr: int = 50,
-    partition: str = None,
+    partition: str | None = None,
     threads: int = 1,
     rerun: int = 0,
-) -> Phylo.BaseTree.Tree:
+) -> tuple[Phylo.BaseTree.Tree, TreesGenerator]:
     """Pipeline that generate the final single tree (by either concatenate or consensus methods) from MFAs."""
     logging.info("Generate phylogenetic tree on MSA fasta.")
-    selected_msas_dir = output / phyling.config.selected_msas
-    treeness_tsv = output / "treeness.tsv"
 
     if rerun == 0:
         tree_generator_obj = TreesGenerator(*inputs, seqtype=seqtype)
@@ -621,6 +626,7 @@ def mfa_to_finaltree(
     if rerun <= 1:
         # Output treeness.tsv
         toverrs = tree_generator_obj.get_toverr(n=top_n_toverr)
+        treeness_tsv = output / phyling.config.treeness_file
         with open(treeness_tsv, "w") as f:
             for input, toverr in zip(inputs, toverrs):
                 print(input, toverr, sep="\t", file=f)
@@ -628,6 +634,7 @@ def mfa_to_finaltree(
 
         # Symlink to seletced MSAs
         inputs = tree_generator_obj.get_mfa(n=top_n_toverr)
+        selected_msas_dir = output / phyling.config.selected_msas_dir
         selected_msas_dir.mkdir(exist_ok=True)
         for file in inputs:
             (selected_msas_dir / file.name).symlink_to(file.absolute())
@@ -638,7 +645,8 @@ def mfa_to_finaltree(
         logging.info("Only one MSA is selected. Report the tree directly.")
         return tree_generator_obj.get_tree(n=top_n_toverr)
     else:
-        logging.info(f"Use the MSAs which the treeness are within the top {top_n_toverr} for final tree building.")
+        corrected_top_n = len(tree_generator_obj.get_tree(n=top_n_toverr))
+        logging.info(f"Use the MSAs which the treeness are among the top {corrected_top_n} for final tree building.")
 
     if concat:
         if rerun <= 2:
@@ -646,8 +654,14 @@ def mfa_to_finaltree(
                 output=output, taxonList=samples, n=top_n_toverr, partition=partition, threads=threads
             )
         else:
-            partition_file = output / "concat_alignments.partition" if partition else None
-            concat_tree_obj = SingleTreeGenerator(output / "concat_alignments.mfa", partition=partition_file, seqtype=seqtype)
+            partition_file = (
+                output / f"{phyling.config.concat_file_basename}.{phyling.config.partition_ext}" if partition else None
+            )
+            concat_tree_obj = SingleTreeGenerator(
+                output / f"{phyling.config.concat_file_basename}.{phyling.config.aln_ext}",
+                partition=partition_file,
+                seqtype=seqtype,
+            )
     else:
         if partition:
             logging.warning("Concatenate option disabled. No partition file will be created.")
@@ -718,9 +732,9 @@ def _determine_samples_and_seqtype(inputs: list[Path], inputs_dir: Path | None) 
     if "-" in chars:
         chars.remove("-")
     if len(chars) <= 4 and chars.issubset(set(NCBICodonTableDNA.nucleotide_alphabet)):
-        seqtype = "DNA"
+        seqtype = phyling.config.seqtype_dna
     elif chars.issubset(set(NCBICodonTable.protein_alphabet)):
-        seqtype = "peptide"
+        seqtype = phyling.config.seqtype_pep
     else:
         logging.error("Cannot determine seqtype. Aborted.")
         sys.exit(1)
@@ -750,8 +764,8 @@ def _output_precheck(output: Path, params: dict) -> int:
     else:
         if output.is_dir():
             if (output / phyling.config.phylotree_checkpoint).exists():
-                old_mfas = [file for file in (output / phyling.config.selected_msas).glob(f"*.{phyling.config.aln_ext}")]
-                params[f"{phyling.config.selected_msas}_md5sum"] = _multiple_files_md5sum(*old_mfas)
+                old_mfas = [file for file in (output / phyling.config.selected_msas_dir).glob(f"*.{phyling.config.aln_ext}")]
+                params[f"{phyling.config.selected_msas_dir}_md5sum"] = _multiple_files_md5sum(*old_mfas)
                 old_params, _ = _load_phylotree_ckp(output)
                 diff_params = {param[0] for param in set(params.items()) ^ set(old_params.items())}
                 logging.info("Load previous parameters from checkpoint to determine the rerun status.")
@@ -768,25 +782,42 @@ def _output_precheck(output: Path, params: dict) -> int:
                         logging.info("Rerun all. Remove all previous files.")
                         [shutil.rmtree(x) for x in output.iterdir() if x.is_dir()]
                         [x.unlink(missing_ok=True) for x in output.iterdir() if x.is_file()]
-                    elif any(param in (f"{phyling.config.selected_msas}_md5sum", "top_n_toverr") for param in diff_params):
+                    elif any(param in (f"{phyling.config.selected_msas_dir}_md5sum", "top_n_toverr") for param in diff_params):
                         rerun = 1
                         logging.info("Rerun treeness/RCV filtering.")
                         [shutil.rmtree(x) for x in output.iterdir() if x.is_dir()]
-                        [x.unlink(missing_ok=True) for x in output.iterdir() if x.is_file() and x.name != ".tree.ckp"]
-                    elif "partition" in diff_params:
-                        rerun = 2
-                        logging.info("Rerun concatenate step.")
-                        [shutil.rmtree(x) for x in Path(output).iterdir() if x.is_dir() and x.name != "selected_MSAs"]
                         [
                             x.unlink(missing_ok=True)
                             for x in output.iterdir()
-                            if x.is_file() and x.name not in ("treeness.tsv", ".tree.ckp")
+                            if x.is_file() and x.name != phyling.config.phylotree_checkpoint
+                        ]
+                    elif "partition" in diff_params:
+                        rerun = 2
+                        logging.info("Rerun concatenate step.")
+                        [
+                            shutil.rmtree(x)
+                            for x in Path(output).iterdir()
+                            if x.is_dir() and x.name != phyling.config.selected_msas_dir
+                        ]
+                        [
+                            x.unlink(missing_ok=True)
+                            for x in output.iterdir()
+                            if x.is_file() and x.name not in (phyling.config.treeness_file, phyling.config.phylotree_checkpoint)
                         ]
                     elif "method" in diff_params:
                         logging.info("Rerun final tree building step.")
                         rerun = 3
-                        [shutil.rmtree(x) for x in Path(output).iterdir() if x.is_dir() and x.name != "selected_MSAs"]
-                        (output / "final_tree.nw").unlink(missing_ok=True)
+                        [
+                            shutil.rmtree(x)
+                            for x in Path(output).iterdir()
+                            if x.is_dir() and x.name != phyling.config.selected_msas_dir
+                        ]
+                        (output / phyling.config.final_tree_file).unlink(missing_ok=True)
+                else:
+                    rerun = 0
+                    logging.info("Rerun all. Remove all previous files.")
+                    [shutil.rmtree(x) for x in output.iterdir() if x.is_dir()]
+                    [x.unlink(missing_ok=True) for x in output.iterdir() if x.is_file()]
             elif any(output.iterdir()):
                 logging.error(f"Checkpoint file not found but the output directory {output} is not empty. Aborted.")
                 sys.exit(1)
@@ -842,13 +873,13 @@ def phylotree(inputs, input_dir, output, method, top_n_toverr, concat, partition
         rerun=rerun,
     )
 
-    selected_msas = [file for file in (output / phyling.config.selected_msas).glob(f"*.{phyling.config.aln_ext}")]
-    params[f"{phyling.config.selected_msas}_md5sum"] = _multiple_files_md5sum(*selected_msas)
+    selected_msas = [file for file in (output / phyling.config.selected_msas_dir).glob(f"*.{phyling.config.aln_ext}")]
+    params[f"{phyling.config.selected_msas_dir}_md5sum"] = _multiple_files_md5sum(*selected_msas)
     _save_phylotree_ckp(output, params, tree_generator_obj)
 
     Phylo.draw_ascii(final_tree)
 
-    output_tree = output / "final_tree.nw"
+    output_tree = output / phyling.config.final_tree_file
     logging.info(f"Output tree to {output_tree}")
     with open(output_tree, "w") as f:
         if concat:

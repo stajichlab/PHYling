@@ -16,18 +16,26 @@ def runtime(start_time: float):
     return msg
 
 
+# download
 database = "https://busco-data.ezlab.org/v5/data"
 cfg_dir = Path.home() / ".phyling"
 default_HMM = "HMM"  # default directory for HMM downloads
-libphyling_checkpoint = ".align.ckp"
-phylotree_checkpoint = ".tree.ckp"
 
-prot_aln_ext = "aa.mfa"  # protein alignment extension
-cds_aln_ext = "cds.mfa"  # cds alignment extension
+# libphyling
+seqtype_dna = "DNA"
+seqtype_pep = "peptide"
+libphyling_checkpoint = ".align.ckp"
 protein_ext = "faa"  # protein fasta files
 cds_ext = "cds"  # coding sequence alignment file extension
 aln_ext = "mfa"  # general alignment extension
-partition_ext = "partition"  # RAxML supported partition file extension
+prot_aln_ext = f"aa.{aln_ext}"  # protein alignment extension
+cds_aln_ext = f"cds.{aln_ext}"  # cds alignment extension
 
-selected_msas = "selected_MSAs"
+# phylotree
+phylotree_checkpoint = ".tree.ckp"
 avail_tree_methods = {"ft": "FastTree", "raxml": "RAxML", "iqtree": "IQTree"}
+selected_msas_dir = "selected_MSAs"
+treeness_file = "treeness.tsv"
+final_tree_file = "final_tree.nw"
+concat_file_basename = "concat_alignments"
+partition_ext = "partition"  # RAxML supported partition file extension

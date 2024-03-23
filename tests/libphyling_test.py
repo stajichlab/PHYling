@@ -18,23 +18,23 @@ class TestMSAGenerator:
     def test_filter_orthologs_with_orthologs(self, msa_instance):
         # Simulate having orthologs in the instance
         msa_instance.orthologs = {
-            "hmm_1": {"species_1_gene_100", "species_2_gene_211", "species_3_gene_311", "species_4_gene_414"},
-            "hmm_2": {"species_1_gene_105", "species_2_gene_223", "species_3_gene_323"},
-            "hmm_3": {"species_1_gene_155", "species_2_gene_253", "species_4_gene_432"},
-            "hmm_4": {"species_3_gene_344", "species_4_gene_466"},
+            "hmm_1": {"species_1_gene_100", "species_2_gene_211", "species_3_gene_311", "species_4_gene_414", "species_5_gene_219"},
+            "hmm_2": {"species_1_gene_105", "species_2_gene_223", "species_3_gene_323", "species_5_gene_558"},
+            "hmm_3": {"species_1_gene_155", "species_2_gene_253", "species_4_gene_432", "species_6_gene_338"},
+            "hmm_4": {"species_3_gene_344", "species_4_gene_466", "species_6_gene_212"},
         }
         msa_instance.filter_orthologs()
         assert len(msa_instance.orthologs) == 3
         assert "hmm_4" not in msa_instance.orthologs
-        assert len(msa_instance.orthologs["hmm_1"]) == 4  # Number of samples
+        assert len(msa_instance.orthologs["hmm_1"]) == 5  # Number of samples
 
     def test_filter_orthologs_with_insufficient_orthologs(self, msa_instance):
         # Simulate having small orthologs in the instance
         msa_instance.orthologs = {
-            "hmm_1": {"species_1_gene_100", "species_2_gene_211"},
-            "hmm_2": {"species_1_gene_105", "species_2_gene_223"},
-            "hmm_3": {"species_1_gene_155", "species_2_gene_253"},
-            "hmm_4": {"species_3_gene_344", "species_4_gene_466"},
+            "hmm_1": {"species_1_gene_100", "species_2_gene_211", "species_3_gene_311"},
+            "hmm_2": {"species_1_gene_105", "species_2_gene_223", "species_3_gene_323"},
+            "hmm_3": {"species_1_gene_155", "species_2_gene_253", "species_4_gene_432"},
+            "hmm_4": {"species_3_gene_344", "species_4_gene_466", "species_6_gene_212"},
         }
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             msa_instance.filter_orthologs()
