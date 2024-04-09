@@ -16,8 +16,7 @@ except ImportError:
 
 import phyling.config
 from phyling.download import download
-from phyling.libphyling import main as search_align
-from phyling.phylotree import phylotree
+from phyling.pipeline import align, tree
 
 
 class _CustomHelpFormatter(argparse.HelpFormatter):
@@ -43,7 +42,7 @@ class _CustomHelpFormatter(argparse.HelpFormatter):
         return help
 
 
-def parser_submodule(parser, parent_parser) -> None:
+def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.ArgumentParser) -> None:
     """Parser for command line inputs."""
     subparsers = parser.add_subparsers()
 
@@ -64,7 +63,7 @@ def parser_submodule(parser, parent_parser) -> None:
         parents=[parent_parser],
         formatter_class=_CustomHelpFormatter,
         help="Run multiple sequence alignments against orthologs found among samples",
-        description=search_align.__doc__,
+        description=align.__doc__,
     )
     input_type = p_aln.add_mutually_exclusive_group(required=True)
     input_type.add_argument(
@@ -118,11 +117,6 @@ def parser_submodule(parser, parent_parser) -> None:
         help="Report non-trimmed alignment results",
     )
     p_aln.add_argument(
-        "--from_checkpoint",
-        action="store_true",
-        help="Load previous hmmsearch results from .checkpoint.pkl in the output directory",
-    )
-    p_aln.add_argument(
         "-t",
         "--threads",
         type=int,
@@ -130,14 +124,14 @@ def parser_submodule(parser, parent_parser) -> None:
         help="Threads for hmmsearch and the number of parallelized jobs in MSA step. "
         + "Better be multiple of 4 if using more than 8 threads",
     )
-    p_aln.set_defaults(func=search_align)
+    p_aln.set_defaults(func=align)
 
     p_tree = subparsers.add_parser(
         "tree",
         parents=[parent_parser],
         formatter_class=_CustomHelpFormatter,
         help="Build a phylogenetic tree based on multiple sequence alignment results",
-        description=phylotree.__doc__,
+        description=tree.__doc__,
     )
     input_type = p_tree.add_mutually_exclusive_group(required=True)
     input_type.add_argument(
@@ -201,7 +195,7 @@ def parser_submodule(parser, parent_parser) -> None:
         default=1,
         help="Threads for tree construction",
     )
-    p_tree.set_defaults(func=phylotree)
+    p_tree.set_defaults(func=tree)
 
 
 def main():
