@@ -10,7 +10,7 @@ def get_file_checksum(file: str | Path) -> int:
     """Compute the crc checksum of a file."""
     file = Path(file)
     if not file.exists():
-        raise FileNotFoundError(file)
+        raise FileNotFoundError(f"{file} not found.")
     crc = 0
     with open(file, "rb") as f:
         crc += crc32(f.read())

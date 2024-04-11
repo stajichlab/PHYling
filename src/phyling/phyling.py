@@ -9,14 +9,9 @@ import textwrap
 import time
 from pathlib import Path
 
-try:
-    from importlib.metadata import version
-except ImportError:
-    from importlib_metadata import version
-
 import phyling.config
-from phyling.download import download
-from phyling.pipeline import align, tree
+from phyling import __name__, __version__
+from phyling.pipeline import align, download, tree
 
 
 class _CustomHelpFormatter(argparse.HelpFormatter):
@@ -206,11 +201,14 @@ def main():
     from BUSCO. The align module is the core element of this package which generate multiple sequence alignment among
     the orthologs found across samples. The tree module help to build a phylogenetic tree.
     """
-    logging.basicConfig(format=f"%(asctime)s {main.__name__} %(levelname)s %(message)s", level="INFO", force=True)
-    logger = logging.getLogger()
+    epilog = """
+    Written by Jason Stajich (jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com).
+    Rewritten by Cheng-Hung Tsai (chenghung.tsai[at]email.ucr.edu).
 
-    # Create config folder in $HOME/.phyling
-    phyling.config.cfg_dir.mkdir(exist_ok=True)
+    Initially written https://github.com/1KFG/Phylogenomics and https://github.com/stajichlab/phyling.
+    """
+    logging.basicConfig(format=f"%(asctime)s {__name__} %(levelname)s %(message)s", level="INFO", force=True)
+    logger = logging.getLogger()
 
     # Implement shared arguments between sub-menu, reference from
     # https://stackoverflow.com/questions/33645859/how-to-add-common-arguments-to-argparse-subcommands
@@ -221,13 +219,13 @@ def main():
 
     # The real parser for user
     parser = argparse.ArgumentParser(
-        prog=main.__name__,
+        prog=__name__,
         formatter_class=_CustomHelpFormatter,
         description=main.__doc__,
-        epilog=main._epilog,
+        epilog=epilog,
     )
 
-    parser.add_argument("-V", "--version", action="version", version=version("phyling"))
+    parser.add_argument("-V", "--version", action="version", version=__version__)
 
     parser_submodule(parser, parent_parser)
 
@@ -245,14 +243,6 @@ def main():
     logging.debug(args)
     args.func(**vars(args))
 
-
-main.__name__ = "PHYling"
-main._epilog = """
-Written by Jason Stajich (jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com).
-Rewritten by Cheng-Hung Tsai (chenghung.tsai[at]email.ucr.edu).
-
-Initially written https://github.com/1KFG/Phylogenomics and https://github.com/stajichlab/phyling.
-"""
 
 if __name__ == "__main__":
     main()

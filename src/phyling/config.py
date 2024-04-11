@@ -15,6 +15,7 @@ cds_aln_ext = f"cds.{aln_ext}"  # cds alignment extension
 database = "https://busco-data.ezlab.org/v5/data"
 cfg_dir = Path.home() / ".phyling"
 default_HMM = "HMM"  # default directory for HMM downloads
+metadata = "metadata.tsv"
 
 # libphyling
 libphyling_checkpoint = ".align.ckp"

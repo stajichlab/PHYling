@@ -12,6 +12,16 @@ T = TypeVar("T")
 SFW = TypeVar("SFW", bound="SeqFileWrapperABC")
 
 
+class Data_updater(ABC):
+    """Store, update and retrieve BUSCO markers."""
+
+    def __init__(self, database_url: str, data_type: str, data: str | Path, **kwargs):
+        """Initialize database URL."""
+        self._database_url = database_url
+        self._data_type = data_type
+        self._data = Path(data)
+
+
 class SeqFileWrapperABC(ABC):
     """An abstract class for sequence files."""
 

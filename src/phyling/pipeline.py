@@ -4,16 +4,57 @@ import shutil
 import sys
 import time
 from pathlib import Path
+from urllib.error import URLError
 
 import phyling.config as config
 import phyling.exception as exception
+import phyling.libdownload as libdownload
 import phyling.libphyling as libphyling
 import phyling.phylotree as phylotree
 import phyling.utils as utils
 
 
+def download(markerset, **kwargs) -> None:
+    """
+    Help to download/update BUSCO v5 markerset to a local folder.
+
+    First it checks whether the metadata file is exist under the config folder ~/.phyling. A missing or outdated file
+    will trigger the module to download/update the metadata.
+
+    Passing "list" to markerset argument will list all the available/already downloaded markersets. Passing a valid
+    name to the markerset argument will download the markerset to the config folder ~/.phyling/HMM.
+    """
+    try:
+        with libdownload.BuscoMetadata(config.database, config.cfg_dir / config.metadata) as metadata:
+            markerset_list = metadata.online + metadata.local
+            if markerset == "list":
+                width, _ = shutil.get_terminal_size((80, 24))
+                col = width // 40
+                markerset_list = [markerset_list[x : x + col] for x in range(0, len(markerset_list), col)]
+                col_width = max(len(word) for row in markerset_list for word in row) + 3  # padding
+
+                if metadata.online:
+                    msg = "Datasets available online:"
+                    libdownload.wrapper(metadata.online, col=col, col_width=col_width, msg=msg)
+
+                if metadata.local:
+                    msg = "Datasets available on local:"
+                    libdownload.wrapper(metadata.local, col=col, col_width=col_width, msg=msg)
+            elif markerset in metadata.online:
+                metadata.download(markerset)
+            else:
+                logging.error(f'Markerset {markerset} not available. Please check it again with "list" option.')
+                sys.exit(1)
+    except URLError as e:
+        logging.error(e)
+        sys.exit(1)
+    except FileExistsError as e:
+        logging.info(e)
+    sys.exit(0)
+
+
 def align(
-    inputs: str | Path | None,
+    inputs: list[str | Path] | None,
     input_dir: str | Path | None,
     output: str | Path,
     markerset: str | Path,
@@ -22,7 +63,7 @@ def align(
     non_trim: bool = False,
     threads: int = 1,
     **kwargs,
-):
+) -> None:
     """
     Perform multiple sequence alignment (MSA) on orthologous sequences that match the hmm markers across samples.
 
@@ -102,7 +143,9 @@ def align(
 
     if not non_trim:
         msa_list = (
-            libphyling.trim(pep_msa_list, cds_msa_list) if inputs.seqtype == config.seqtype_cds else libphyling.trim(pep_msa_list)
+            libphyling.trim(pep_msa_list, cds_msa_list)
+            if inputs.seqtype == config.seqtype_cds
+            else libphyling.trim(pep_msa_list)
         )
     else:
         msa_list = cds_msa_list if inputs.seqtype == config.seqtype_cds else pep_msa_list
@@ -126,6 +169,7 @@ def align(
     precheck_obj.save_checkpoint()
 
     logging.debug(f"Align module finished in {utils.runtime(module_start)}.")
+    sys.exit(0)
 
 
 def tree(
@@ -139,7 +183,7 @@ def tree(
     figure: bool = False,
     threads: int = 1,
     **kwargs,
-):
+) -> None:
     """
     Construct a phylogenetic tree based on the results of multiple sequence alignment (MSA).
 
@@ -224,3 +268,4 @@ def tree(
     precheck_obj.output_results(tree, figure=figure)
 
     logging.debug(f"Tree module finished in {utils.runtime(module_start)}.")
+    sys.exit(0)

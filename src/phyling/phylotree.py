@@ -10,7 +10,6 @@ import logging
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 from io import StringIO
@@ -161,8 +160,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         )
         tree, err = p.communicate()
         if not tree:
-            print(err)
-            sys.exit(1)
+            raise RuntimeError(err)
         return Phylo.read(StringIO(tree), "newick")
 
     def _with_FastTree(self, verbose: bool) -> Tree:
@@ -197,8 +195,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         )
         tree, err = p.communicate()
         if not tree:
-            print(err)
-            sys.exit(1)
+            raise RuntimeError(err)
         return Phylo.read(StringIO(tree), "newick")
 
     def _with_RAxML(self, output: Path, threads: int, verbose: bool) -> Tree:
@@ -218,7 +215,9 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 break
 
         if not raxml:
-            raise exception.BinaryNotFoundError('RAxML not found. Please install it through "conda install -c bioconda raxml"')
+            raise exception.BinaryNotFoundError(
+                'RAxML not found. Please install it through "conda install -c bioconda raxml"'
+            )
 
         if output is None:
             tempdir = Path(tempfile.mkdtemp())
@@ -263,9 +262,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         try:
             tree = Phylo.read(output_raxml / f"RAxML_bestTree.{self.seqtype}", "newick")
         except FileNotFoundError:
-            print(str(self.path))
-            print(stdout)
-            sys.exit(1)
+            raise RuntimeError(f"RAxML run on {str(self.path)} failed: {stdout}")
         if output is None:
             shutil.rmtree(tempdir)
 
@@ -277,7 +274,9 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         if iqtree and verbose:
             logging.debug(f"Found IQTree at {iqtree}")
         if not iqtree:
-            raise exception.BinaryNotFoundError('IQTree not found. Please install it through "conda install -c bioconda iqtree"')
+            raise exception.BinaryNotFoundError(
+                'IQTree not found. Please install it through "conda install -c bioconda iqtree"'
+            )
 
         if output is None:
             tempdir = Path(tempfile.mkdtemp())
@@ -315,16 +314,12 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         )
         stdout, stderr = p.communicate()
         if stderr:
-            print(str(self.path))
-            print(stderr)
-            sys.exit(1)
+            raise RuntimeError(f"IQTree run on {str(self.path)} failed: {stderr}")
 
         try:
             tree = Phylo.read(output_iqtree / "iqtree.treefile", "newick")
         except FileNotFoundError:
-            print(str(self.path))
-            print(stdout)
-            sys.exit(1)
+            raise RuntimeError(f"IQTree run on {str(self.path)} success but not able to load tree from file: {stdout}")
 
         if output is None:
             shutil.rmtree(tempdir)
@@ -429,7 +424,9 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
                     self._build_helper,
                     ((mfa2tree, method, output, threads, verbose) for mfa2tree in self),
                 )
-        logging.debug(f"Tree building with {config.avail_tree_methods[method]} was finished in " f"{utils.runtime(func_start)}.")
+        logging.debug(
+            f"Tree building with {config.avail_tree_methods[method]} was finished in " f"{utils.runtime(func_start)}."
+        )
 
     def compute_toverr(self, threads: int = 1) -> None:
         """Calculate the treeness/RCV for each MFA2Tree object and sort the MFA2Tree object by the values."""
@@ -471,7 +468,9 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         logging.debug(f"Consensus tree estimation with ASTRAL was finished in {utils.runtime(func_start)}.")
         return Phylo.read(StringIO(stdout), "newick")
 
-    def concat(self, output: Path, samples: Iterable[str], partition: str | None = None, threads: int = 1) -> ConcatMFA2Tree:
+    def concat(
+        self, output: Path, samples: Iterable[str], partition: str | None = None, threads: int = 1
+    ) -> ConcatMFA2Tree:
         """Concatenate selected MSAs to a single mfa file and return the corresponding ConcatMFA2Tree object."""
         func_start = time.monotonic()
         self._single_file_check(self.concat.__name__)
@@ -505,8 +504,9 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
             alignmentList = self._concat_msa_with_missing_states(alignmentList)
             logging.info("Done.")
             if len(alignmentList) == 1:
-                logging.error("Only 1 MSA left after combining msas with missing states. Please rerun with --partition disabled.")
-                sys.exit(1)
+                raise RuntimeError(
+                    "Only 1 MSA left after combining msas with missing states. Please rerun with --partition disabled."
+                )
 
         # Concatenate
         logging.info("Concatenate selected MSAs...")
@@ -621,7 +621,9 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
                 partition_info.append(f'{model}, {alignment.annotations["seqname"]} = {start}-{end}')
             elif partition == "seq+codon":
                 for pos in range(3):
-                    partition_info.append(f'{model}, {alignment.annotations["seqname"]}_codon{pos + 1} = {start + pos}-{end}\\3')
+                    partition_info.append(
+                        f'{model}, {alignment.annotations["seqname"]}_codon{pos + 1} = {start + pos}-{end}\\3'
+                    )
         if partition == "codon":
             for pos in range(3):
                 partition_info.append(f"{model}, codon{pos + 1} = {pos + 1}-{end}\\3")
@@ -953,8 +955,7 @@ def determine_samples_and_seqtype(inputs: list[Path], inputs_dir: Path | None) -
     elif chars.issubset(set(NCBICodonTable.protein_alphabet)):
         seqtype = config.seqtype_pep
     else:
-        logging.error("Cannot determine seqtype. Aborted.")
-        sys.exit(1)
+        raise exception.SeqtypeError("Cannot determine seqtype. Aborted.")
     return tuple(samples), seqtype
 
 

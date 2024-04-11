@@ -378,7 +378,7 @@ class Orthologs(UserDict):
         sample_id, seq_id = item
         if not isinstance(sample_id, str) or not isinstance(seq_id, bytes):
             raise TypeError(
-                f'Only accepts tuple with ("{str.__qualname__}", "{bytes.__qualname__}") but got ("{type(sample_id)}", "{type(seq_id)}").'
+                f'Only accepts tuple with ("str", "bytes") but got ("{type(sample_id)}", "{type(seq_id)}").'
             )
         self.data.setdefault(key, set()).add((sample_id, seq_id))
 
@@ -424,7 +424,9 @@ class Orthologs(UserDict):
             return self._pep_seqs[key]
         elif seqtype == config.seqtype_cds:
             if not self._cds_seqs:
-                raise AttributeError("Orthologs was mapped to a SampleList with peptide seqeunces where cds is not available.")
+                raise AttributeError(
+                    "Orthologs was mapped to a SampleList with peptide seqeunces where cds is not available."
+                )
             return self._cds_seqs[key]
         else:
             raise KeyError('seqtype only accepts "pep" or "cds"')
@@ -453,8 +455,12 @@ class Orthologs(UserDict):
         """Filter the orthologs by a given min taxa number or a list contains the samples that no longer exists."""
         ortho_dict = self.data
         if droplist:
-            ortho_dict = {key: set(filter(lambda hit: hit[0] not in droplist, value)) for key, value in ortho_dict.items()}
-            logging.info(f'Remove hits corresponding to {", ".join([str(sample) for sample in droplist])} from orthologs.')
+            ortho_dict = {
+                key: set(filter(lambda hit: hit[0] not in droplist, value)) for key, value in ortho_dict.items()
+            }
+            logging.info(
+                f'Remove hits corresponding to {", ".join([str(sample) for sample in droplist])} from orthologs.'
+            )
 
         if min_taxa and ortho_dict:
             ortho_dict = dict(filter(lambda item: len(item[1]) >= min_taxa, ortho_dict.items()))
@@ -528,7 +534,9 @@ class OutputPrecheck(_abc.OutputPrecheck[SampleList | Orthologs]):
         rm_files = [x for x in self._output.iterdir() if x.is_file() if x != self._ckp]
         droplist = cur_samples.update(prev_samples)
         if droplist:
-            logging.info("Remove samples that no longer exist from the orthologs collection retrieved from the checkpoint.")
+            logging.info(
+                "Remove samples that no longer exist from the orthologs collection retrieved from the checkpoint."
+            )
             cur_orthologs = prev_orthologs.filter(droplist=droplist)
         else:
             cur_orthologs = prev_orthologs
@@ -616,12 +624,16 @@ def align(
         if method == "muscle":
             pep_msa_list = [_run_muscle(orthologs.query(hmm, config.seqtype_pep)) for hmm in orthologs.keys()]
         else:
-            pep_msa_list = [_run_hmmalign(orthologs.query(hmm, config.seqtype_pep), hmms[hmm]) for hmm in orthologs.keys()]
+            pep_msa_list = [
+                _run_hmmalign(orthologs.query(hmm, config.seqtype_pep), hmms[hmm]) for hmm in orthologs.keys()
+            ]
     else:
         logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
         with Pool(threads) as pool:
             if method == "muscle":
-                pep_msa_list = pool.map(_run_muscle, [orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
+                pep_msa_list = pool.map(
+                    _run_muscle, [orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()]
+                )
             else:
                 pep_msa_list = pool.starmap(
                     _run_hmmalign, [(orthologs.query(hmm, config.seqtype_pep), hmms[hmm]) for hmm in orthologs.keys()]
@@ -641,7 +653,9 @@ def align(
     else:
         logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
         with Pool(threads) as pool:
-            cds_seqs_list = pool.map(_to_seqrecord, [orthologs.query(hmm, config.seqtype_cds) for hmm in orthologs.keys()])
+            cds_seqs_list = pool.map(
+                _to_seqrecord, [orthologs.query(hmm, config.seqtype_cds) for hmm in orthologs.keys()]
+            )
             cds_msa_list = pool.starmap(_bp_mrtrans, zip(pep_msa_list, cds_seqs_list))
     logging.info("Done.")
     logging.debug(f"Back translation was finished in {utils.runtime(func_start)}.")
@@ -658,7 +672,9 @@ def trim(
     func_start = time.monotonic()
     if threads == 1:
         if cds_msa_list:
-            cds_msa_trimmed_list = [_trim_gaps(pep_msa, cds_msa) for pep_msa, cds_msa in zip(pep_msa_list, cds_msa_list)]
+            cds_msa_trimmed_list = [
+                _trim_gaps(pep_msa, cds_msa) for pep_msa, cds_msa in zip(pep_msa_list, cds_msa_list)
+            ]
         else:
             pep_msa_trimmed_list = [_trim_gaps(pep_msa) for pep_msa in pep_msa_list]
     else:
@@ -673,7 +689,9 @@ def trim(
     return cds_msa_trimmed_list if cds_msa_list else pep_msa_trimmed_list
 
 
-def _run_hmmsearch(hmms: HMMMarkerSet, input: SampleSeqs, evalue: float = 1e-10, threads: int = 4) -> Iterator[str, str, bytes]:
+def _run_hmmsearch(
+    hmms: HMMMarkerSet, input: SampleSeqs, evalue: float = 1e-10, threads: int = 4
+) -> Iterator[str, str, bytes]:
     """
     Run the hmmsearch process using the pyhmmer library.
 
@@ -780,7 +798,9 @@ def _bp_mrtrans(pep_msa: MultipleSeqAlignment, cds_rec: list[SeqRecord]) -> Mult
     return cds_msa
 
 
-def _trim_gaps(pep_msa: MultipleSeqAlignment, cds_msa: MultipleSeqAlignment = None, gaps: int = 0.9) -> MultipleSeqAlignment:
+def _trim_gaps(
+    pep_msa: MultipleSeqAlignment, cds_msa: MultipleSeqAlignment = None, gaps: int = 0.9
+) -> MultipleSeqAlignment:
     """Trim some regions on a MSA if the gappyness ratio (gaps/total length) is higher than the argument "gaps"."""
     if gaps > 1 or gaps < 0:
         raise ValueError('The argument "gaps" should be a float between 0 to 1.')
