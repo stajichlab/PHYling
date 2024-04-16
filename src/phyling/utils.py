@@ -1,5 +1,7 @@
 """Utilities that commonly used in different modules."""
+import logging
 import time
+from functools import wraps
 from hashlib import md5
 from pathlib import Path
 from typing import Iterable
@@ -29,13 +31,41 @@ def get_multifiles_checksum(files: Iterable[str | Path]) -> str:
     return md5(str(crcsum).encode()).hexdigest()
 
 
-def runtime(start_time: float) -> str:
-    """Measure the runtime of a process by given the start time."""
-    elapsed_sec = time.monotonic() - start_time
-    hours = int(elapsed_sec // 3600)
-    mins = int((elapsed_sec // 60) % 60)
-    secs = elapsed_sec % 60
-    msg = f"{secs:.3f} seconds"
-    msg = f"{mins} minutes " + msg if mins > 0 else msg
-    msg = f"{hours} hours " + msg if hours > 0 else msg
-    return msg
+def timing(func):
+    """A decorator to measure the elapsed time of a function."""
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        """The wrapper function that measure the elapsed time."""
+        t_start = time.monotonic()
+        result = func(*args, **kwargs)
+        t_end = time.monotonic()
+        elapsed_sec = t_end - t_start
+        hours = int(elapsed_sec // 3600)
+        mins = int((elapsed_sec // 60) % 60)
+        secs = elapsed_sec % 60
+        msg = f"{secs:.3f} seconds"
+        msg = f"{mins} minutes " + msg if mins > 0 else msg
+        msg = f"{hours} hours " + msg if hours > 0 else msg
+        logging.debug(f"{func.__module__}.{func.__name__} finished in {msg}.")
+        return result
+
+    return wrapper
+
+
+def check_cls_vars(*vars: str):
+    """A decorator to check whether a class variable is already defined before calling a class method."""
+
+    def decorator(func: callable):
+        """The actual decorator function that wraps the class method."""
+
+        def wrapper(cls: type, *args, **kwargs):
+            """The wrapper function that checks the class variable and calls the method."""
+            for var in vars:
+                if not hasattr(cls, var):
+                    raise ValueError(f'The class variable "{var}" of "{cls.__module__}.{cls.__name__}" must be set before calling this method.')
+            return func(cls, *args, **kwargs)
+
+        return wrapper
+
+    return decorator

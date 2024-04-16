@@ -7,25 +7,16 @@ from pathlib import Path
 from typing import Generic, Iterable, Iterator, TypeVar
 
 import phyling.config as config
+from phyling.utils import check_cls_vars
 
 T = TypeVar("T")
 SFW = TypeVar("SFW", bound="SeqFileWrapperABC")
 
 
-class Data_updater(ABC):
-    """Store, update and retrieve BUSCO markers."""
-
-    def __init__(self, database_url: str, data_type: str, data: str | Path, **kwargs):
-        """Initialize database URL."""
-        self._database_url = database_url
-        self._data_type = data_type
-        self._data = Path(data)
-
-
 class SeqFileWrapperABC(ABC):
     """An abstract class for sequence files."""
 
-    def __init__(self, file: str | Path, seqtype: str | None = None) -> None:
+    def __init__(self, file: str | Path, *, seqtype: str | None = None) -> None:
         """Initialize the object and check sequence type."""
         self._file = Path(file)
         if seqtype:
@@ -132,126 +123,92 @@ class DataListABC(ABC, Generic[T]):
         return tuple(data.name for data in self.data)
 
 
-class OutputPrecheck(ABC, Generic[T]):
+class OutputPrecheckABC(ABC):
     """A abstract class that provides features for input/output precheck and checkpoint loading/saving."""
 
+    folder: Path
+    ckp: str
+
+    def __new__(cls, *args, **kwargs):
+        """Prevent instantiation by raising an exception."""
+        raise NotImplementedError("This class cannot be instantiated.")
+
+    @classmethod
     @abstractmethod
-    def __init__(self, output: str | Path, param_keys: tuple[str], data: T = None) -> None:
-        """Initialize the object with Nonetype slots for parameters and data if not receiving params and samplelist."""
-        self._output = Path(output)
-        self._params = {param: None for param in param_keys}
-        self._data = data
-        self._ckp: Path  # Need to be specified in the subclass.
-        ...
+    def setup(cls, folder: Path = None, ckp: str = None) -> None:
+        """Setup the class variable."""
+        if folder is not None:
+            cls.folder = folder
+        if ckp is not None:
+            cls.ckp = ckp
+        for var in ("folder", "ckp"):
+            if getattr(cls, var, None) is None:
+                raise ValueError(f"The class variable '{var}' must be set before calling this method.")
 
-    def __str__(self) -> str:
-        """Return the string representation of the object."""
-        return str(self._output)
-
-    @property
-    def path(self) -> Path:
-        """Return the pathlib object of the file."""
-        return self._output
-
-    @property
-    def checkpoint(self) -> Path:
-        """Return the pathlib object of the checkpoint."""
-        return self._ckp
-
-    @property
-    def params(self) -> dict:
-        """Return the parameters of the current run."""
-        return self._params
-
-    @params.setter
-    def params(self, cur_params: dict) -> None:
-        """Update the current parameters by the given dictionary."""
-        for param in cur_params.keys():
-            if param not in self._params:
-                raise KeyError(f"Invalid param: {param}")
-        self._params.update(cur_params)
-
-    @property
-    def data(self) -> list[T] | T:
-        """Return the data of the current run."""
-        return self._data
-
-    @data.setter
+    @classmethod
+    @check_cls_vars("folder", "ckp")
     @abstractmethod
-    def data(self) -> None:
-        """Update the current data. Need to be further defined in subclass."""
-        ...
-
-    def precheck(self, force_rerun: bool = False) -> int:
+    def precheck(cls, params: dict, data: tuple, force_rerun: bool = False) -> tuple | None:
         """
         Check the output folder and determine the rerun status.
 
         Rerun status:
         0: rerun all
         """
-        rerun_status = 0
-        if not self._output.exists():
-            self._output.mkdir()
+        if not cls.folder.exists():
+            cls.folder.mkdir()
 
-        if not self._output.is_dir():
-            raise NotADirectoryError(f"{self._output} is already existed but not a folder. Aborted.")
+        if not cls.folder.is_dir():
+            raise NotADirectoryError(f"{cls.folder} is already existed but not a folder. Aborted.")
 
         if force_rerun:
-            shutil.rmtree(self._output)
-            self._output.mkdir()
+            shutil.rmtree(cls.folder)
+            cls.folder.mkdir()
 
-        if not any(self._output.iterdir()):
-            pass
-        elif self._ckp.exists():
-            rerun_status = self._determine_rerun(*self.load_checkpoint())
-        else:
-            raise FileExistsError(f"Checkpoint file not found but the output directory {self._output} is not empty. Aborted.")
+        if not any(cls.folder.iterdir()):
+            return None
+        elif not (cls.folder / cls.ckp).exists():
+            raise FileExistsError(f"Checkpoint file not found but the output directory {cls.folder} is not empty. Aborted.")
+        results = cls._determine_rerun((params, *data), cls.load_checkpoint())
 
-        return rerun_status
+        return results
 
-    def load_checkpoint(self) -> tuple[dict, ...]:
+    @classmethod
+    @check_cls_vars("folder", "ckp")
+    def load_checkpoint(cls) -> tuple[dict, ...]:
         """
         Load the checkpoint and retrieve the required params/data to determine the rerun status.
 
-        This should be run before precheck.
+        This should be run before output precheck.
         """
         logging.info("Loading from checkpoint...")
         try:
-            with open(self._ckp, "rb") as f:
+            with open(cls.folder / cls.ckp, "rb") as f:
                 params, *data = pickle.load(f)
+        except FileNotFoundError:
+            raise SystemExit("Checkpoint file not found.")
         except (EOFError, ValueError):
             raise SystemExit("Align module checkpoint file corrupted. Please remove the output folder and try again.")
 
         return params, *data
 
-    def save_checkpoint(self) -> None:
+    @classmethod
+    @check_cls_vars("folder", "ckp")
+    def save_checkpoint(cls, params: dict, *data) -> None:
         """Save the parameters and data as a checkpoint for rerun."""
-        if not hasattr(self, "_params"):
-            raise AttributeError("No params available for checkpoint saving.")
-        if not hasattr(self, "_data"):
-            raise AttributeError("No data available for checkpoint saving.")
-        else:
-            if type(self._data) == list:
-                if not all(self._data):
-                    raise AttributeError("One item of the data is None.")
-                data = self._data
-            else:
-                data = [self._data]
-        with open(self._ckp, "wb") as f:
-            pickle.dump((self._params, *data), f)
+        with open(cls.folder / cls.ckp, "wb") as f:
+            pickle.dump((params, *data), f)
 
+    @classmethod
+    @check_cls_vars("folder", "ckp")
     @abstractmethod
-    def _determine_rerun(self, prev_params: dict) -> int:
+    def _determine_rerun(cls, cur: tuple, prev: tuple) -> tuple:
         """
         An abstract method for the actions that need to do when found a checkpoint file in the given output folder.
 
         Need to be further defined in the subclass.
         """
-        logging.info("Get previous parameters and data and determine rerun status.")
-        if not hasattr(self, "_params"):
-            raise AttributeError(
-                f"Currernt params not found. Please specify it through {self.__name__}.params = {dict} object first."
-            )
+        ...
 
     @staticmethod
     def _remove_files(files: Iterable[Path] | None = None, dirs: Iterable[Path] | None = None) -> None:

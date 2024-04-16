@@ -2,7 +2,6 @@
 import logging
 import shutil
 import sys
-import time
 from pathlib import Path
 from urllib.error import URLError
 
@@ -14,6 +13,7 @@ import phyling.phylotree as phylotree
 import phyling.utils as utils
 
 
+@utils.timing
 def download(markerset, **kwargs) -> None:
     """
     Help to download/update BUSCO v5 markerset to a local folder.
@@ -50,13 +50,13 @@ def download(markerset, **kwargs) -> None:
         sys.exit(1)
     except FileExistsError as e:
         logging.info(e)
-    sys.exit(0)
 
 
+@utils.timing
 def align(
-    inputs: list[str | Path] | None,
-    input_dir: str | Path | None,
+    inputs: str | Path | list[str | Path],
     output: str | Path,
+    *,
     markerset: str | Path,
     evalue: float = 1e-10,
     method: str = "hmmalign",
@@ -77,21 +77,21 @@ def align(
     You can use the --non_trim option to skip the trimming step. Finally, The alignment results are output separately
     for each hmm marker.
     """
-    module_start = time.monotonic()
-
-    # If args.input_dir is used to instead of args.inputs
-    if input_dir:
-        inputs = tuple(Path(input_dir).iterdir())
-    elif inputs:
+    if isinstance(inputs, list):
         inputs = tuple(Path(sample) for sample in inputs)
     else:
-        logging.error("No input given.")
+        inputs = tuple(Path(inputs).iterdir())
+
     # Check input files, terminate if less than 4 files
     if len(inputs) < 4:
         logging.error("Should have at least 4 input files.")
         sys.exit(1)
     logging.info("Loading sequences...")
-    inputs: libphyling.SampleList = libphyling.SampleList(inputs)
+    try:
+        inputs: libphyling.SampleList = libphyling.SampleList(inputs)
+    except Exception as e:
+        logging.error(e)
+        sys.exit(1)
     logging.info(f"Found {len(inputs)} samples.")
 
     markerset = Path(markerset)
@@ -101,20 +101,32 @@ def align(
         logging.error(f"Markerset folder does not exist {markerset} - did you download BUSCO?")
         sys.exit(1)
     logging.info(f"Loading markerset from {markerset}...")
-    hmms = libphyling.HMMMarkerSet(markerset, markerset.parent / "scores_cutoff")
+    markerset: libphyling.HMMMarkerSet = libphyling.HMMMarkerSet(markerset, markerset.parent / "scores_cutoff")
+
+    if evalue > 1:
+        logging.error(f"Invalid evalue: {evalue}")
+        sys.exit(1)
+    if method not in config.avail_align_methods:
+        logging.error(f"Invalid method: {method}")
+        sys.exit(1)
+    if threads > config.avail_cpus:
+        logging.error(f"The maximum number of threads is {config.avail_cpus} but got {threads}")
+        sys.exit(1)
 
     params = {
+        "inputs": inputs.checksum,
+        "markerset": markerset.checksum,
         "evalue": evalue,
         "method": method,
         "non_trim": non_trim,
-        "inputs_checksum": inputs.checksum,
-        "hmms_checksum": hmms.checksum,
     }
 
-    precheck_obj = libphyling.OutputPrecheck(output, params=params, samplelist=inputs)
-    precheck_obj.precheck()
-    orthologs: libphyling.Orthologs
-    inputs, orthologs = precheck_obj.data
+    libphyling.OutputPrecheck.setup(folder=output)
+    try:
+        inputs, orthologs = libphyling.OutputPrecheck.precheck(params, inputs)
+    except Exception as e:
+        logging.error(e)
+        sys.exit(1)
 
     if method == "muscle" and not shutil.which("muscle"):
         logging.error(
@@ -123,7 +135,7 @@ def align(
         )
         sys.exit(1)
 
-    orthologs = libphyling.search(hmms, inputs, orthologs=orthologs, evalue=evalue, threads=threads)
+    orthologs = libphyling.search(inputs, markerset, orthologs=orthologs, evalue=evalue, threads=threads)
 
     try:
         filtered_orthologs = orthologs.filter(min_taxa=4)
@@ -136,21 +148,18 @@ def align(
 
     filtered_orthologs.map(inputs)
 
-    if inputs.seqtype == config.seqtype_cds:
-        pep_msa_list, cds_msa_list = libphyling.align(filtered_orthologs, hmms=hmms, method=method, threads=threads)
-    else:
-        pep_msa_list = libphyling.align(filtered_orthologs, hmms=hmms, method=method, threads=threads)
+    try:
+        msa_lists = libphyling.align(filtered_orthologs, markerset, method=method, threads=threads)
+    except Exception as e:
+        logging.error(e)
+        sys.exit(1)
 
     if not non_trim:
-        msa_list = (
-            libphyling.trim(pep_msa_list, cds_msa_list)
-            if inputs.seqtype == config.seqtype_cds
-            else libphyling.trim(pep_msa_list)
-        )
+        fianl_msa_list = libphyling.trim(*msa_lists, threads=threads)
     else:
-        msa_list = cds_msa_list if inputs.seqtype == config.seqtype_cds else pep_msa_list
+        fianl_msa_list = msa_lists[1] if inputs.seqtype == config.seqtype_cds else msa_lists[0]
 
-    if not msa_list:
+    if not fianl_msa_list:
         logging.error("Nothing left after trimming. Please disable its through --non_trim and try again.")
         sys.exit(1)
 
@@ -159,23 +168,20 @@ def align(
     else:
         ext = config.prot_aln_ext
     logging.info(f"Output individual fasta to folder {output}...")
-    [
-        precheck_obj.output_results(msa, precheck_obj.path, ".".join((hmm.decode(), ext)))
-        for msa, hmm in zip(msa_list, filtered_orthologs.keys())
-    ]
+
+    for msa, hmm in zip(fianl_msa_list, filtered_orthologs.keys()):
+        libphyling.OutputPrecheck.output_results(msa, ".".join((hmm.decode(), ext)))
+
     logging.info("Done.")
 
-    precheck_obj.data = orthologs
-    precheck_obj.save_checkpoint()
-
-    logging.debug(f"Align module finished in {utils.runtime(module_start)}.")
-    sys.exit(0)
+    libphyling.OutputPrecheck.save_checkpoint(params, inputs, orthologs)
 
 
+@utils.timing
 def tree(
-    inputs: list[str | Path] | None,
-    input_dir: str | Path | None,
+    inputs: str | Path | list[str | Path],
     output: str | Path,
+    *,
     method: str = "ft",
     top_n_toverr: int = 50,
     concat: bool = False,
@@ -202,22 +208,29 @@ def tree(
     will be generated as output. Additionally, users can choose to obtain a matplotlib-style figure using the
     -f/--figure option.
     """
-    module_start = time.monotonic()
-
-    if input_dir:
-        inputs = [Path(file) for file in Path(input_dir).glob(f"*.{config.aln_ext}")]
-    else:
-        inputs = [Path(file) for file in inputs if str(file).endswith(config.aln_ext)]
-        input_dir: set = {file.parent for file in inputs}
-
+    if isinstance(inputs, list):
+        inputs = tuple(Path(file) for file in inputs)
+        input_dir = {file.parent for file in inputs}
         if len(input_dir) > 1:
             logging.error("The inputs aren't in the same folder, which indicates might come from different analysis.")
             sys.exit(1)
-        input_dir: Path = input_dir.pop()
+        input_dir = input_dir.pop()
+    else:
+        inputs = Path(inputs)
+        if inputs.is_file():
+            input_dir = inputs.parent
+            inputs = (inputs,)
+        else:
+            input_dir = inputs
+            inputs = tuple(file for file in input_dir.glob(f"*.{config.aln_ext}"))
 
     inputs_checksum = utils.get_multifiles_checksum(inputs)
     logging.info(f"Found {len(inputs)} MSA fasta.")
-    samples, seqtype = phylotree.determine_samples_and_seqtype(inputs, input_dir)
+    try:
+        samples, seqtype = phylotree.determine_samples_and_seqtype(inputs, input_dir)
+    except Exception as e:
+        logging.error(e)
+        sys.exit(1)
     logging.info(f"Inputs are {seqtype} sequences.")
 
     params = {
@@ -225,47 +238,52 @@ def tree(
         "top_n_toverr": top_n_toverr,
         "concat": concat,
         "partition": partition,
-        "inputs_checksum": inputs_checksum,
+        "inputs": inputs_checksum,
     }
 
-    precheck_obj = phylotree.OutputPrecheck(output, params=params)
-    rerun = precheck_obj.precheck()
-    wrapper = precheck_obj.data
-    logging.debug(f"rerun = {rerun}")
+    phylotree.OutputPrecheck.setup(folder=output, method=method, concat=concat, partition=partition, figure=figure)
+    try:
+        rerun, wrapper = phylotree.OutputPrecheck.precheck(params=params)
+    except Exception as e:
+        logging.error(e)
+        sys.exit(1)
+    logging.debug(f"rerun = {rerun}, wrapper = {wrapper}")
 
-    if len(inputs) == 1:
-        tree, wrapper = phylotree.single_mfa(
-            inputs, output=output, method=method, seqtype=seqtype, threads=threads, rerun=rerun, wrapper=wrapper
-        )
-    else:
-        if concat:
-            tree, wrapper = phylotree.concat(
-                inputs,
-                output=output,
-                method=method,
-                seqtype=seqtype,
-                samples=samples,
-                top_n_toverr=top_n_toverr,
-                partition=partition,
-                threads=threads,
-                rerun=rerun,
-                wrapper=wrapper,
+    try:
+        if len(inputs) == 1:
+            tree, wrapper = phylotree.single_mfa(
+                inputs, output, method=method, seqtype=seqtype, threads=threads, rerun=rerun, wrapper=wrapper
             )
+            params.update(top_n_toverr=0, concat=False, partition=None)
         else:
-            tree, wrapper = phylotree.consensus(
-                inputs,
-                output=output,
-                method=method,
-                seqtype=seqtype,
-                top_n_toverr=top_n_toverr,
-                threads=threads,
-                rerun=rerun,
-                wrapper=wrapper,
-            )
+            if concat:
+                tree, wrapper = phylotree.concat(
+                    inputs,
+                    output,
+                    method=method,
+                    seqtype=seqtype,
+                    samples=samples,
+                    top_n_toverr=top_n_toverr,
+                    partition=partition,
+                    threads=threads,
+                    rerun=rerun,
+                    wrapper=wrapper,
+                )
+            else:
+                tree, wrapper = phylotree.consensus(
+                    inputs,
+                    output,
+                    method=method,
+                    seqtype=seqtype,
+                    top_n_toverr=top_n_toverr,
+                    threads=threads,
+                    rerun=rerun,
+                    wrapper=wrapper,
+                )
+            params.update(partition=phylotree.OutputPrecheck.partition)
+    except Exception as e:
+        logging.error(e)
+        sys.exit(1)
 
-    precheck_obj.data = wrapper
-    precheck_obj.save_checkpoint()
-    precheck_obj.output_results(tree, figure=figure)
-
-    logging.debug(f"Tree module finished in {utils.runtime(module_start)}.")
-    sys.exit(0)
+    phylotree.OutputPrecheck.save_checkpoint(params, wrapper)
+    phylotree.OutputPrecheck.output_results(tree)

@@ -8,12 +8,11 @@ import logging
 import re
 import subprocess
 import textwrap
-import time
 from collections import UserDict
 from io import BytesIO, StringIO
 from multiprocessing.dummy import Pool
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import AnyStr, Iterable, Iterator, Sequence
 
 import numpy as np
 import pyhmmer
@@ -31,7 +30,7 @@ import phyling.exception as exception
 import phyling.utils as utils
 
 
-class SampleSeqs(_abc.SeqFileWrapperABC):
+class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
     """A wrapper of pyhmmer.easel.DigitalSequenceBlock with convenient implementation to retrieve sequence by name."""
 
     def __init__(self, file: str | Path) -> None:
@@ -349,7 +348,7 @@ class Orthologs(UserDict):
 
     def __init__(self, data: dict | None = None) -> None:
         """Initialize the object and perform seqtype and duplicated name checks."""
-        self.data: dict[str | bytes, set] = {}
+        self.data: dict[AnyStr, set] = {}
         if data is not None:
             self.update(data)
         self._is_mapped = False
@@ -368,7 +367,7 @@ class Orthologs(UserDict):
         seqtype = f", seqtype={self.seqtype}" if self.is_mapped else ""
         return f"{self.__class__.__qualname__}(number={len(self)}, mapped={self.is_mapped}{seqtype}){data}"
 
-    def __setitem__(self, key: str | bytes, item: tuple[str, bytes]) -> None:
+    def __setitem__(self, key: AnyStr, item: tuple[str, bytes]) -> None:
         """Store the given hits in a set by key."""
         if not isinstance(item, tuple | list):
             raise TypeError(f"Only accepts tuple or list but got {type(item)}.")
@@ -377,9 +376,7 @@ class Orthologs(UserDict):
 
         sample_id, seq_id = item
         if not isinstance(sample_id, str) or not isinstance(seq_id, bytes):
-            raise TypeError(
-                f'Only accepts tuple with ("str", "bytes") but got ("{type(sample_id)}", "{type(seq_id)}").'
-            )
+            raise TypeError(f'Only accepts tuple with ("str", "bytes") but got ("{type(sample_id)}", "{type(seq_id)}").')
         self.data.setdefault(key, set()).add((sample_id, seq_id))
 
     def __getstate__(self):
@@ -424,9 +421,7 @@ class Orthologs(UserDict):
             return self._pep_seqs[key]
         elif seqtype == config.seqtype_cds:
             if not self._cds_seqs:
-                raise AttributeError(
-                    "Orthologs was mapped to a SampleList with peptide seqeunces where cds is not available."
-                )
+                raise AttributeError("Orthologs was mapped to a SampleList with peptide seqeunces where cds is not available.")
             return self._cds_seqs[key]
         else:
             raise KeyError('seqtype only accepts "pep" or "cds"')
@@ -448,19 +443,14 @@ class Orthologs(UserDict):
             if sample_list.seqtype == config.seqtype_cds:
                 self._cds_seqs[key] = cds_seqs
         self._is_mapped = True
-        if self._cds_seqs:
-            self._seqtype = config.seqtype_cds
+        self._seqtype = sample_list.seqtype
 
     def filter(self, min_taxa: int = 0, droplist: list = None) -> Orthologs:
         """Filter the orthologs by a given min taxa number or a list contains the samples that no longer exists."""
         ortho_dict = self.data
         if droplist:
-            ortho_dict = {
-                key: set(filter(lambda hit: hit[0] not in droplist, value)) for key, value in ortho_dict.items()
-            }
-            logging.info(
-                f'Remove hits corresponding to {", ".join([str(sample) for sample in droplist])} from orthologs.'
-            )
+            ortho_dict = {key: set(filter(lambda hit: hit[0] not in droplist, value)) for key, value in ortho_dict.items()}
+            logging.info(f'Remove hits corresponding to {", ".join([str(sample) for sample in droplist])} from orthologs.')
 
         if min_taxa and ortho_dict:
             ortho_dict = dict(filter(lambda item: len(item[1]) >= min_taxa, ortho_dict.items()))
@@ -476,36 +466,27 @@ class Orthologs(UserDict):
             self.data[key] = set()
 
 
-class OutputPrecheck(_abc.OutputPrecheck[SampleList | Orthologs]):
+class OutputPrecheck(_abc.OutputPrecheckABC):
     """A class that provides features for input/output precheck, checkpoint loading/saving and final MSA output."""
 
-    def __init__(self, output: str | Path, params: dict | None = None, samplelist: SampleList | None = None) -> None:
-        """Initialize the object with Nonetype slots for parameters and data if not receiving params and samplelist."""
-        param_keys = ("evalue", "method", "non_trim", "inputs_checksum", "hmms_checksum")
-        data = [None] * 2
-        super().__init__(output, param_keys, data)
-        self._ckp = self._output / config.libphyling_checkpoint
-        if params:
-            self.params = params
-        if samplelist:
-            self.data = samplelist
+    folder: Path
+    ckp: str
 
-    @_abc.OutputPrecheck.data.setter
-    def data(self, data: SampleList | Orthologs) -> None:
-        """
-        Update the current data.
+    @classmethod
+    def setup(cls, *, folder: Path, ckp: str = config.libphyling_checkpoint) -> None:
+        """Setup the class variable."""
+        super().setup(folder, ckp)
 
-        Only accepts SampleList and Orthologs objects.
-        SampleList and Orthologs will be store in [0] and [1] of the self.data, respectivetly.
-        """
-        if isinstance(data, SampleList):
-            self._data[0] = data
-        elif isinstance(data, Orthologs):
-            self._data[1] = data
-        else:
-            raise ValueError(f"Invalid data. Only accept {SampleList.__qualname__} or {Orthologs.__qualname__} object.")
+    @classmethod
+    def precheck(cls, params: dict, samplelist: SampleList, *, force_rerun: bool = False) -> tuple[SampleList, Orthologs | None]:
+        """Check the output folder and determine what orthologs should be removed and what samples should be rerun."""
+        results = super().precheck(params, (samplelist), force_rerun=force_rerun)
+        if results:
+            return results
+        return samplelist, None
 
-    def load_checkpoint(self) -> tuple[dict, SampleList, Orthologs]:
+    @classmethod
+    def load_checkpoint(cls) -> tuple[dict, SampleList, Orthologs]:
         """
         Load the checkpoint and retrieve the required params/data to determine the rerun status.
 
@@ -513,42 +494,48 @@ class OutputPrecheck(_abc.OutputPrecheck[SampleList | Orthologs]):
         """
         return super().load_checkpoint()
 
-    @staticmethod
-    def output_results(msa: MultipleSeqAlignment, output: Path, filename: str) -> None:
+    @classmethod
+    def save_checkpoint(cls, params: dict, samplelist: SampleList, orthologs: Orthologs) -> None:
+        """Save the parameters and data as a checkpoint for rerun."""
+        return super().save_checkpoint(params, samplelist, orthologs)
+
+    @classmethod
+    @utils.check_cls_vars("folder")
+    def output_results(cls, msa: MultipleSeqAlignment, filename: str) -> None:
         """Output the MSA results in separate files."""
         msa.sort()
-        with open(output / filename, "w") as f:
+        with open(cls.folder / filename, "w") as f:
             SeqIO.write(msa, f, format="fasta")
 
-    def _determine_rerun(self, prev_params: dict, prev_samples: SampleList, prev_orthologs: Orthologs) -> int:
+    @classmethod
+    def _determine_rerun(
+        cls, cur: tuple[dict, SampleList], prev: tuple[dict, SampleList, Orthologs]
+    ) -> tuple[SampleList, Orthologs]:
         """Define the actions that need to do when found a checkpoint file in the given output folder."""
-        super()._determine_rerun(prev_params)
-        if not hasattr(self, "_data"):
-            raise AttributeError(f"Current data not found. Please specify it through {self.__name__}.data.")
-        cur_samples: SampleList = self._data[0]
+        cur_params, cur_samples = cur
+        prev_params, prev_samples, prev_orthologs = prev
         if prev_samples.seqtype != cur_samples.seqtype:
             raise SystemExit("Seqtype is changed. Aborted.")
-        if prev_params == self.params:
+        if prev_params == cur_params:
             raise SystemExit("Files not changed and parameters are identical to the previous run. Aborted.")
 
-        rm_files = [x for x in self._output.iterdir() if x.is_file() if x != self._ckp]
+        rm_files = [x for x in cls.folder.iterdir() if x.is_file() if x.name != cls.ckp]
         droplist = cur_samples.update(prev_samples)
         if droplist:
-            logging.info(
-                "Remove samples that no longer exist from the orthologs collection retrieved from the checkpoint."
-            )
+            logging.info("Remove samples that no longer exist from the orthologs collection retrieved from the checkpoint.")
             cur_orthologs = prev_orthologs.filter(droplist=droplist)
         else:
             cur_orthologs = prev_orthologs
-        self.data = cur_orthologs
 
-        self._remove_files(files=rm_files)
-        return 0
+        cls._remove_files(files=rm_files)
+        return cur_samples, cur_orthologs
 
 
+@utils.timing
 def search(
-    hmms: HMMMarkerSet,
     inputs: SampleList,
+    markerset: HMMMarkerSet,
+    *,
     orthologs: Orthologs | None = None,
     evalue: float = 1e-10,
     threads: int = 1,
@@ -563,7 +550,6 @@ def search(
 
     After the hmmsearch, all the results will be rearrange to a dictionary with dict["hmm", ["sample"]].
     """
-    func_start = time.monotonic()
     logging.info("Identify orthologs using hmmsearch...")
     inputs = [input for input in inputs if not input.is_scanned]
     if not orthologs:
@@ -575,7 +561,7 @@ def search(
         search_res = []
         for input in inputs:
             # Select the sequences of each sample
-            search_res.append(_run_hmmsearch(hmms, input, evalue, threads))
+            search_res.append(_run_hmmsearch(markerset, input, evalue, threads))
     else:
         # Multi processes mode
         threads_per_process = 4
@@ -586,7 +572,7 @@ def search(
                 _run_hmmsearch,
                 [
                     (
-                        hmms,
+                        markerset,
                         input,
                         evalue,
                         threads_per_process,
@@ -599,13 +585,13 @@ def search(
         for hmm, sample_id, seq_id in res:
             orthologs[hmm] = (sample_id, seq_id)
     logging.info("Done.")
-    logging.debug(f"Ortholog search was finished in {utils.runtime(func_start)}.")
     return orthologs
 
 
+@utils.timing
 def align(
-    orthologs: Orthologs, hmms: HMMMarkerSet | None = None, method: str = "hmmalign", threads: int = 1
-) -> list[MultipleSeqAlignment] | tuple[list[MultipleSeqAlignment], list[MultipleSeqAlignment]]:
+    orthologs: Orthologs, markerset: HMMMarkerSet | None = None, *, method: str = "hmmalign", threads: int = 1
+) -> tuple[list[MultipleSeqAlignment]] | tuple[list[MultipleSeqAlignment], list[MultipleSeqAlignment]]:
     """
     Align a set of identify orthologous proteins.
 
@@ -614,9 +600,8 @@ def align(
     """
     if not orthologs.is_mapped:
         raise AttributeError("Need to map the orthologs to a SampleList first.")
-    func_start = time.monotonic()
     logging.info(f"Run multiple sequence alignment on peptides using {method}...")
-    if method == "hmmalign" and not hmms:
+    if method == "hmmalign" and not markerset:
         raise AttributeError(f'Need to specify a {HMMMarkerSet} object to argument "hmms" When using hmmalign.')
 
     if threads == 1:
@@ -624,27 +609,21 @@ def align(
         if method == "muscle":
             pep_msa_list = [_run_muscle(orthologs.query(hmm, config.seqtype_pep)) for hmm in orthologs.keys()]
         else:
-            pep_msa_list = [
-                _run_hmmalign(orthologs.query(hmm, config.seqtype_pep), hmms[hmm]) for hmm in orthologs.keys()
-            ]
+            pep_msa_list = [_run_hmmalign(orthologs.query(hmm, config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
     else:
         logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
         with Pool(threads) as pool:
             if method == "muscle":
-                pep_msa_list = pool.map(
-                    _run_muscle, [orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()]
-                )
+                pep_msa_list = pool.map(_run_muscle, [orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
             else:
                 pep_msa_list = pool.starmap(
-                    _run_hmmalign, [(orthologs.query(hmm, config.seqtype_pep), hmms[hmm]) for hmm in orthologs.keys()]
+                    _run_hmmalign, [(orthologs.query(hmm, config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
                 )
     logging.info("Done.")
-    logging.debug(f"MSA with {method} was finished in {utils.runtime(func_start)}.")
 
     if orthologs.seqtype == config.seqtype_pep:
-        return pep_msa_list
+        return (pep_msa_list,)
 
-    func_start = time.monotonic()
     logging.info(f"{config.seqtype_cds} found. Run back translation...")
     if threads == 1:
         logging.debug("Sequential mode with 1 thread.")
@@ -653,28 +632,24 @@ def align(
     else:
         logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
         with Pool(threads) as pool:
-            cds_seqs_list = pool.map(
-                _to_seqrecord, [orthologs.query(hmm, config.seqtype_cds) for hmm in orthologs.keys()]
-            )
+            cds_seqs_list = pool.map(_to_seqrecord, [orthologs.query(hmm, config.seqtype_cds) for hmm in orthologs.keys()])
             cds_msa_list = pool.starmap(_bp_mrtrans, zip(pep_msa_list, cds_seqs_list))
     logging.info("Done.")
-    logging.debug(f"Back translation was finished in {utils.runtime(func_start)}.")
 
     return pep_msa_list, cds_msa_list
 
 
+@utils.timing
 def trim(
     pep_msa_list: list[MultipleSeqAlignment],
     cds_msa_list: list[MultipleSeqAlignment] | None = None,
+    *,
     threads: int = 1,
 ) -> list[MultipleSeqAlignment]:
     """Trim the uninformative regions."""
-    func_start = time.monotonic()
     if threads == 1:
         if cds_msa_list:
-            cds_msa_trimmed_list = [
-                _trim_gaps(pep_msa, cds_msa) for pep_msa, cds_msa in zip(pep_msa_list, cds_msa_list)
-            ]
+            cds_msa_trimmed_list = [_trim_gaps(pep_msa, cds_msa) for pep_msa, cds_msa in zip(pep_msa_list, cds_msa_list)]
         else:
             pep_msa_trimmed_list = [_trim_gaps(pep_msa) for pep_msa in pep_msa_list]
     else:
@@ -684,14 +659,11 @@ def trim(
             else:
                 pep_msa_trimmed_list = pool.map(_trim_gaps, pep_msa_list)
     logging.info("Trimming done.")
-    logging.debug(f"Trimming was finished in {utils.runtime(func_start)}.")
 
     return cds_msa_trimmed_list if cds_msa_list else pep_msa_trimmed_list
 
 
-def _run_hmmsearch(
-    hmms: HMMMarkerSet, input: SampleSeqs, evalue: float = 1e-10, threads: int = 4
-) -> Iterator[str, str, bytes]:
+def _run_hmmsearch(hmms: HMMMarkerSet, input: SampleSeqs, evalue: float = 1e-10, threads: int = 4) -> Iterator[str, str, bytes]:
     """
     Run the hmmsearch process using the pyhmmer library.
 
@@ -798,9 +770,7 @@ def _bp_mrtrans(pep_msa: MultipleSeqAlignment, cds_rec: list[SeqRecord]) -> Mult
     return cds_msa
 
 
-def _trim_gaps(
-    pep_msa: MultipleSeqAlignment, cds_msa: MultipleSeqAlignment = None, gaps: int = 0.9
-) -> MultipleSeqAlignment:
+def _trim_gaps(pep_msa: MultipleSeqAlignment, cds_msa: MultipleSeqAlignment = None, gaps: int = 0.9) -> MultipleSeqAlignment:
     """Trim some regions on a MSA if the gappyness ratio (gaps/total length) is higher than the argument "gaps"."""
     if gaps > 1 or gaps < 0:
         raise ValueError('The argument "gaps" should be a float between 0 to 1.')

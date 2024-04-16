@@ -9,7 +9,7 @@ import textwrap
 import time
 from pathlib import Path
 
-import phyling.config
+import phyling.config as config
 from phyling import __name__, __version__
 from phyling.pipeline import align, download, tree
 
@@ -64,6 +64,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
     input_type.add_argument(
         "-i",
         "--inputs",
+        dest="inputs",
         metavar=("file", "files"),
         nargs="+",
         help="Query pepetide/cds fasta or gzipped fasta",
@@ -71,6 +72,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
     input_type.add_argument(
         "-I",
         "--input_dir",
+        dest="inputs",
         metavar="directory",
         type=Path,
         help="Directory containing query pepetide/cds fasta or gzipped fasta",
@@ -102,7 +104,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
     p_aln.add_argument(
         "-M",
         "--method",
-        choices=["hmmalign", "muscle"],
+        choices=config.avail_align_methods,
         default="hmmalign",
         help="Program used for multiple sequence alignment",
     )
@@ -132,6 +134,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
     input_type.add_argument(
         "-i",
         "--inputs",
+        dest="inputs",
         metavar=("file", "files"),
         nargs="+",
         type=Path,
@@ -140,6 +143,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
     input_type.add_argument(
         "-I",
         "--input_dir",
+        dest="inputs",
         metavar="directory",
         type=Path,
         help="Directory containing multiple sequence alignment fasta of the markers",
@@ -155,11 +159,11 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
     p_tree.add_argument(
         "-M",
         "--method",
-        choices=phyling.config.avail_tree_methods.keys(),
+        choices=config.avail_tree_methods.keys(),
         default="ft",
         help="Algorithm used for tree building. (default: %(default)s)\n"
         + "Available options:\n"
-        + "\n".join(f"{value}: {key}" for key, value in phyling.config.avail_tree_methods.items()),
+        + "\n".join(f"{value}: {key}" for key, value in config.avail_tree_methods.items()),
     )
     p_tree.add_argument(
         "-n",
