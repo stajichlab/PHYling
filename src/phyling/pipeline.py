@@ -116,6 +116,7 @@ def align(
     params = {
         "inputs": inputs.checksum,
         "markerset": markerset.checksum,
+        "markerset_cutoff": markerset.have_cutoff,
         "evalue": evalue,
         "method": method,
         "non_trim": non_trim,

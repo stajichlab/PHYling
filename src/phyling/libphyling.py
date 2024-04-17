@@ -317,7 +317,7 @@ class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
         checksums = 0
         for data in self.data:
             checksums += data.checksum
-        return hashlib.md5(str(checksums + self._cutoff).encode()).hexdigest()
+        return hashlib.md5(str(checksums).encode()).hexdigest()
 
     @property
     def have_cutoff(self) -> bool:
@@ -366,6 +366,12 @@ class Orthologs(UserDict):
             data = f"{{\n{data}}}"
         seqtype = f", seqtype={self.seqtype}" if self.is_mapped else ""
         return f"{self.__class__.__qualname__}(number={len(self)}, mapped={self.is_mapped}{seqtype}){data}"
+
+    def __eq__(self, other: Orthologs) -> bool:
+        """Return true if the data of two objects are the same."""
+        if not isinstance(other, self.__class__):
+            raise TypeError(f"Can only compare to {self.__class__.__qualname__} object but got {type(other)}.")
+        return self.data == other.data
 
     def __setitem__(self, key: AnyStr, item: tuple[str, bytes]) -> None:
         """Store the given hits in a set by key."""
@@ -480,6 +486,8 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
     @classmethod
     def precheck(cls, params: dict, samplelist: SampleList, *, force_rerun: bool = False) -> tuple[SampleList, Orthologs | None]:
         """Check the output folder and determine what orthologs should be removed and what samples should be rerun."""
+        if params.keys() != config.libphyling_precheck_params:
+            raise KeyError(f"Params should contain keys {config.libphyling_precheck_params}")
         results = super().precheck(params, (samplelist), force_rerun=force_rerun)
         if results:
             return results
@@ -516,9 +524,13 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
         prev_params, prev_samples, prev_orthologs = prev
         if prev_samples.seqtype != cur_samples.seqtype:
             raise SystemExit("Seqtype is changed. Aborted.")
-        if prev_params == cur_params:
+        diff_params = {param[0] for param in set(cur_params.items()) ^ set(prev_params.items())}
+        if not diff_params:
             raise SystemExit("Files not changed and parameters are identical to the previous run. Aborted.")
-
+        if "markerset" in diff_params:
+            raise SystemExit("Markerset is changed. Aborted.")
+        if ("markerset_cutoff" in diff_params) or (not cur_params["markerset_cutoff"] and "evalue" in diff_params):
+            return cur_samples, None
         rm_files = [x for x in cls.folder.iterdir() if x.is_file() if x.name != cls.ckp]
         droplist = cur_samples.update(prev_samples)
         if droplist:

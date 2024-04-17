@@ -341,6 +341,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
 
     class Decorator:
         """A decorator to contains classmethods "check_single_file" and "check_sorted"."""
+
         @classmethod
         def check_single_file(cls, func: callable):
             """Check whether data has more than one MFA2Tree object and raise an error if not."""
@@ -685,6 +686,8 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
         2: rerun concatenate step
         3: rerun final tree building step
         """
+        if params.keys() != config.phylotree_precheck_params:
+            raise KeyError(f"Params should contain keys {config.phylotree_precheck_params}")
         results = super().precheck(params, (), force_rerun=force_rerun)
         if results:
             return results

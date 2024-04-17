@@ -22,8 +22,10 @@ metadata = "metadata.tsv"
 
 # libphyling
 libphyling_checkpoint = ".align.ckp"
+libphyling_precheck_params = {"inputs", "markerset", "markerset_cutoff", "evalue", "method", "non_trim"}
 avail_align_methods = ("hmmalign", "muscle")
 
 # phylotree
 phylotree_checkpoint = ".tree.ckp"
+phylotree_precheck_params = {"method", "top_n_toverr", "concat", "partition", "inputs"}
 avail_tree_methods = {"ft": "FastTree", "raxml": "RAxML", "iqtree": "IQTree"}

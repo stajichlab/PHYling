@@ -169,7 +169,7 @@ class OutputPrecheckABC(ABC):
             return None
         elif not (cls.folder / cls.ckp).exists():
             raise FileExistsError(f"Checkpoint file not found but the output directory {cls.folder} is not empty. Aborted.")
-        results = cls._determine_rerun((params, *data), cls.load_checkpoint())
+        results = cls._determine_rerun((params, data), cls.load_checkpoint())
 
         return results
 
