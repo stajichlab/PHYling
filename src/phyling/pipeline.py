@@ -101,7 +101,7 @@ def align(
         logging.error(f"Markerset folder does not exist {markerset} - did you download BUSCO?")
         sys.exit(1)
     logging.info(f"Loading markerset from {markerset}...")
-    markerset: libphyling.HMMMarkerSet = libphyling.HMMMarkerSet(markerset, markerset.parent / "scores_cutoff")
+    markerset: libphyling.HMMMarkerSet = libphyling.HMMMarkerSet(markerset, markerset.parent / "scores_cutoff", raise_err=False)
 
     if evalue > 1:
         logging.error(f"Invalid evalue: {evalue}")

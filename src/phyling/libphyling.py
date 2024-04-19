@@ -37,7 +37,7 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
         """Initialize the object and perform sequence preprocessing."""
         super().__init__(file)
         self._kh = pyhmmer.easel.KeyHash()
-        seqblock = pyhmmer.easel.SequenceFile(self.path, digital=True).read_block()
+        seqblock: DigitalSequenceBlock = pyhmmer.easel.SequenceFile(self.path, digital=True).read_block()
 
         if seqblock.alphabet.is_amino():
             self._set_seqtype(config.seqtype_pep)
@@ -67,10 +67,12 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
     def __eq__(self, other: SampleSeqs) -> bool:
         """Return true if the two objects have the same name."""
         super().__eq__(other)
-        return self.name == other.name
+        return (self.name == other.name) and (self.seqtype == other.seqtype)
 
     def __lt__(self, other: SampleSeqs) -> bool:
         """Return true if the sample name of the current object is alphabatically prior to another object."""
+        if self.seqtype != other.seqtype:
+            raise exception.SeqtypeError("Items represent different seqtypes.")
         return str(self.name) < str(other.name)
 
     def __hash__(self) -> int:
@@ -224,7 +226,7 @@ class SampleList(_abc.DataListABC[SampleSeqs]):
     def append(self, item: SampleSeqs) -> None:
         """Add new sample to the collection."""
         if not isinstance(item, SampleSeqs):
-            raise TypeError(f"Can only append {SampleSeqs} object but got {type(item)}.")
+            raise TypeError(f"Can only append {SampleSeqs.__qualname__} object but got {type(item)}.")
         if item.seqtype != self.seqtype:
             raise exception.SeqtypeError("Item represents different seqtype.")
         if item.name in self._names():
@@ -240,14 +242,14 @@ class SampleList(_abc.DataListABC[SampleSeqs]):
     def update(self, other: SampleList) -> list:
         """Compare with the previously hmmsearched SampleList and update those need to be rerun."""
         if not isinstance(other, self.__class__):
-            raise TypeError(f"Can only update with {self.__class__} object but got {type(other)}.")
+            raise TypeError(f"Can only update with {self.__class__.__qualname__} object but got {type(other)}.")
         if other.seqtype != self.seqtype:
             raise exception.SeqtypeError("Item represents different seqtype.")
         droplist = []
         for prev_data in other:
             if prev_data.name not in self._names():
                 droplist.append(prev_data.name)
-            elif prev_data.checksum == self[prev_data.name].checksum:
+            elif prev_data.checksum == self[prev_data.name].checksum and prev_data.is_scanned:
                 self[prev_data.name].scanned()
                 logging.info(f"Skip hmmsearch for {self[prev_data.name].path.name} since it was already done.")
             else:
@@ -282,22 +284,21 @@ class SampleList(_abc.DataListABC[SampleSeqs]):
 class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
     """A wrapper that stores the selected HMM markers."""
 
-    def __init__(self, folder: Path, cutoff: Path | None = None):
+    def __init__(self, folder: str | Path, cutoff: str | Path | None = None, *, raise_err: bool = True):
         """Initialize the object and perform seqtype and duplicated name checks."""
-        files = [file for file in folder.iterdir()]
+        if isinstance(folder, str | Path):
+            folder = Path(folder)
+        else:
+            raise TypeError('Argument "folder" only accepts of str or Path.')
+        files = tuple(file for file in folder.iterdir())
         super().__init__(files)
         for file in files:
-            if isinstance(file, pyhmmer.plan7.HMM):
-                self.data.append(file)
-            elif isinstance(file, str | Path):
-                with pyhmmer.plan7.HMMFile(file) as hmm_profile:
-                    self.data.append(hmm_profile.read())
-            else:
-                raise TypeError(f"{self.__class__.__qualname__} only accepts list of str/Path/pyhmmer.plan7.HMM")
+            with pyhmmer.plan7.HMMFile(file) as hmm_profile:
+                self.data.append(hmm_profile.read())
 
         logging.info(f"Found {len(self.data)} hmm markers.")
 
-        self._cutoff = self._load_cutoffs(cutoff) if cutoff else False
+        self._cutoff = self._load_cutoffs(cutoff, cutoff_exit=raise_err) if cutoff else False
 
     def __repr__(self) -> str:
         """Return the object representation when being called."""
@@ -309,7 +310,7 @@ class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
             if key not in self._names():
                 raise KeyError(f"{key}: Sample not found.")
             return self.data[self._names().index(key)]
-        return super().__getitem__(key)
+        return self.data[key]
 
     @property
     def checksum(self) -> str:
@@ -324,8 +325,9 @@ class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
         """Return whether use the trusted cutoff loaded from the file."""
         return self._cutoff
 
-    def _load_cutoffs(self, file: Path) -> bool:
+    def _load_cutoffs(self, file: str | Path, *, cutoff_exit: bool) -> bool:
         """Retrieve the The model-specific bit-score cutoffs for each HMM."""
+        evalue_hint = " Will use evalue instead."
         try:
             with open(file) as f:
                 for line in csv.reader(f, delimiter="\t"):
@@ -335,9 +337,20 @@ class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
                     self[line[0].encode()].cutoffs.trusted = (cutoff, cutoff)
             logging.info("Load model-specific bit-score cutoff for each hmm marker.")
         except FileNotFoundError:
-            logging.warning("HMM cutoff file not found.")
+            msg = "HMM cutoff file not found."
+            if cutoff_exit:
+                raise FileNotFoundError(msg)
+            else:
+                logging.warning(msg + evalue_hint)
+        except KeyError:
+            msg = "HMM cutoff file doesn't match the markerset."
+            if cutoff_exit:
+                raise KeyError(msg)
+            else:
+                logging.warning(msg + evalue_hint)
 
         if not all(hmm.cutoffs.trusted for hmm in self.data):
+            logging.warning("HMM cutoff file is incomplete." + evalue_hint)
             return False
         logging.info("Use HMM cutoff file to determine cutoff.")
         return True
@@ -373,9 +386,9 @@ class Orthologs(UserDict):
             raise TypeError(f"Can only compare to {self.__class__.__qualname__} object but got {type(other)}.")
         return self.data == other.data
 
-    def __setitem__(self, key: AnyStr, item: tuple[str, bytes]) -> None:
+    def __setitem__(self, key: AnyStr, item: Sequence[str, bytes]) -> None:
         """Store the given hits in a set by key."""
-        if not isinstance(item, tuple | list):
+        if not isinstance(item, Sequence):
             raise TypeError(f"Only accepts tuple or list but got {type(item)}.")
         if len(item) != 2:
             raise IndexError(f"Only accepts 2 elements (sample_id, seq_id) but got {len(item)}.")
@@ -407,17 +420,20 @@ class Orthologs(UserDict):
 
     def update(self, other: dict, /, **kwds):
         """Update the current data."""
+
+        def setitem(hits: set):
+            """Add the item to the current collection."""
+            for item in hits:
+                self[key] = item
+
         if isinstance(other, dict):
             for key in other.keys():
-                self._create_keys(key)
-                self.data[key].update(other[key])
+                setitem(other[key])
         else:
             for key, value in other:
-                self._create_keys(key)
-                self.data[key].update(value)
+                setitem(value)
         for key, value in kwds.items():
-            self._create_keys(key)
-            self.data[key].update = value
+            setitem(value)
 
     def query(self, key: bytes, seqtype: str = config.seqtype_pep) -> list[pyhmmer.easel.DigitalSequence]:
         """Query the mapped SampleList object and retrieve all the sequences from a given key."""
@@ -451,7 +467,7 @@ class Orthologs(UserDict):
         self._is_mapped = True
         self._seqtype = sample_list.seqtype
 
-    def filter(self, min_taxa: int = 0, droplist: list = None) -> Orthologs:
+    def filter(self, min_taxa: int = 0, droplist: Sequence | None = None) -> Orthologs:
         """Filter the orthologs by a given min taxa number or a list contains the samples that no longer exists."""
         ortho_dict = self.data
         if droplist:
@@ -466,10 +482,6 @@ class Orthologs(UserDict):
             raise exception.EmptyWarning("None of the ortholog left after filtering.")
 
         return Orthologs(ortho_dict)
-
-    def _create_keys(self, key):
-        if key not in self.data.keys():
-            self.data[key] = set()
 
 
 class OutputPrecheck(_abc.OutputPrecheckABC):
@@ -742,7 +754,7 @@ def _run_muscle(seqs: list[pyhmmer.easel.DigitalSequence]) -> MultipleSeqAlignme
     return alignment
 
 
-def _to_seqrecord(seqs: list[pyhmmer.easel.DigitalSequence]) -> SeqRecord:
+def _to_seqrecord(seqs: list[pyhmmer.easel.DigitalSequence]) -> list[SeqRecord]:
     """Transform the list of pyhmmer.easel.DigitalSequence to Biopython SeqRecord object."""
     seqs_stream = BytesIO()
     [seq.write(seqs_stream) for seq in seqs]

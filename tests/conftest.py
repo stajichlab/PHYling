@@ -28,5 +28,5 @@ def pack_current_metadata():
 
 
 @pytest.fixture(scope="class")
-def shared_tmpdir(tmp_path_factory: pytest.TempPathFactory):
+def shared_tmpdir_class(tmp_path_factory: pytest.TempPathFactory):
     return tmp_path_factory.mktemp("shared_tmpdir")
