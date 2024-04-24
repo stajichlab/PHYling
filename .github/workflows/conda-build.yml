@@ -47,5 +47,5 @@ jobs:
           key: ${{ runner.os }}-ASTER
 
       - name: Test with pytest
-        run: pytest
+        run: pytest --runslow
         shell: micromamba-shell {0}

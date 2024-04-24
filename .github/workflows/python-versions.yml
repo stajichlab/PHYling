@@ -66,4 +66,4 @@ jobs:
           key: ${{ runner.os }}-FastTree
 
       - name: Test with pytest
-        run: pytest
+        run: pytest --runslow
