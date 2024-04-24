@@ -27,12 +27,12 @@ The marker sets developed for this approach in fungi are available as part of th
 - Simplify some steps and reduce the intermediate files as much as possible.
 - [Muscle] is now available for alternative alignment method.
 - Use [PhyKIT] to remove uninformative orthologs.
-- [FastTree] is now available for tree construction.
+- [FastTree], [RAxML] and [IQTree] are now available for tree construction.
 - [ASTER], a C++ version of [ASTRAL] is now integrated to resolve consensus among trees built upon individual genes.
 
 ## Usage
 
-First of all, install the package following the [instruction](#requirements-and-installation) below.
+First of all, install the package following the [instruction](#install) below.
 
 PHYling is a package to extract phylogenomic markers and build a phylogenetic
 tree upon them. It comprises 3 modules - download, align and tree. Use `phyling --help` to see more details.
@@ -86,7 +86,9 @@ phyling download list
 ```
 
 By default the downloaded markersets will be saved to the `~/.phyling/HMM`.
-The `Downloaded datasets` section listed the markersets that have already been downloaded.
+The **Datasets available online** section lists the markersets that available on the [BUSCO][Busco] website.
+
+And the **Datasets available on local** section lists the markersets that have already been downloaded.
 
 To download the markerset, copy the name from the list and paste it to the download module directly.
 Here we use `fungi_odb10` as example.
@@ -95,20 +97,24 @@ Here we use `fungi_odb10` as example.
 phyling download fungi_odb10
 ```
 
+The download module will automatically check for updates to the markerset online each time it runs.
+The local markersets which have available updates online will be marked as _\[Outdated\]_.
+You can rerun `phyling download [markerset]` to update the local files.
+
 ### Find the orthologs and align them
 
 The align module identify the orthologs among all the samples using _hmmsearch_.
-HMM profiles that have matches on more than 3 samples are considered **orthologs**.
+HMM profiles that have matches on more than 4 samples are considered **orthologs**.
 
 Before conducting _hmmsearch_, the module will first search for the bitscore cutoff file within the root HMM folder.
 If the cutoff file is not found, the reporting threshold for _hmmsearch_ will be determined based on the `-E/-evalue` (default is 1e-10).
 
 Once the orthologs are identified, the sequences extracted from each sample undergo multiple sequence alignment.
 By default, the alignment is performed using the _hmmalign_ method.
-However, users have the option to switch to using _muscle_ by specifying the `-M/--method muscle` flag.
+However, users have the option to switch to _muscle_ by specifying the `-M/--method muscle` flag.
 
 Finally, each alignment result is output separately.
-You can decide whether you want to concatenate them in the tree module.
+You can decide whether you want to concatenate them or use consensus strategy in the tree module.
 See all the options with `phyling align --help`.
 
 ```
@@ -120,31 +126,28 @@ options:
   -I directory, --input_dir directory
                         Directory containing query pepetide/cds fasta or gzipped fasta
   -o directory, --output directory
-                        Output directory of the alignment results (default: phyling-align-20240227-103913-0800
-                        [current timestamp])
+                        Output directory of the alignment results (default: phyling-align-20240423-173849-0700 [current timestamp])
   -m directory, --markerset directory
                         Directory of the HMM markerset
   -E float, --evalue float
-                        Hmmsearch reporting threshold (default: 1e-10)
+                        Hmmsearch reporting threshold (default: 1e-10, only being used when bitscore cutoff file is not available)
   -M {hmmalign,muscle}, --method {hmmalign,muscle}
                         Program used for multiple sequence alignment (default: hmmalign)
   --non_trim            Report non-trimmed alignment results
-  --from_checkpoint     Load previous hmmsearch results from .checkpoint.pkl in the output directory
   -t THREADS, --threads THREADS
-                        Threads for hmmsearch and the number of parallelized jobs in MSA step. Better be multiple of 4
-                        if using more than 8 threads (default: 1)
+                        Threads for hmmsearch and the number of parallelized jobs in MSA step. Better be multiple of 4 if using more than 8 threads (default: 1)
 ```
 
 Run the align module with all the fasta files under folder `pep`.
 
 ```
-phyling align -I pep -o align -m HMM/fungi_odb10/hmms
+phyling align -I pep -o align -m fungi_odb10
 ```
 
 An equivalent way to send inputs.
 
 ```
-phyling align -i pep/*.fasta.gz -o align -m HMM/fungi_odb10/hmms
+phyling align -i pep/*.fasta.gz -o align -m fungi_odb10
 ```
 
 Or if you're just interested in part of the fasta, you can specify the inputs one-by-one.
@@ -153,11 +156,12 @@ Or if you're just interested in part of the fasta, you can specify the inputs on
 phyling align -i pep/Pilobolus_umbonatus_NRRL_6349.aa.fasta.gz \
   pep/Rhizopus_homothallicus_CBS_336.62.aa.fasta.gz \
   pep/Rhizopus_rhizopodiformis_NRRL_2570.aa.fasta.gz \
+  pep/Zygorhynchus_heterogamous_NRRL_1489.aa.fasta.gz \
   -o align \
-  -m HMM/fungi_odb10/hmms
+  -m fungi_odb10
 ```
 
-**Note: Required at least 3 samples in order to build a tree!**
+**Note: Required at least 4 samples to build a tree!**
 
 Accelerate by using 16 cpus.
 
@@ -168,19 +172,12 @@ phyling align -I pep -o align -m HMM/fungi_odb10/hmms -t 16
 #### Multithreading strategy
 
 According to [pyhmmer benchmark](https://pyhmmer.readthedocs.io/en/stable/benchmarks.html), the acceleration benefits from multithreading drop significantly as more CPUs are utilized.
-When less then 8 cpus are given, the hmmsearch step will run in single-thread manner and all cpus will be used for each round of hmmsearch.
+When less then 8 cpus are given, the hmmsearch step will run on single-thread manner and all cpus will be used for each round of hmmsearch.
 When 8 or more cpus are given, the hmmsearch step will use 4 cpus for each parallel job.
 In the example above, 4 hmmsearch jobs will run parallelly and each job utilize 4 cpus.
-For the alignment step, 16 parallel jobs will be launched and each parallel job is running in single-thread manner.
+For the alignment step, 16 parallel jobs will be launched and each parallel job is running on single-thread manner.
 
 Highly recommended if **muscle** is chosen for alignment. (**muscle** is much slower than **hmmalign**!!)
-
-#### Checkpoint for quick rerun
-
-A checkpoint file will be generated after the hmmsearch step.
-The `--from_checkpoint` option allow you to retrieve already completed hmmsearch results on those inputs that don't have changes to save time.
-Only the newly added/changed inputs will do the hmmsearch when `--from_checkpoint` is enabled.
-Meanwhile, the samples not specified in the command with `--from_checkpoint` will be removed from the checkpoint file.
 
 #### Use coding sequences instead of peptide sequences
 
@@ -198,13 +195,54 @@ The translated peptide sequences will be used for hmmsearch and the alignment st
 The peptide alignment results will then being back-translated according to the original CDS inputs.
 And the back-translated DNA version alignments will be output.
 
+#### Checkpoint for quick rerun
+
+Once the align module complete, a checkpoint file will be generated to the output folder.
+This checkpoint file stores the parameters, samples and identified orthologs, which will be loaded to the pipeline when rerun with the same output folder.
+Then the align module will determine whether to skip the hmmsearch on some of the samples that were already completed in the previous run.
+
+For example, we run the align module by:
+
+```
+phyling align -i pep/Pilobolus_umbonatus_NRRL_6349.aa.fasta.gz \
+  pep/Rhizopus_homothallicus_CBS_336.62.aa.fasta.gz \
+  pep/Rhizopus_rhizopodiformis_NRRL_2570.aa.fasta.gz \
+  pep/Zygorhynchus_heterogamous_NRRL_1489.aa.fasta.gz \
+  -o align \
+  -m fungi_odb10
+  -t 16
+```
+
+And later we want to add `Actinomucor elegans` to the analysis but kick out `Zygorhynchus heterogamous`.
+We can start another run and specifying the same output folder:
+
+```
+phyling align -i pep/Actinomucor_elegans_CBS_100.09.aa.fasta.gz
+  pep/Pilobolus_umbonatus_NRRL_6349.aa.fasta.gz \
+  pep/Rhizopus_homothallicus_CBS_336.62.aa.fasta.gz \
+  pep/Rhizopus_rhizopodiformis_NRRL_2570.aa.fasta.gz \
+  -o align \
+  -m fungi_odb10
+  -t 16
+```
+
+In this case, `Pilobolus umbonatus`, `Rhizopus homothallicus` and `Rhizopus rhizopodiformis` will be skipped from the hmmsearch process since they have already been searched in the previous run.
+The `Actinomucor elegans` is the only sample need to be hmmsearched.
+On the other hand, the `Zygorhynchus heterogamous` will be removed from the current run.
+
+Note that if the input files have changes, they will also being detected by align module and trigger the rerun.
+If the hmmsearch evalue/bitscore cutoff is changed, all the samples will need to rerun the hmmsearch step.
+Also, the changes on HMM markersets or input samples with different seqtype will terminate the align module. (since this case should be considered an entirely different analysis)
+
 ### Build tree from multiple sequence alignment results
 
-Finally, we can run the tree module to use the multiple sequence alignment results to build a phylogenetic tree.
+Finally, we can run the tree module, use the multiple sequence alignment results to build a phylogenetic tree.
 By default, it uses the _consensus tree_ strategy (conclude the majority of trees which was built upon each single gene)
 But you can choose to use _concatenated alignment_ strategy by specifying `-c/--concat`.
-Currently, 3 methods (upgma, Neighbor Joining and FastTree) are available for tree building.
-We further calculate the [treeness/RCV] by [PhyKit] and select the top 50 most informative markers for final tree building.
+Currently, 3 methods (FastTree, RAxML and IQTree) are available for tree building.
+You can choose your own preferred method by specifying `-M/--method`. (default is FastTree)
+We also use the [treeness/RCV] calculated by [PhyKit] and select the most informative markers for final tree building.
+You can adjust the number of selected markers by specifying `-n/--top_n_toverr`.
 See all the options with `phyling tree --help`.
 
 ```
@@ -216,18 +254,18 @@ options:
   -I directory, --input_dir directory
                         Directory containing multiple sequence alignment fasta of the markers
   -o directory, --output directory
-                        Output directory of the newick treefile (default: phyling-tree-20240227-103934-0800 [current
-                        timestamp])
-  -M {upgma,nj,ft}, --method {upgma,nj,ft}
-                        Algorithm used for tree building. (default: upgma)
+                        Output directory of the newick treefile (default: phyling-tree-20240423-183138-0700 [current timestamp])
+  -M {ft,raxml,iqtree}, --method {ft,raxml,iqtree}
+                        Algorithm used for tree building. (default: ft)
                         Available options:
-                        UPGMA: upgma
-                        Neighbor Joining: nj
                         FastTree: ft
+                        RAxML: raxml
+                        IQTree: iqtree
   -n TOP_N_TOVERR, --top_n_toverr TOP_N_TOVERR
-                        Select the top n markers based on their treeness/RCV for final tree building (default: 50.
-                        Specify 0 to use all markers)
+                        Select the top n markers based on their treeness/RCV for final tree building (default: 50. Specify 0 to use all markers)
   -c, --concat          Concatenated alignment results
+  -p {seq,codon,seq+codon}, --partition {seq,codon,seq+codon}
+                        Create a partition file by sequence or by codon position when --concat enabled. "codon" and "seq+codon" only work when inputs are DNA sequences
   -f, --figure          Generate a matplotlib tree figure
   -t THREADS, --threads THREADS
                         Threads for tree construction (default: 1)
@@ -245,62 +283,131 @@ You can also use only part of the alignment results to build tree.
 phyling tree -i align/100957at4751.aa.mfa align/174653at4751.aa.mfa align/255412at4751.aa.mfa
 ```
 
-**Note: the checkpoint file .checkpoint.pkl is required in the same directory to provide the sample names and sequence type for tree building.**
+**Note: the tree module uses the checkpoint file .align.ckp in the input folder (or the parent folder of the input files) to determine the sample names and seqtype. If the checkpoint file is missing or corrupted it can also automatically detects these information but requires more time.**
 
-Use FastTree instead of the default UPGMA method for tree building and running with 16 threads.
+Use IQTree instead of the default FastTree method for tree building and running with 16 threads.
 
 ```
-phyling tree -I align -m ft -t 16
+phyling tree -I align -m iqtree -t 16
 ```
 
 Use matplotlib to generate a tree figure.
 
 ```
-phyling tree -I align -f
+phyling tree -I align -f -t 16
 ```
-
-#### Use concatenate strategy
-
-By default the consensus strategy is used but users can choose to concatenate the markers and generate a single tree on it.
-
-```
-phyling tree -I align -c
-```
-
-When enable the concatenate option, the concatenated fasta will be output to the designated output folder.
-Meanwhile, a partition file compatible with RAxML and IQTree will also being generated to support users who are interested in using RAxML and IQTree.
-
-**Note: with default setting PHYling will only concatenate top 50 markers based on their treeness/RCV score.
-See more [details](#use-top_n_toverr-to-filter-the-markers-by-treenessrcv) in the section below.**
 
 #### Use top_n_toverr to filter the markers by treeness/RCV
 
-The align module usually report a lot of markers.
-We integrate [PhyKIT] to calculate the [treeness/RCV] value to determine how informative a marker is.
-The higher the [treeness/RCV] values, the marker are more informative and least susceptible to composition bias.
-By doing so, we're able to select the most informative and rubost markers to build the final tree.
+The align module sometimes reports a lot of orthologs depending on the size of BUSCO dataset and the gene set homogeneity among samples.
+However, not every marker is equally informative in resolving phylogeny; some substitutions may not contribute significantly to the branches in the phylogenetic tree.
+To address this issue, PHYling incorporates [PhyKIT] to compute the [treeness/RCV] scores (toverr) and ranks the markers accordingly.
+Higher ranks indicate greater informativeness and lower susceptibility to composition bias and will be selected for final tree building (thru _consensus_ or _concatenate_ strategy).
 
-By default the top 50 markers are selected for the final tree building.
-You can specify your own desired number.
-Say we want only the top 20:
+By default, PHYling pick the top 50 markers for further analysis but user can adjust the number by specifying `-n/--top_n_toverr`.
+In the example below, we pick only the top 20 markers:
 
 ```
 phyling tree -I align -n 20 -t 16
 ```
 
-You can also enable the -c/--concat at the same time to concatenate only the top ranked markers.
-The following example will concatenate the top 20 markers.
-```
-phyling tree -I align -c -n 20 -t 16
-```
+All markers will undergo tree building and compute their treeness/RCV scores, and the top 20 markers will be selected to reconstruct the final consensus tree. (PHYling uses _consensus_ strategy by default)
 
-If you want to use all the markers without filtering, you can specify `-n/--top_n_toverr 0`.
+Note that if the number of identified orthologs is less than the assigned `-n/--top_n_toverr` value, PHYling will use all markers instead.
+Users can also specify 0 to use all the markers directly.
 
 ```
 phyling tree -I align -n 0 -t 16
 ```
 
-**Note: when -n/--top_n_toverr is enable (>0), a file `top_toverr_trees.tsv` that record the treeness/RCV of selected markers will be generate as well.**
+After tree construction, a file `top_toverr_trees.tsv` recording the treeness/RCV of selected markers and a folder `selected_MSAs` containing the symlinks to the mfa of the selected markers will be output as well.
+
+#### Use concatenate strategy
+
+The consensus strategy is used for tree construction by default but users can choose to concatenate the markers and generate a single tree on it.
+
+```
+phyling tree -I align -c -t 16
+```
+
+When concatenation mode is enabled, PHYling do the first round tree building on each marker with [FastTree] and compute their [toverr][treeness/RCV].
+These highly ranked markers are then selected for concatenation and do the final tree building. (using the method specified by `-M/--method`)
+The concatnated fasta `concat_alignments.mfa` will also being output which allow users to perform tree building with tools not incorporated in PHYling.
+The example below shows to pick the top 20 markers and build a tree with _concatenate_ strategy by specifying `-n/--top_n_toverr`.
+
+```
+phyling tree -I align -n 20 -c -t 16
+```
+
+Meanwhile, users can construct tree with a more sophisticated **partition mode** when using [RAxML] and [IQTree].
+In general, the partition mode expects different sequence regions exhibit different evolutionary rates, which should be estimated with different models.
+Here we provide 3 different most commonly-used modes:
+
+- seq: partitioning by marker. (each marker evolves separately)
+- codon: partitioning by codon of 3 of concatenated sequence. (only available on CDS. Each codon evolves separately)
+- seq+codon: partitioning by codon of 3 marker-wisely. (only available on CDS. Each codon of each marker evolves separately)
+
+The example below concatenate the top markers (50 by default) and run tree building with sequence partitioning thru iqtree.
+
+```
+phyling tree -I align -M iqtree -c -p seq -t 16
+```
+
+**Note: Partition mode is not supported in FastTree.**
+
+#### Tune it yourselves
+
+To adapt the most common needs, PHYling uses the very basic commands to run [FastTree], [RAxML] and [IQTree]:
+
+FastTree for peptide:
+
+```
+FastTree -gamma file.mfa -lg
+```
+
+FastTree for cds:
+
+```
+FastTree -gamma file.mfa -nt
+```
+
+RAxML for peptide:
+
+```
+raxml -s file.mfa -p 12345 -w [absolute_path_output] -n pep -m PROTGAMMAAUTO
+```
+
+RAxML for peptide + partition mode:
+
+```
+raxml -s file.mfa -p 12345 -w [absolute_path_output] -n pep -m PROTGAMMAAUTO -q file.partition
+```
+
+RAxML for cds:
+
+```
+raxml -s file.mfa -p 12345 -w [absolute_path_output] -n cds -m GTRCAT
+```
+
+RAxML for cds + partition mode:
+
+```
+raxml -s file.mfa -p 12345 -w [absolute_path_output] -n cds -m GTRCAT -q file.partition
+```
+
+IQTree for pep/cds:
+
+```
+iqtree2 -s file.mfa --prefix [output_path] -m MFP --mset raxml -T AUTO
+```
+
+IQTree partition mode:
+
+```
+iqtree2 -s file.mfa --prefix [output_path] -m MFP --mset raxml -T AUTO -p file.partition
+```
+
+You can use the tree module to prepare the required data (i.e. concat_alignment.mfa or toverr filtered mfas) and rerun the tree building step with your own preferred parameters.
 
 ## Requirements
 
@@ -310,7 +417,9 @@ phyling tree -I align -n 0 -t 16
 - [muscle] for alternative method for multiple sequence alignment. (Optional)
 - [ClipKIT] for removing sites that are poor of phylogenetic signal.
 - [PhyKIT] for calculating treeness/RCV to filter uninformative orthologs.
-- [FastTree], use approximately maximum-likelihood to build trees. (Optional)
+- [FastTree], use approximately maximum-likelihood to build trees.
+- [RAxML], a more sophisticated maximum-likelihood-based tree building tool. (Optional)
+- [IQTree], a modern maximum-likelihood-based tool for tree building. (Optional)
 - [ASTER], a C++ re-implementation of [ASTRAL] to resolve consensus among trees.
 
 ## Install
@@ -318,7 +427,7 @@ phyling tree -I align -n 0 -t 16
 Please download the source code from the [latest release](https://github.com/stajichlab/PHYling/releases/latest) and decompress it or `git clone` the main branch.
 
 Go into the PHYling folder.
-To avoid messing around the base environment, consider installing it in a conda environment.
+To avoid altering the base environment, it's advisable to install the software in a dedicated conda environment
 Please use the environment.yml to create environment and install all the required packages.
 
 ```
@@ -353,11 +462,6 @@ For convenience we also provide the additional conda env file. Please use the de
 conda env update -f dev_additional_packages.yml
 ```
 
-## Notes
-
-- Training your own marker set is also possible but most busco sets are good starting place.
-- The multiple sequence alignment results can also be sent to other phylogenetic tool like IQ-tree for tree building.
-
 [Busco]: https://busco-data.ezlab.org/v5/data/lineages/
 [pyhmmer]: https://pyhmmer.readthedocs.io/en/stable/index.html
 [muscle]: https://drive5.com/muscle5/
@@ -365,6 +469,8 @@ conda env update -f dev_additional_packages.yml
 [PhyKIT]: https://jlsteenwyk.com/PhyKIT/
 [Treeness/RCV]: https://jlsteenwyk.com/PhyKIT/usage/index.html#treeness-over-rcv
 [FastTree]: http://www.microbesonline.org/fasttree/
+[RAxML]: https://cme.h-its.org/exelixis/web/software/raxml/
+[IQTree]: http://www.iqtree.org/
 [ASTER]: https://github.com/chaoszhang/ASTER
 [ASTRAL]: https://github.com/smirarab/ASTRAL
 [pre-commit]: https://pre-commit.com/

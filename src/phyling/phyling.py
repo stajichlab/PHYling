@@ -99,7 +99,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
         metavar="float",
         type=float,
         default=1e-10,
-        help="Hmmsearch reporting threshold",
+        help="Hmmsearch reporting threshold (default: %(default)s, only being used when bitscore cutoff file is not available)",
     )
     p_aln.add_argument(
         "-M",
