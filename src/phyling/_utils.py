@@ -56,14 +56,17 @@ def timing(func):
 def check_cls_vars(*vars: str):
     """A decorator to check whether a class variable is already defined before calling a class method."""
 
-    def decorator(func: callable):
+    def decorator(func):
         """The actual decorator function that wraps the class method."""
 
+        @wraps(func)
         def wrapper(cls: type, *args, **kwargs):
             """The wrapper function that checks the class variable and calls the method."""
             for var in vars:
                 if not hasattr(cls, var):
-                    raise ValueError(f'The class variable "{var}" of "{cls.__module__}.{cls.__name__}" must be set before calling this method.')
+                    raise ValueError(
+                        f'The class variable "{var}" of "{cls.__module__}.{cls.__name__}" must be set before calling this method.'
+                    )
             return func(cls, *args, **kwargs)
 
         return wrapper

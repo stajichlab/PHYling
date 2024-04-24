@@ -22,7 +22,7 @@ metadata = "metadata.tsv"
 
 # libphyling
 libphyling_checkpoint = ".align.ckp"
-libphyling_precheck_params = {"inputs", "markerset", "markerset_cutoff", "evalue", "method", "non_trim"}
+libphyling_precheck_params = {"inputs", "markerset", "markerset_cutoff", "method", "non_trim"}
 avail_align_methods = ("hmmalign", "muscle")
 
 # phylotree

@@ -29,9 +29,9 @@ from phykit.services.alignment.base import Alignment as Phykit_alignment
 from phykit.services.tree.base import Tree as Phykit_tree
 
 import phyling._abc as _abc
+import phyling._utils as _utils
 import phyling.config as config
 import phyling.exception as exception
-import phyling.utils as utils
 from phyling.libphyling import OutputPrecheck as libphylingPrecheck
 
 expected_files = {
@@ -47,11 +47,45 @@ expected_files = {
 
 
 class MFA2Tree(_abc.SeqFileWrapperABC):
-    """Convert peptide/DNA multiple sequence alignment to Biopython Tree object and calculate the treeness/RCV."""
+    """
+    Convert peptide/DNA multiple sequence alignment to Biopython Tree object and calculate the treeness/RCV.
 
-    def __init__(self, file: str | Path, *, seqtype: str) -> None:
+    Optionally take a partition file to build tree with partition mode with RAxML and IQTree.
+    """
+
+    class Decorator:
+        """A decorator to contains classmethods "check_built" and "check_toverr"."""
+
+        @classmethod
+        def check_built(cls, func):
+            """Check whether the method build() has already being run."""
+
+            def wrapper(self: MFA2Tree, *args, **kwargs):
+                if not hasattr(self, "_tree"):
+                    raise AttributeError("build() need to be run first.")
+                return func(self, *args, **kwargs)
+
+            return wrapper
+
+        @classmethod
+        def check_toverr(cls, func):
+            """Check whether the method compute_toverr() has already being run."""
+
+            def wrapper(self: MFA2Tree, *args, **kwargs):
+                if not hasattr(self, "_toverr"):
+                    raise AttributeError("compute_toverr() need to be run first.")
+                return func(self, *args, **kwargs)
+
+            return wrapper
+
+    def __init__(self, file: str | Path, partition: Path | None = None, *, seqtype: str | None = None) -> None:
         """Initialize the object and check sequence type."""
         super().__init__(file, seqtype=seqtype)
+        if partition:
+            self._partition = partition
+        if not seqtype:
+            self._seqtype = None
+            self._determine_seqtype()
 
     def __repr__(self) -> str:
         """Return the string representation."""
@@ -67,6 +101,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
     def __lt__(self, other: MFA2Tree) -> bool:
         """Return true if the toverr of the current object is smaller than another object."""
+        super().__lt__(other)
         return self.toverr < other.toverr
 
     @property
@@ -77,42 +112,39 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
     @property
     def checksum(self) -> int:
         """Compute the checksum of the stored data."""
-        return utils.get_file_checksum(self.path)
+        return _utils.get_file_checksum(self.path)
 
     @property
     def msa(self) -> MultipleSeqAlignment:
         """Return Biopython MultipleSeqAlignment object."""
         alignment = AlignIO.read(self.path, format="fasta")
-        alignment.annotations["seqtype"] = self.seqtype
+        alignment.annotations["seqtype"] = self._seqtype
         alignment.annotations["seqname"] = self.name
         return alignment
 
     @property
+    @Decorator.check_built
     def tree(self) -> Tree:
         """Return the Biopython tree object."""
-        if not hasattr(self, "_tree"):
-            raise AttributeError("build() need to be run first.")
         return self._tree
 
     @property
+    @Decorator.check_built
     def method(self) -> str:
         """Return the treeness/RCVs."""
-        if not hasattr(self, "_method"):
-            raise AttributeError("build() need to be run first.")
         return self._method
 
     @property
+    @Decorator.check_built
+    @Decorator.check_toverr
     def toverr(self) -> float:
         """Return the treeness/RCVs."""
-        if not hasattr(self, "_toverr"):
-            raise AttributeError("compute_toverr() need to be run first.")
         return self._toverr
 
     def build(self, method: str, output: Path | None = None, *, threads: int = 1, verbose=False) -> None:
         """Run tree building step and return the Biopython Tree object."""
         if method not in config.avail_tree_methods.keys():
             raise KeyError(f'Argument "method" not falling in {config.avail_tree_methods.keys()}')
-        self._method = method
         if method in ("upgma", "nj"):
             tree = self._with_phylo_module(method=method)
         elif method == "ft":
@@ -124,8 +156,10 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         else:
             raise NotImplementedError(f"{config.avail_tree_methods[method]} is not implemented yet.")
         logging.debug(f"Tree building on {self.name} is done.")
+        self._method = method
         self._tree = tree
 
+    @Decorator.check_built
     def compute_toverr(self) -> None:
         """Calculate the treeness/RCV of the tree by PhyKIT implementation."""
         # calculate treeness
@@ -137,6 +171,18 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
         # calculate treeness/rcv
         self._toverr = round(treeness / relative_composition_variability, 4)
+
+    def _determine_seqtype(self) -> str:
+        chars = set()
+        [chars.update(str(rec.seq)) for rec in self.msa]
+        if "-" in chars:
+            chars.remove("-")
+        if len(chars) <= 4 and chars.issubset(set(NCBICodonTableDNA.nucleotide_alphabet)):
+            self._seqtype = config.seqtype_cds
+        elif chars.issubset(set(NCBICodonTable.protein_alphabet)):
+            self._seqtype = config.seqtype_pep
+        else:
+            raise exception.SeqtypeError("Cannot determine seqtype. Aborted.")
 
     def _with_phylo_module(self, *, method: str) -> Tree:
         """Run the tree calculation using a simple distance method."""
@@ -322,20 +368,6 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         return tree
 
 
-class ConcatMFA2Tree(MFA2Tree):
-    """
-    Convert concatenated peptide/DNA multiple sequence alignment to Biopython Tree object and calculate the treeness/RCV.
-
-    Optionally take a partition file to build tree with partition mode with RAxML and IQTree.
-    """
-
-    def __init__(self, file: str | Path, partition: Path | None = None, *, seqtype: str) -> None:
-        """Initialize the object and check sequence type."""
-        super().__init__(file, seqtype=seqtype)
-        if partition:
-            self._partition = partition
-
-
 class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
     """A Wrapper for MFA2Tree object(s) which also provides concatenated data preparation and consensus tree calculation."""
 
@@ -343,7 +375,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         """A decorator to contains classmethods "check_single_file" and "check_sorted"."""
 
         @classmethod
-        def check_single_file(cls, func: callable):
+        def check_single_file(cls, func):
             """Check whether data has more than one MFA2Tree object and raise an error if not."""
 
             def wrapper(self: MFA2TreeWrapper, *args, **kwargs):
@@ -354,7 +386,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
             return wrapper
 
         @classmethod
-        def check_sorted(cls, func: callable):
+        def check_sorted(cls, func):
             """Check whether data is sorted and raise an error if not."""
 
             def wrapper(self: MFA2TreeWrapper, *args, **kwargs):
@@ -367,17 +399,19 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
 
             return wrapper
 
-    def __init__(self, files: list[str | Path | MFA2Tree], *, seqtype: str) -> None:
+    def __init__(self, files: list[str | Path | MFA2Tree], *, seqtype: str | None = None) -> None:
         """Initialize the wrapper object."""
         super().__init__(files)
         for file in files:
-            if isinstance(file, MFA2Tree):
-                self.data.append(file)
-            elif isinstance(file, str | Path):
-                self.data.append(MFA2Tree(file, seqtype=seqtype))
+            if isinstance(file, str | Path):
+                data = MFA2Tree(file, seqtype=seqtype)
+            elif isinstance(file, MFA2Tree):
+                data = file
             else:
                 raise TypeError(f"{self.__class__.__qualname__} only accepts list of str/Path/MFA2Tree")
-        self._seqtype = seqtype
+            if not hasattr(self, "_seqtype"):
+                self._seqtype = data.seqtype
+            self._append(data)
         self._issorted = False
 
     def __repr__(self) -> str:
@@ -385,7 +419,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         info = f"seqtype={self.seqtype}, sorted={self.is_sorted}"
         if self.is_sorted:
             info += f", method={self.method}"
-        return super().__repr__() % info
+        return super().__repr__() % f"({info})"
 
     @Decorator.check_sorted
     def __getitem__(self, idx: int | slice) -> MFA2Tree | MFA2TreeWrapper[MFA2Tree]:
@@ -431,7 +465,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         super().sort(reverse=True)
         self._issorted = True
 
-    @utils.timing
+    @_utils.timing
     def build(self, method: str, output: Path | None = None, *, threads: int = 1, verbose=False) -> None:
         """Run the tree building step for each MFA2Tree object."""
         if len(self) == 1 or threads == 1:
@@ -446,7 +480,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
                     ((mfa2tree, method, output, threads, verbose) for mfa2tree in self),
                 )
 
-    @utils.timing
+    @_utils.timing
     def compute_toverr(self, *, threads: int = 1) -> None:
         """Calculate the treeness/RCV for each MFA2Tree object and sort the MFA2Tree object by the values."""
         logging.info("Calculating treeness/RCV...")
@@ -461,7 +495,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         self.sort()
         logging.info("Done.")
 
-    @utils.timing
+    @_utils.timing
     @Decorator.check_sorted
     @Decorator.check_single_file
     def get_consensus_tree(self) -> Tree:
@@ -484,21 +518,22 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         logging.info("Done.")
         return Phylo.read(StringIO(stdout), "newick")
 
-    @utils.timing
+    @_utils.timing
     @Decorator.check_sorted
     @Decorator.check_single_file
-    def concat(self, output: Path, samples: Iterable[str], *, partition: str | None = None, threads: int = 1) -> ConcatMFA2Tree:
-        """Concatenate selected MSAs to a single mfa file and return the corresponding ConcatMFA2Tree object."""
-        if self.method not in ("raxml", "iqtree") and partition:
-            logging.warning("Partition is forced to be disabled since it only works when using raxml and iqtree.")
-            OutputPrecheck.partition = partition = None
-
+    def concat(self, output: Path, samples: Iterable[str] | None, *, partition: str | None = None, threads: int = 1) -> MFA2Tree:
+        """Concatenate selected MSAs to a single mfa file and return the corresponding MFA2Tree object."""
         alignmentList = [mfa2tree.msa for mfa2tree in self]
         # Sort by MSA length, since shorter MSA might have higher chances to have missing states
         alignmentList = sorted(alignmentList, key=lambda alignment: alignment.get_alignment_length())
 
         # Create an empty MSA holder
         concat_alignments = MultipleSeqAlignment([])
+        if not samples:
+            samples = set()
+            for mfa2tree in self:
+                for rec in mfa2tree.msa:
+                    samples.add(rec.id)
         for sample in samples:
             concat_alignments.append(SeqRecord(Seq(""), id=sample, description=""))
         concat_alignments.sort()
@@ -507,9 +542,9 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         logging.info("Fill missing taxon...")
         if threads > 1:
             with Pool(threads) as pool:
-                alignmentList = pool.starmap(self.fill_missing_taxon, product([samples], alignmentList))
+                alignmentList = pool.starmap(self._fill_missing_taxon, product([samples], alignmentList))
         else:
-            alignmentList = [self.fill_missing_taxon(samples, alignment) for alignment in alignmentList]
+            alignmentList = [self._fill_missing_taxon(samples, alignment) for alignment in alignmentList]
         logging.info("Done.")
 
         # Save partition_info
@@ -534,10 +569,10 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
 
         concat_file, partition_file = self._output_concat_file(output, concat_alignments)
 
-        return ConcatMFA2Tree(concat_file, partition=partition_file, seqtype=self.seqtype)
+        return MFA2Tree(concat_file, partition=partition_file, seqtype=self.seqtype)
 
     @staticmethod
-    def fill_missing_taxon(samples: Iterable[str], alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
+    def _fill_missing_taxon(samples: Iterable[str], alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
         """Include empty gap-only strings to the alignment for taxa lacking an ortholog."""
         missing = set(samples) - {seq.id for seq in alignment}
         for sample in missing:
@@ -550,6 +585,16 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
             )
             alignment.sort()
         return alignment
+
+    def _append(self, item: MFA2Tree) -> None:
+        """Add new sample to the collection."""
+        if not isinstance(item, MFA2Tree):
+            raise TypeError(f"Can only append {MFA2Tree.__qualname__} object but got {type(item)}.")
+        if item.seqtype != self.seqtype:
+            raise exception.SeqtypeError("Item represents different seqtype.")
+        if item.name in self._names():
+            raise exception.IdenticalKeyError(f"File {item.name} already exists.")
+        self.data.append(item)
 
     def _build_helper(self, mfa2tree: MFA2Tree, method: str, output: Path | None, threads: int, verbose: bool) -> Tree:
         """Helper function to run the MFA2tree build method."""
@@ -676,7 +721,7 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
                 setattr(cls, key, value)
 
     @classmethod
-    @utils.check_cls_vars("folder", "ckp")
+    @_utils.check_cls_vars("folder", "ckp")
     def precheck(cls, params: dict, *, force_rerun: bool = False) -> tuple[int, MFA2TreeWrapper | None]:
         """
         Check the output folder and determine the rerun status.
@@ -688,10 +733,11 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
         """
         if params.keys() != config.phylotree_precheck_params:
             raise KeyError(f"Params should contain keys {config.phylotree_precheck_params}")
-        results = super().precheck(params, (), force_rerun=force_rerun)
-        if results:
-            return results
-        return 0, None
+        super().precheck(params, (), force_rerun=force_rerun)
+        if not any(cls.folder.iterdir()):
+            return (0, None)
+        results = cls._determine_rerun(params, *cls.load_checkpoint())
+        return results
 
     @classmethod
     def load_checkpoint(cls) -> tuple[dict, MFA2TreeWrapper]:
@@ -705,13 +751,13 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
     @classmethod
     def save_checkpoint(cls, params: dict, wrapper: MFA2TreeWrapper) -> None:
         """Save the parameters and data as a checkpoint for rerun."""
-        params[f'{expected_files["msas_dir"]}_checksum'] = utils.get_multifiles_checksum(
+        params[f'{expected_files["msas_dir"]}_checksum'] = _utils.get_multifiles_checksum(
             (cls.folder / expected_files["msas_dir"]).glob(f"*.{config.aln_ext}")
         )
         super().save_checkpoint(params, wrapper)
 
     @classmethod
-    @utils.check_cls_vars("folder", "method", "concat", "figure")
+    @_utils.check_cls_vars("folder", "method", "concat", "partition", "figure")
     def output_results(cls, tree: Tree):
         """Output the tree in newick format and figure."""
         Phylo.draw_ascii(tree)
@@ -735,7 +781,7 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
             fig.savefig(output_fig)
 
     @classmethod
-    def _determine_rerun(cls, cur: tuple[dict], prev: tuple[dict, MFA2TreeWrapper]) -> tuple[int, MFA2TreeWrapper]:
+    def _determine_rerun(cls, cur_params: dict, prev_params: dict, wrapper: MFA2TreeWrapper) -> tuple[int, MFA2TreeWrapper]:
         """Define the actions that need to do when found a checkpoint file in the given output folder."""
 
         def rerun_status_3(rm_dirs: set = set(), rm_files: set = set()) -> tuple[int, set, set]:
@@ -802,11 +848,9 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
 
             return 0, rm_dirs, rm_files
 
-        (cur_params,) = cur
-        prev_params, wrapper = prev
         mfas = [file for file in (cls.folder / expected_files["msas_dir"]).glob(f"*.{config.aln_ext}")]
         if mfas:
-            mfas_checksum = utils.get_multifiles_checksum(mfas)
+            mfas_checksum = _utils.get_multifiles_checksum(mfas)
         else:
             mfas_checksum = -1
         cur_params.update({f'{expected_files["msas_dir"]}_checksum': mfas_checksum})
@@ -844,26 +888,18 @@ def single_mfa(
     output: Path,
     *,
     method: str,
-    seqtype: str,
+    seqtype: str | None = None,
     threads: int = 1,
-    rerun: int = 0,
-    wrapper: MFA2TreeWrapper | None = None,
 ) -> tuple[Tree, MFA2TreeWrapper]:
     """
     Run the analysis in single mfa mode.
 
     Return the tree and wrapper for rerun purpose.
     """
-    if bool(rerun) ^ bool(wrapper):
-        raise RuntimeError("Rerun must to be coupled with wrapper.")
-
-    if rerun == 0:
-        wrapper = MFA2TreeWrapper(input, seqtype=seqtype)
-        wrapper.build(method=method, output=output, threads=threads, verbose=True)
-        wrapper.compute_toverr(threads=threads)
-
-    if rerun <= 1:
-        _output_treeness(wrapper, output)
+    wrapper = MFA2TreeWrapper(input, seqtype=seqtype)
+    wrapper.build(method=method, output=output, threads=threads, verbose=True)
+    wrapper.compute_toverr(threads=threads)
+    _output_treeness(wrapper, output)
 
     logging.info("Only one MSA is selected. Report the tree directly.")
     return wrapper[0].tree, wrapper
@@ -874,8 +910,8 @@ def concat(
     output: Path,
     *,
     method: str,
-    seqtype: str,
-    samples: list,
+    seqtype: str | None = None,
+    samples: list | None = None,
     top_n_toverr: int = 50,
     partition: str | None = None,
     threads: int = 1,
@@ -912,7 +948,7 @@ def concat(
         concat_mfa2tree = wrapper.concat(output=output, samples=samples, partition=partition, threads=threads)
     else:
         partition_file = output / expected_files["partition"] if partition else None
-        concat_mfa2tree = ConcatMFA2Tree(output / expected_files["concat"], partition=partition_file, seqtype=seqtype)
+        concat_mfa2tree = MFA2Tree(output / expected_files["concat"], partition=partition_file, seqtype=seqtype)
 
     logging.info("Use the concatednated fasta to generate final tree.")
     concat_mfa2tree.build(method=method, output=output, threads=threads, verbose=True)
@@ -924,30 +960,20 @@ def consensus(
     output: Path,
     *,
     method: str,
-    seqtype: str,
+    seqtype: str | None = None,
     top_n_toverr: int = 50,
     threads: int = 1,
-    rerun: int = 0,
-    wrapper: MFA2TreeWrapper | None = None,
 ) -> tuple[Tree, MFA2TreeWrapper]:
     """
     Run the analysis in consensus mode.
 
     Required more than 1 files. Return the tree and wrapper for rerun purpose.
     """
-    if bool(rerun) ^ bool(wrapper):
-        raise RuntimeError("Rerun must to be coupled with wrapper.")
-
-    if rerun == 0:
-        wrapper = MFA2TreeWrapper(inputs, seqtype=seqtype)
-        logging.info(f"Use {config.avail_tree_methods[method]} to generate trees for treeness filtering.")
-        wrapper.build(method=method, threads=threads)
-        wrapper.compute_toverr(threads=threads)
-    else:
-        wrapper = wrapper
-
-    if rerun <= 1:
-        _output_treeness(wrapper, output, n=top_n_toverr)
+    wrapper = MFA2TreeWrapper(inputs, seqtype=seqtype)
+    logging.info(f"Use {config.avail_tree_methods[method]} to generate trees for treeness filtering.")
+    wrapper.build(method=method, threads=threads)
+    wrapper.compute_toverr(threads=threads)
+    _output_treeness(wrapper, output, n=top_n_toverr)
 
     if 0 < top_n_toverr < len(wrapper):
         corrected_top_n = len(wrapper[:top_n_toverr])
@@ -960,7 +986,7 @@ def consensus(
     return wrapper.get_consensus_tree(), wrapper
 
 
-def determine_samples_and_seqtype(inputs: list[Path], inputs_dir: Path | None) -> tuple[tuple[str], str]:
+def determine_samples_and_seqtype(inputs_dir: Path | None) -> tuple[tuple[str] | None, str | None]:
     """
     Determine the sample names and seqtype from libphyling checkpoint.
 
@@ -972,31 +998,18 @@ def determine_samples_and_seqtype(inputs: list[Path], inputs_dir: Path | None) -
             _, samplelist, _ = libphylingPrecheck.load_checkpoint()
             seqtype = samplelist.seqtype
             samples = tuple(sample.name for sample in samplelist)
+            logging.info(f"Inputs are {seqtype} sequences.")
             return samples, seqtype
-        except ValueError:
+        except RuntimeError:
             msg = "Align module checkpoint file corrupted. "
         except FileNotFoundError:
             msg = "Align module checkpoint file not found. "
+        except Exception:
+            msg = "Unknown issue to read samples and seqtype info from checkpoint file."
     else:
         msg = "Have ambiguous input directory. "
     logging.warning(msg + "Determine samples and seqtype from the given inputs.")
-
-    samples = set()
-    chars = set()
-    for file in inputs:
-        alignment = AlignIO.read(file, format="fasta")
-        for rec in alignment:
-            samples.add(rec.id)
-            chars.update(str(rec.seq))
-    if "-" in chars:
-        chars.remove("-")
-    if len(chars) <= 4 and chars.issubset(set(NCBICodonTableDNA.nucleotide_alphabet)):
-        seqtype = config.seqtype_cds
-    elif chars.issubset(set(NCBICodonTable.protein_alphabet)):
-        seqtype = config.seqtype_pep
-    else:
-        raise exception.SeqtypeError("Cannot determine seqtype. Aborted.")
-    return tuple(samples), seqtype
+    return None, None
 
 
 def _output_treeness(wrapper: MFA2TreeWrapper, output: Path, *, n: int = 0) -> None:

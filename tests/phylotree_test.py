@@ -1,372 +1,458 @@
+import logging
+from copy import deepcopy
+from itertools import permutations, product
 from pathlib import Path
+import shutil
 
 import pytest
-from Bio import Phylo
+from Bio.AlignIO import MultipleSeqAlignment
+from Bio.Phylo.BaseTree import Tree
 
-import phyling.config
-from phyling.phylotree import mfa_to_finaltree, phylotree
-
-samples = [
-    "Actinomucor_elegans_CBS_100.09",
-    "Pilobolus_umbonatus_NRRL_6349",
-    "Rhizopus_homothallicus_CBS_336.62",
-    "Rhizopus_rhizopodiformis_NRRL_2570",
-    "Zygorhynchus_heterogamous_NRRL_1489",
-]
+import phyling.config as config
+import phyling.exception as exception
+from phyling.phylotree import MFA2Tree, MFA2TreeWrapper, OutputPrecheck, determine_samples_and_seqtype
 
 
-@pytest.fixture(scope="class")
-def shared_tmpdir(tmp_path_factory):
-    return tmp_path_factory.mktemp("shared_tmpdir")
-
-
-@pytest.mark.parametrize(
-    "method, concat, partition",
-    [
-        ("ft", True, None),
-        ("raxml", True, None),
-        ("iqtree", True, None),
-        ("ft", True, "seq"),
-        ("raxml", True, "seq"),
-        ("iqtree", True, "seq"),
-        ("ft", False, None),
-        ("raxml", False, None),
-        ("iqtree", False, None),
-    ],
-)
-def test_mfa_to_finaltree_peptide(method, concat, partition, shared_tmpdir):
-    inputs = list(Path("tests/pep_align").iterdir())
-    final_tree, _ = mfa_to_finaltree(
-        inputs=inputs,
-        output=shared_tmpdir,
-        method=method,
-        seqtype=phyling.config.seqtype_pep,
-        samples=samples,
-        concat=concat,
-        top_n_toverr=5,
-        partition=partition,
-        threads=1,
-        rerun=0,
+class TestMFA2Tree:
+    @pytest.mark.parametrize(
+        "file, partition, seqtype",
+        (
+            ("tests/data/pep_align/10at10240.aa.mfa", None, "pep"),
+            ("tests/data/cds_align/14at10240.cds.mfa", None, "cds"),
+            ("tests/data/pep_align/10at10240.aa.mfa", None, None),
+            ("tests/data/cds_align/14at10240.cds.mfa", None, None),
+            ("tests/data/concat_pep.mfa", "tests/data/concat_pep.partition", "pep"),
+            ("tests/data/concat_cds.mfa", "tests/data/concat_cds.partition", "cds"),
+        ),
     )
-    assert isinstance(final_tree, Phylo.BaseTree.Tree) is True
-    if concat:
-        assert (Path(shared_tmpdir) / f"{phyling.config.concat_file_basename}.{phyling.config.aln_ext}").is_file()
-        if partition:
-            assert (Path(shared_tmpdir) / f"{phyling.config.concat_file_basename}.{phyling.config.partition_ext}").is_file()
+    def test_init(self, file: str, partition: str, seqtype: str):
+        m = MFA2Tree(file, partition, seqtype=seqtype)
+        assert m.name == Path(file).name
+        assert isinstance(m.msa, MultipleSeqAlignment)
 
+    def test_eq_lt(self):
+        a = MFA2Tree("tests/data/pep_align/10at10240.aa.mfa", seqtype="pep")  # 1.3572
+        b = MFA2Tree("tests/data/pep_align/10at10240.aa.mfa", seqtype="pep")
+        c = MFA2Tree("tests/data/pep_align/74at10240.aa.mfa", seqtype="pep")  # 1.5419
+        for x in (a, b, c):
+            x.build("ft")
+            x.compute_toverr()
+        assert a == b < c
 
-@pytest.mark.parametrize(
-    "method, concat, partition",
-    [
-        ("ft", True, None),
-        ("raxml", True, None),
-        ("iqtree", True, None),
-        ("ft", True, "seq"),
-        ("raxml", True, "seq"),
-        ("iqtree", True, "seq"),
-        ("ft", True, "codon"),
-        ("raxml", True, "codon"),
-        ("iqtree", True, "codon"),
-        ("ft", True, "seq+codon"),
-        ("raxml", True, "seq+codon"),
-        ("iqtree", True, "seq+codon"),
-        ("ft", False, None),
-        ("raxml", False, None),
-        ("iqtree", False, None),
-    ],
-)
-def test_mfa_to_finaltree_cds(method, concat, partition, shared_tmpdir):
-    inputs = list(Path("tests/cds_align").iterdir())
-    final_tree, _ = mfa_to_finaltree(
-        inputs=inputs,
-        output=shared_tmpdir,
-        method=method,
-        seqtype=phyling.config.seqtype_dna,
-        samples=samples,
-        concat=concat,
-        top_n_toverr=5,
-        partition=partition,
-        threads=1,
-        rerun=0,
-    )
-    assert isinstance(final_tree, Phylo.BaseTree.Tree) is True
-    if concat:
-        assert (Path(shared_tmpdir) / f"{phyling.config.concat_file_basename}.{phyling.config.aln_ext}").is_file()
-        if partition:
-            assert (Path(shared_tmpdir) / f"{phyling.config.concat_file_basename}.{phyling.config.partition_ext}").is_file()
+    def test_eq_lt_attributeerror(self):
+        a = MFA2Tree("tests/data/pep_align/10at10240.aa.mfa", seqtype="pep")  # 1.3572
+        b = MFA2Tree("tests/data/pep_align/10at10240.aa.mfa", seqtype="pep")
+        c = MFA2Tree("tests/data/pep_align/74at10240.aa.mfa", seqtype="pep")  # 1.5419
+        with pytest.raises(AttributeError, match=r"build\(\) need to be run first"):
+            a == b
+        with pytest.raises(AttributeError, match=r"build\(\) need to be run first"):
+            a < c
+        for x in (a, b, c):
+            x.build("ft")
+        with pytest.raises(AttributeError, match=r"compute_toverr\(\) need to be run first"):
+            a == b
+        with pytest.raises(AttributeError, match=r"compute_toverr\(\) need to be run first"):
+            a < c
 
+    def test_eq_lt_seqtypeerror(self):
+        a = MFA2Tree("tests/data/pep_align/10at10240.aa.mfa", seqtype="pep")  # 1.3572
+        b = MFA2Tree("tests/data/cds_align/10at10240.cds.mfa", seqtype="cds")  # 2.1163
+        c = MFA2Tree("tests/data/pep_align/74at10240.aa.mfa", seqtype="pep")  # 1.3572
+        for x in (a, b, c):
+            x.build("ft")
+            x.compute_toverr()
+        with pytest.raises(exception.SeqtypeError, match="Items represent different seqtypes"):
+            a < b
+        with pytest.raises(exception.SeqtypeError, match="Items represent different seqtypes"):
+            b > c
 
-@pytest.mark.parametrize(
-    "inputs, seqtype",
-    [
-        (list(Path("tests/pep_align").iterdir()), "peptide"),
-        (list(Path("tests/cds_align").iterdir()), "DNA"),
-    ],
-)
-def test_mfa_to_finaltree_top_n_toverr_out_of_range(inputs, seqtype, shared_tmpdir):
-    final_tree, tree_gen_obj = mfa_to_finaltree(
-        inputs=inputs,
-        output=shared_tmpdir,
-        method="ft",
-        seqtype=seqtype,
-        samples=samples,
-        concat=True,
-        top_n_toverr=8,
-        partition=None,
-        threads=1,
-        rerun=0,
-    )
-    assert isinstance(final_tree, Phylo.BaseTree.Tree) is True
-    assert isinstance(tree_gen_obj.get_mfa(), list) is True
-    assert len(tree_gen_obj.get_mfa()) == 5
-
-
-@pytest.mark.parametrize(
-    "inputs, seqtype",
-    [
-        ([Path("tests/pep_align/112646at4751.aa.mfa")], "peptide"),
-        ([Path("tests/cds_align/112646at4751.cds.mfa")], "DNA"),
-    ],
-)
-def test_mfa_to_finaltree_single_input(inputs, seqtype, shared_tmpdir):
-    inputs = list(Path("tests/pep_align").iterdir())
-    final_tree, tree_gen_obj = mfa_to_finaltree(
-        inputs=inputs,
-        output=shared_tmpdir,
-        method="ft",
-        seqtype="peptide",
-        samples=samples,
-        concat=True,
-        top_n_toverr=5,
-        partition=None,
-        threads=1,
-        rerun=0,
-    )
-    assert isinstance(final_tree, Phylo.BaseTree.Tree) is True
-
-
-def test_mfa_to_finaltree_seqtype_KeyError(shared_tmpdir):
-    inputs = list(Path("tests/pep_align").iterdir())
-    with pytest.raises(KeyError):
-        mfa_to_finaltree(
-            inputs=inputs,
-            output=shared_tmpdir,
-            method="ft",
-            seqtype="RNA",
-            samples=samples,
-            concat=True,
-            top_n_toverr=2,
-            partition=None,
-            threads=1,
-            rerun=0,
-        )
-
-
-def test_mfa_to_finaltree_method_KeyError(shared_tmpdir):
-    inputs = list(Path("tests/pep_align").iterdir())
-    with pytest.raises(KeyError):
-        mfa_to_finaltree(
-            inputs=inputs,
-            output=shared_tmpdir,
-            method="not_implemented_method",
-            seqtype="peptide",
-            samples=samples,
-            concat=True,
-            top_n_toverr=2,
-            partition=None,
-            threads=1,
-            rerun=0,
-        )
-
-
-class TestCheckpointRerun:
-    @pytest.fixture(scope="class", autouse=True)
-    def filepath(self, shared_tmpdir):
-        self.__class__.checkpoint = shared_tmpdir / phyling.config.phylotree_checkpoint
-        self.__class__.final_tree_file = shared_tmpdir / phyling.config.final_tree_file
-        self.__class__.treeness_file = shared_tmpdir / phyling.config.treeness_file
-        self.__class__.selected_msas_dir = shared_tmpdir / phyling.config.selected_msas_dir
-        self.__class__.concat_file = shared_tmpdir / f"{phyling.config.concat_file_basename}.{phyling.config.aln_ext}"
-        self.__class__.partition_file = shared_tmpdir / f"{phyling.config.concat_file_basename}.{phyling.config.partition_ext}"
-
-    def _run_phylotree(self, output, method, top_n_toverr, concat, partition):
-        phylotree(
-            inputs=None,
-            input_dir=Path("tests/pep_align"),
-            output=output,
-            method=method,
-            top_n_toverr=top_n_toverr,
-            concat=concat,
-            partition=partition,
-            figure=False,
-            threads=1,
-        )
-
-    def _get_mtime(self):
-        checkpoint = self.checkpoint.stat().st_mtime_ns
-        final_tree_file = self.final_tree_file.stat().st_mtime_ns
-        concat_file = self.concat_file.stat().st_mtime_ns if self.concat_file.exists() else False
-        partition_file = self.partition_file.stat().st_mtime_ns if self.partition_file.exists() else False
-        treeness_file = self.treeness_file.stat().st_mtime_ns
-        selected_msas_dir = self.selected_msas_dir.stat().st_mtime_ns
-        return checkpoint, final_tree_file, concat_file, partition_file, treeness_file, selected_msas_dir
-
-    def test_checkpoint_creation(self, shared_tmpdir):
-        assert not self.checkpoint.exists()
-        self._run_phylotree(output=shared_tmpdir, method="ft", top_n_toverr=5, concat=True, partition="seq")
-        assert self.checkpoint.is_file()
-
-    def test_no_rerun(self, shared_tmpdir):
-        checkpoint_before = self.checkpoint.stat().st_mtime_ns
-        with pytest.raises(SystemExit):
-            self._run_phylotree(output=shared_tmpdir, method="ft", top_n_toverr=5, concat=True, partition="seq")
-        assert checkpoint_before == self.checkpoint.stat().st_mtime_ns
-
-    def test_input_changed(self, shared_tmpdir):
-        checkpoint_before = self.checkpoint.stat().st_mtime_ns
-        with pytest.raises(SystemExit):
-            phylotree(
-                inputs=None,
-                input_dir=Path("tests/cds_align"),
-                output=shared_tmpdir,
-                method="ft",
-                top_n_toverr=5,
-                concat=True,
-                partition="seq",
-                figure=False,
-                threads=1,
+    @pytest.mark.slow
+    @pytest.mark.parametrize(
+        "input, partition, seqtype, method",
+        [
+            (input, partition, seqtype, method)
+            for (input, partition, seqtype), method in product(
+                (
+                    ("tests/data/pep_align/10at10240.aa.mfa", None, "pep"),
+                    ("tests/data/cds_align/10at10240.cds.mfa", None, "cds"),
+                    ("tests/data/concat_pep.mfa", "tests/data/concat_pep.partition", "pep"),
+                    ("tests/data/concat_cds.mfa", "tests/data/concat_cds.partition", "cds"),
+                ),
+                ("ft", "raxml", "iqtree"),
             )
-        assert checkpoint_before == self.checkpoint.stat().st_mtime_ns
-
-    @pytest.mark.parametrize(
-        "method, top_n_toverr, concat, partition",
-        [
-            ("raxml", 5, True, "seq"),
-            ("iqtree", 5, True, "seq"),
-            ("ft", 5, True, "seq"),
         ],
     )
-    def test_rerun_final_tree(self, method, top_n_toverr, concat, partition, shared_tmpdir):
-        (
-            checkpoint_before,
-            final_tree_file_before,
-            concat_file_before,
-            partition_file_before,
-            treeness_file_before,
-            selected_msas_dir_before,
-        ) = self._get_mtime()
-
-        self._run_phylotree(output=shared_tmpdir, method=method, top_n_toverr=top_n_toverr, concat=concat, partition=partition)
-
-        assert checkpoint_before != self.checkpoint.stat().st_mtime_ns
-        assert final_tree_file_before != self.final_tree_file.stat().st_mtime_ns
-        assert concat_file_before == self.concat_file.stat().st_mtime_ns
-        assert partition_file_before == self.partition_file.stat().st_mtime_ns
-        assert treeness_file_before == self.treeness_file.stat().st_mtime_ns
-        assert selected_msas_dir_before == self.selected_msas_dir.stat().st_mtime_ns
+    def test_build(self, input, partition, seqtype, method):
+        m = MFA2Tree(input, partition, seqtype=seqtype)
+        m.build(method)
+        assert m.method == method
+        assert isinstance(m.tree, Tree)
 
     @pytest.mark.parametrize(
-        "method, top_n_toverr, concat, partition",
-        [
-            ("ft", 5, True, None),
-            ("raxml", 5, True, "seq"),
-        ],
-    )
-    def test_rerun_concat(self, method, top_n_toverr, concat, partition, shared_tmpdir):
+        "file, seqtype",
         (
-            checkpoint_before,
-            final_tree_file_before,
-            concat_file_before,
-            partition_file_before,
-            treeness_file_before,
-            selected_msas_dir_before,
-        ) = self._get_mtime()
+            ("tests/data/pep_align/10at10240.aa.mfa", "pep"),
+            ("tests/data/cds_align/14at10240.cds.mfa", "cds"),
+        ),
+    )
+    def test_compute_toverr(self, file: str, seqtype: str):
+        m = MFA2Tree(file, seqtype=seqtype)  # 1.3572
+        m.build("ft")
+        m.compute_toverr()
+        assert isinstance(m.toverr, float)
 
-        self._run_phylotree(output=shared_tmpdir, method=method, top_n_toverr=top_n_toverr, concat=concat, partition=partition)
 
-        assert checkpoint_before != self.checkpoint.stat().st_mtime_ns
-        assert final_tree_file_before != self.final_tree_file.stat().st_mtime_ns
-        assert concat_file_before != self.concat_file.stat().st_mtime_ns
-        assert partition_file_before != (self.partition_file.stat().st_mtime_ns if self.partition_file.exists() else False)
-        assert treeness_file_before == self.treeness_file.stat().st_mtime_ns
-        assert selected_msas_dir_before == self.selected_msas_dir.stat().st_mtime_ns
+class TestMFA2TreeWrapper:
+    files_pep = (
+        "tests/data/pep_align/10at10240.aa.mfa",
+        "tests/data/pep_align/14at10240.aa.mfa",
+        "tests/data/pep_align/22at10240.aa.mfa",
+    )
+
+    files_cds = (
+        "tests/data/cds_align/14at10240.cds.mfa",
+        "tests/data/cds_align/10at10240.cds.mfa",
+        "tests/data/cds_align/22at10240.cds.mfa",
+    )
+
+    wrapper_pep = MFA2TreeWrapper(files_pep, seqtype="pep")
+    wrapper_cds = MFA2TreeWrapper(files_cds, seqtype="cds")
+    built_pep, built_cds = deepcopy(wrapper_pep), deepcopy(wrapper_cds)
+    for x in (built_pep, built_cds):
+        x.build("ft")
+    sorted_pep, sorted_cds = deepcopy(built_pep), deepcopy(built_cds)
+    for x in (sorted_pep, sorted_cds):
+        x.compute_toverr()
+
+    @pytest.mark.parametrize("wrapper, seqtype", ((built_pep, "pep"), (built_cds, "cds")))
+    def test_init(self, wrapper: MFA2TreeWrapper, seqtype: str):
+        assert wrapper.seqtype == seqtype
+        assert wrapper.is_sorted is False
+
+    @pytest.mark.parametrize("wrapper, sorted_wrapper", ((wrapper_pep, sorted_pep), (wrapper_cds, sorted_cds)))
+    def test_getitem(self, wrapper: MFA2TreeWrapper, sorted_wrapper: MFA2TreeWrapper):
+        assert len(wrapper) == 3
+        assert all(isinstance(x, MFA2Tree) for x in wrapper)
+        w_sub = sorted_wrapper[0:2]
+        assert isinstance(w_sub, MFA2TreeWrapper)
+        assert len(w_sub) == 2
+        assert all(isinstance(x, MFA2Tree) for x in w_sub)
+
+    @pytest.mark.parametrize("wrapper, built_wrapper", ((wrapper_pep, built_pep), (wrapper_cds, built_cds)))
+    def test_getitem_attributeerror(self, wrapper: MFA2TreeWrapper, built_wrapper: MFA2TreeWrapper):
+        with pytest.raises(AttributeError, match=r"build\(\) need to be run first"):
+            wrapper[0:2]
+        with pytest.raises(AttributeError, match=r"compute_toverr\(\) need to be run first"):
+            built_wrapper[0:2]
+
+    @pytest.mark.parametrize("wrapper", (built_pep, built_cds))
+    def test_sort(self, wrapper: MFA2TreeWrapper):
+        w = deepcopy(wrapper)
+        w.compute_toverr()
+        w.sort()
+        assert w.is_sorted is True
+        assert w[0] > w[1] > w[2]
+
+    @pytest.mark.parametrize("wrapper, built_wrapper", ((wrapper_pep, built_pep), (wrapper_cds, built_cds)))
+    def test_sort_attributeerror(self, wrapper: MFA2TreeWrapper, built_wrapper: MFA2TreeWrapper):
+        with pytest.raises(AttributeError, match=r"build\(\) need to be run first"):
+            wrapper.sort()
+        with pytest.raises(AttributeError, match=r"compute_toverr\(\) need to be run first"):
+            built_wrapper.sort()
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("wrapper, method", list(product((wrapper_pep, wrapper_cds), ("ft", "raxml", "iqtree"))))
+    def test_build(self, wrapper: MFA2TreeWrapper, method: str):
+        w = deepcopy(wrapper)
+        w.build(method)
+        assert w.method == method
+
+    @pytest.mark.parametrize("wrapper", (built_pep, built_cds))
+    def test_compute_toverr(self, wrapper: MFA2TreeWrapper):
+        w = deepcopy(wrapper)
+        w.compute_toverr()
+        assert all(isinstance(x.toverr, float) for x in w)
+
+    @pytest.mark.parametrize("wrapper", (sorted_pep, sorted_cds))
+    def test_get_consensus_tree(self, wrapper: MFA2TreeWrapper):
+        w = deepcopy(wrapper)
+        assert isinstance(w.get_consensus_tree(), Tree)
 
     @pytest.mark.parametrize(
-        "method, top_n_toverr, concat, partition",
-        [
-            ("raxml", 4, True, "seq"),
-            ("ft", 5, True, None),
-        ],
-    )
-    def test_rerun_msa_selection(self, method, top_n_toverr, concat, partition, shared_tmpdir):
+        "wrapper, samples, partition",
         (
-            checkpoint_before,
-            final_tree_file_before,
-            concat_file_before,
-            partition_file_before,
-            treeness_file_before,
-            selected_msas_dir_before,
-        ) = self._get_mtime()
+            (sorted_pep, None, None),
+            (sorted_cds, None, None),
+            (sorted_pep, None, "seq"),
+            (sorted_cds, None, "seq"),
+            (sorted_cds, None, "codon"),
+            (sorted_cds, None, "seq+codon"),
+            (
+                sorted_pep,
+                ("Anomala_cuprea_entomopoxvirus", "Canarypox_virus", "Cowpox_virus", "Goatpox_virus", "Variola_virus"),
+                "seq",
+            ),
+        ),
+    )
+    def test_concat(self, tmp_path: Path, wrapper: MFA2TreeWrapper, samples: tuple, partition: str):
+        w = deepcopy(wrapper)
+        r = w.concat(tmp_path, samples, partition=partition)
+        assert (tmp_path / f"concat_alignments.{config.aln_ext}").is_file() is True
+        assert isinstance(r, MFA2Tree)
+        assert r.name == f"concat_alignments.{config.aln_ext}"
+        if partition:
+            assert (tmp_path / "concat_alignments.partition").is_file() is True
 
-        self._run_phylotree(output=shared_tmpdir, method=method, top_n_toverr=top_n_toverr, concat=concat, partition=partition)
 
-        assert checkpoint_before != self.checkpoint.stat().st_mtime_ns
-        assert final_tree_file_before != self.final_tree_file.stat().st_mtime_ns
-        assert concat_file_before != self.concat_file.stat().st_mtime_ns
-        assert partition_file_before != (self.partition_file.stat().st_mtime_ns if self.partition_file.exists() else False)
-        assert treeness_file_before != self.treeness_file.stat().st_mtime_ns
-        assert selected_msas_dir_before != self.selected_msas_dir.stat().st_mtime_ns
+class TestOutputPrecheck:
+    @pytest.fixture(scope="function")
+    def copy_phylotree_ckp(self, tmp_path: Path) -> Path:
+        shutil.copy("tests/data/tree/.tree.ckp", tmp_path / ".tree.ckp")
+        OutputPrecheck.setup(folder=tmp_path)
+        return tmp_path
+
+    def test_precheck_new(self, tmp_path: Path):
+        assert (tmp_path / "output").exists() is False
+        OutputPrecheck.setup(folder=tmp_path / "output")
+        params = {
+            "method": "ft",
+            "top_n_toverr": 50,
+            "concat": False,
+            "partition": None,
+            "inputs": "fakechecksum",
+        }
+        r, _ = OutputPrecheck.precheck(params)
+        assert r == 0
+        assert (tmp_path / "output").is_dir() is True
+
+    def test_precheck_folder_exists(self, tmp_path: Path):
+        OutputPrecheck.setup(folder=tmp_path)
+        params = {
+            "method": "ft",
+            "top_n_toverr": 18,
+            "concat": False,
+            "partition": None,
+            "inputs": "fakechecksum",
+        }
+        r, _ = OutputPrecheck.precheck(params)
+        assert r == 0
+        assert tmp_path.is_dir() is True
+
+    def test_precheck_notadirectoryerror(self, tmp_path: Path):
+        (tmp_path / "output").touch()
+        OutputPrecheck.setup(folder=tmp_path / "output")
+        params = {
+            "method": "ft",
+            "top_n_toverr": 18,
+            "concat": False,
+            "partition": None,
+            "inputs": "fakechecksum",
+        }
+        with pytest.raises(NotADirectoryError, match="already existed but not a folder"):
+            OutputPrecheck.precheck(params)
+
+    @pytest.mark.parametrize("method1, method2", list(permutations(("ft", "raxml", "iqtree"), 2)))
+    def test_precheck_rerun_status_3(self, method1: str, method2: str, tmp_path: Path):
+        OutputPrecheck.setup(folder=tmp_path)
+        msas_dir = tmp_path / "selected_MSAs"
+        msas_dir.mkdir()
+        for file in Path("tests/data/pep_align").glob("*.mfa"):
+            (msas_dir / file.name).symlink_to(file.absolute())
+
+        prev_params = {
+            "method": method1,
+            "top_n_toverr": 18,
+            "concat": True,
+            "partition": None,
+            "inputs": "fakechecksum",
+        }
+        fake_input = tmp_path / "input"
+        fake_input.touch()
+        OutputPrecheck.save_checkpoint(prev_params, MFA2TreeWrapper([fake_input], seqtype="pep"))
+        cur_params = {
+            "method": method2,
+            "top_n_toverr": 18,
+            "concat": True,
+            "partition": None,
+            "inputs": "fakechecksum",
+        }
+        r, _ = OutputPrecheck.precheck((cur_params))
+        assert r == 3
 
     @pytest.mark.parametrize(
-        "method, top_n_toverr, concat, partition",
-        [
-            ("ft", 4, False, None),
-            ("ft", 5, True, None),
-            ("ft", 5, False, None),
-        ],
+        "method, partition",
+        tuple(
+            product(
+                tuple(product(("ft", "raxml", "iqtree"), repeat=2)),
+                tuple(permutations((None, "seq", "codon", "seq+codon"), 2)),
+            )
+        ),
     )
-    def test_switch_type(self, method, top_n_toverr, concat, partition, shared_tmpdir):
-        (
-            checkpoint_before,
-            final_tree_file_before,
-            concat_file_before,
-            partition_file_before,
-            treeness_file_before,
-            selected_msas_dir_before,
-        ) = self._get_mtime()
+    def test_precheck_rerun_status_2(self, method: str, partition: str, tmp_path: Path):
+        OutputPrecheck.setup(folder=tmp_path)
+        msas_dir = tmp_path / "selected_MSAs"
+        msas_dir.mkdir()
+        for file in Path("tests/data/pep_align").glob("*.mfa"):
+            (msas_dir / file.name).symlink_to(file.absolute())
 
-        self._run_phylotree(output=shared_tmpdir, method=method, top_n_toverr=top_n_toverr, concat=concat, partition=partition)
-
-        assert checkpoint_before != self.checkpoint.stat().st_mtime_ns
-        assert final_tree_file_before != self.final_tree_file.stat().st_mtime_ns
-        assert concat_file_before != (self.concat_file.stat().st_mtime_ns if self.concat_file.exists() else False)
-        assert partition_file_before == self.partition_file.exists() is False
-        assert treeness_file_before != self.treeness_file.stat().st_mtime_ns
-        assert selected_msas_dir_before != self.selected_msas_dir.stat().st_mtime_ns
+        prev_params = {
+            "method": method[0],
+            "top_n_toverr": 18,
+            "concat": True,
+            "partition": partition[0],
+            "inputs": "fakechecksum",
+        }
+        fake_input = tmp_path / "input"
+        fake_input.touch()
+        OutputPrecheck.save_checkpoint(prev_params, MFA2TreeWrapper([fake_input], seqtype="pep"))
+        cur_params = {
+            "method": method[1],
+            "top_n_toverr": 18,
+            "concat": True,
+            "partition": partition[1],
+            "inputs": "fakechecksum",
+        }
+        r, _ = OutputPrecheck.precheck(cur_params)
+        assert r == 2
 
     @pytest.mark.parametrize(
-        "method, top_n_toverr, concat, partition",
-        [
-            ("raxml", 5, False, None),
-            ("iqtree", 4, False, None),
-            ("ft", 5, False, None),
-        ],
+        "top_n, partition",
+        tuple(
+            product(
+                ((18, 5),),
+                tuple(product(("ft", "raxml", "iqtree"), repeat=2)),
+            )
+        ),
     )
-    def test_consensus_rerun(self, method, top_n_toverr, concat, partition, shared_tmpdir):
+    def test_precheck_rerun_status_1(self, top_n: int, partition: str, tmp_path: Path):
+        OutputPrecheck.setup(folder=tmp_path)
+        msas_dir = tmp_path / "selected_MSAs"
+        msas_dir.mkdir()
+        for file in Path("tests/data/pep_align").glob("*.mfa"):
+            (msas_dir / file.name).symlink_to(file.absolute())
+
+        prev_params = {
+            "method": "ft",
+            "top_n_toverr": top_n[0],
+            "concat": True,
+            "partition": partition[0],
+            "inputs": "fakechecksum",
+        }
+        fake_input = tmp_path / "input"
+        fake_input.touch()
+        OutputPrecheck.save_checkpoint(prev_params, MFA2TreeWrapper([fake_input], seqtype="pep"))
+        cur_params = {
+            "method": "ft",
+            "top_n_toverr": top_n[1],
+            "concat": True,
+            "partition": partition[1],
+            "inputs": "fakechecksum",
+        }
+        r, _ = OutputPrecheck.precheck(cur_params)
+        assert r == 1
+
+    @pytest.mark.parametrize(
+        "method, top_n, concat, partition",
+        list(
+            product(
+                (("ft", "ft"), ("ft", "raxml")),
+                ((10, 10), (10, 50)),
+                ((False, False), (True, False), (False, True)),
+                tuple(product((None, "seq", "codon", "seq+codon"), repeat=2)),
+            )
+        ),
+    )
+    def test_precheck_rerun_status_0(self, method: str, top_n: int, concat: bool, partition: str, tmp_path: Path):
+        OutputPrecheck.setup(folder=tmp_path)
+        msas_dir = tmp_path / "selected_MSAs"
+        msas_dir.mkdir()
+        for file in Path("tests/data/pep_align").glob("*.mfa"):
+            (msas_dir / file.name).symlink_to(file.absolute())
+
+        prev_params = {
+            "method": method[0],
+            "top_n_toverr": top_n[0],
+            "concat": concat[0],
+            "partition": partition[0],
+            "inputs": "fakechecksum",
+        }
+        fake_input = tmp_path / "input"
+        fake_input.touch()
+        OutputPrecheck.save_checkpoint(prev_params.copy(), MFA2TreeWrapper([fake_input], seqtype="pep"))
+        cur_params = {
+            "method": method[1],
+            "top_n_toverr": top_n[1],
+            "concat": concat[1],
+            "partition": partition[1],
+            "inputs": "fakechecksum",
+        }
+        print(prev_params)
+        if prev_params == cur_params:
+            with pytest.raises(SystemExit, match="Files not changed and parameters are identical to the previous run"):
+                OutputPrecheck.precheck(cur_params)
+        else:
+            r, _ = OutputPrecheck.precheck(cur_params)
+            assert r == 0
+
+    def test_load_checkpoint(self):
+        OutputPrecheck.setup(folder=Path("tests/data/tree"))
+        params, wrapper = OutputPrecheck.load_checkpoint()
+        assert isinstance(params, dict)
+        assert isinstance(wrapper, MFA2TreeWrapper)
+
+    def test_save_checkpoint(self, tmp_path):
+        OutputPrecheck.setup(folder=tmp_path)
+        params = {
+            "method": "ft",
+            "top_n_toverr": 18,
+            "concat": False,
+            "partition": None,
+            "inputs": "fakechecksum",
+        }
+        wrapper = MFA2TreeWrapper(["tests/data/pep_align/10at10240.aa.mfa"], seqtype="pep")
+        OutputPrecheck.save_checkpoint(params, wrapper)
+        a, b = OutputPrecheck.load_checkpoint()
+        assert len(a) == 6
+        assert b == wrapper
+
+    @pytest.mark.parametrize(
+        "method, concat, partition, figure",
         (
-            checkpoint_before,
-            final_tree_file_before,
-            concat_file_before,
-            partition_file_before,
-            treeness_file_before,
-            selected_msas_dir_before,
-        ) = self._get_mtime()
+            ("ft", True, "seq", False),
+            ("iqtree", False, None, False),
+            ("raxml", True, "seq+codon", True),
+        ),
+    )
+    def test_output_results(self, copy_phylotree_ckp: Path, method: str, concat: bool, partition: str, figure: bool):
+        tmp_path = copy_phylotree_ckp
+        OutputPrecheck.setup(folder=tmp_path, method=method, concat=concat, partition=partition, figure=figure)
+        _, wrapper = OutputPrecheck.load_checkpoint()
+        OutputPrecheck.output_results(wrapper[0].tree)
 
-        self._run_phylotree(output=shared_tmpdir, method=method, top_n_toverr=top_n_toverr, concat=concat, partition=partition)
+        with open(tmp_path / "final_tree.nw") as f:
+            content = f.read()
+        strategy = "concatenate" if concat else "consensus"
+        assert f"Final tree is built using {config.avail_tree_methods[method]} with {strategy} strategy" in content
 
-        assert checkpoint_before != self.checkpoint.stat().st_mtime_ns
-        assert final_tree_file_before != self.final_tree_file.stat().st_mtime_ns
-        assert concat_file_before == self.concat_file.exists() is False
-        assert partition_file_before == self.partition_file.exists() is False
-        assert treeness_file_before != self.treeness_file.stat().st_mtime_ns
-        assert selected_msas_dir_before != self.selected_msas_dir.stat().st_mtime_ns
+        if concat and partition:
+            assert f"Partition is enabled using {partition} mode" in content
+
+        if figure:
+            assert (tmp_path / "final_tree.png").is_file()
+
+
+@pytest.mark.parametrize("input_dir, exp_seqtype", ((Path("tests/data/pep_align"), "pep"), (Path("tests/data/cds_align"), "cds")))
+def test_determine_samples_and_seqtype(input_dir, exp_seqtype):
+    samples, seqtype = determine_samples_and_seqtype(input_dir)
+
+    assert len(samples) == 5
+    assert seqtype == exp_seqtype
+
+
+def test_determine_samples_and_seqtype_checkpoint_not_found(tmp_path, caplog: pytest.LogCaptureFixture):
+    with caplog.at_level(logging.WARNING):
+        samples, seqtype = determine_samples_and_seqtype(tmp_path)
+
+    assert samples is None
+    assert seqtype is None
+    assert "Determine samples and seqtype from the given inputs" in caplog.text

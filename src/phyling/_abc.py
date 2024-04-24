@@ -4,10 +4,11 @@ import shutil
 import textwrap
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Generic, Iterable, Iterator, TypeVar
+from typing import Generic, Iterable, Iterator, Sequence, TypeVar
 
 import phyling.config as config
-from phyling.utils import check_cls_vars
+import phyling.exception as exception
+from phyling._utils import check_cls_vars
 
 T = TypeVar("T")
 SFW = TypeVar("SFW", bound="SeqFileWrapperABC")
@@ -16,9 +17,38 @@ SFW = TypeVar("SFW", bound="SeqFileWrapperABC")
 class SeqFileWrapperABC(ABC):
     """An abstract class for sequence files."""
 
+    class Decorator:
+        """A decorator to contains classmethods "check_seqtypes"."""
+
+        @classmethod
+        def check_class(cls, func: callable):
+            """Check whether self and other are the same class."""
+
+            def wrapper(self: SFW, other: SFW):
+                if not isinstance(other, self.__class__):
+                    raise TypeError(f"Can only operate with another {self.__class__} object but got {type(other)}")
+                return func(self, other)
+
+            return wrapper
+
+        @classmethod
+        def check_seqtype(cls, func: callable):
+            """Check whether self and other represent the same seqtype."""
+
+            def wrapper(self: SFW, other: SFW):
+                if self.seqtype != other.seqtype:
+                    raise exception.SeqtypeError("Items represent different seqtypes.")
+                return func(self, other)
+
+            return wrapper
+
     def __init__(self, file: str | Path, *, seqtype: str | None = None) -> None:
         """Initialize the object and check sequence type."""
         self._file = Path(file)
+        if not self._file.exists():
+            raise FileNotFoundError(f"{self._file}")
+        if self._file.is_dir():
+            raise IsADirectoryError(f"{self._file}")
         if seqtype:
             self._set_seqtype(seqtype)
 
@@ -27,12 +57,15 @@ class SeqFileWrapperABC(ABC):
         return f"{self.__class__.__qualname__}({self.name}" + ", %s)"
 
     @abstractmethod
+    @Decorator.check_seqtype
+    @Decorator.check_class
     def __eq__(self, other: SFW) -> bool:
         """Return true if the two objects have the same value."""
-        if not isinstance(other, self.__class__):
-            raise TypeError(f"Can only compare to {self.__class__} object but got {type(other)}")
+        ...
 
     @abstractmethod
+    @Decorator.check_seqtype
+    @Decorator.check_class
     def __lt__(self, other: SFW) -> bool:
         """Return true if the current object is smaller than/prior to another object."""
         ...
@@ -65,11 +98,11 @@ class DataListABC(ABC, Generic[T]):
     """A list-like abstract class which have partial list methods."""
 
     @abstractmethod
-    def __init__(self, files: Iterable[str | Path | T]) -> None:
+    def __init__(self, files: Iterator[str | Path | T] | Sequence[str | Path | T]) -> None:
         """Initialize the object and store data into a list."""
         self.data: list[T] = []
-        if not isinstance(files, Iterable):
-            raise TypeError(f"{self.__class__.__qualname__} is not iterable")
+        if not isinstance(files, Iterator | tuple | list):
+            raise TypeError(f"{self.__class__.__qualname__} is not an iterator/tuple/list")
 
     def __repr__(self) -> str:
         """Return the object representation when being called."""
@@ -80,7 +113,7 @@ class DataListABC(ABC, Generic[T]):
             if len(self) > 20:
                 data = data[:5] + ["..."] + data[-5:]
             data = ",\n".join([textwrap.indent(line, prefix=" " * 4) for line in data])
-            data = f"[\n{data}]"
+        data = f"[\n{data}]"
         return self.__class__.__qualname__ + "%s" + data
 
     def __iter__(self) -> Iterator[T]:
@@ -165,13 +198,8 @@ class OutputPrecheckABC(ABC):
             shutil.rmtree(cls.folder)
             cls.folder.mkdir()
 
-        if not any(cls.folder.iterdir()):
-            return None
-        elif not (cls.folder / cls.ckp).exists():
+        if any(cls.folder.iterdir()) and not (cls.folder / cls.ckp).exists():
             raise FileExistsError(f"Checkpoint file not found but the output directory {cls.folder} is not empty. Aborted.")
-        results = cls._determine_rerun((params, data), cls.load_checkpoint())
-
-        return results
 
     @classmethod
     @check_cls_vars("folder", "ckp")
@@ -186,9 +214,9 @@ class OutputPrecheckABC(ABC):
             with open(cls.folder / cls.ckp, "rb") as f:
                 params, *data = pickle.load(f)
         except FileNotFoundError:
-            raise SystemExit("Checkpoint file not found.")
+            raise FileNotFoundError("Checkpoint file not found.")
         except (EOFError, ValueError):
-            raise SystemExit("Align module checkpoint file corrupted. Please remove the output folder and try again.")
+            raise RuntimeError("Align module checkpoint file corrupted. Please remove the output folder and try again.")
 
         return params, *data
 

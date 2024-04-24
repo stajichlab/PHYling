@@ -6,10 +6,8 @@ import pytest
 
 from phyling.pipeline import align, download, tree
 
-pytestmark = pytest.mark.skip("Skipping pipeline testing.")
 
-
-@pytest.mark.usefixtures("pack_current_metadata")
+@pytest.mark.usefixtures("hide_metadata_wo_download")
 class TestDownload:
     def test_download_list(self):
         download("list")
@@ -36,35 +34,32 @@ class TestDownload:
         assert "Markerset InvalidName not available" in caplog.text
 
 
-@pytest.mark.usefixtures("pack_current_metadata")
 class TestAlign:
     inputs = (
-        "tests/pep",
-        "tests/cds",
+        "tests/data/pep",
+        "tests/data/cds",
         [
-            "tests/pep/Anomala_cuprea_entomopoxvirus.faa.gz",
-            "tests/pep/Canarypox_virus.faa.gz",
-            "tests/pep/Cowpox_virus.faa.gz",
-            "tests/pep/Goatpox_virus.faa.gz",
-            "tests/pep/Monkeypox_virus.faa.gz",
-            "tests/pep/Variola_virus.faa.gz",
+            "tests/data/pep/Anomala_cuprea_entomopoxvirus.faa.gz",
+            "tests/data/pep/Canarypox_virus.faa.gz",
+            "tests/data/pep/Cowpox_virus.faa.gz",
+            "tests/data/pep/Goatpox_virus.faa.gz",
+            "tests/data/pep/Variola_virus.faa.gz",
         ],
         [
-            "tests/cds/Anomala_cuprea_entomopoxvirus.fna.gz",
-            "tests/cds/Canarypox_virus.fna.gz",
-            "tests/cds/Cowpox_virus.fna.gz",
-            "tests/cds/Goatpox_virus.fna.gz",
-            "tests/cds/Monkeypox_virus.fna.gz",
-            "tests/cds/Variola_virus.fna.gz",
+            "tests/data/cds/Anomala_cuprea_entomopoxvirus.fna.gz",
+            "tests/data/cds/Canarypox_virus.fna.gz",
+            "tests/data/cds/Cowpox_virus.fna.gz",
+            "tests/data/cds/Goatpox_virus.fna.gz",
+            "tests/data/cds/Variola_virus.fna.gz",
         ],
     )
     method = ("hmmalign", "muscle")
     nontrim = (True, False)
 
-    @pytest.mark.skip(reason="Skipping Align pipeline since they're quite time consuming.")
+    @pytest.mark.slow
     @pytest.mark.parametrize("inputs, method, nontrim", list(product(inputs, method, nontrim)))
     def test_align_inputs(self, inputs: str, tmp_path: Path, method: str, nontrim: bool):
-        align(inputs, tmp_path, markerset="poxviridae_odb10", method=method, non_trim=nontrim)
+        align(inputs, tmp_path, markerset="tests/database/poxviridae_odb10/hmms", method=method, non_trim=nontrim)
 
     def test_align_markerset_not_avail(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
         with pytest.raises(SystemExit):
@@ -75,7 +70,7 @@ class TestAlign:
 
     def test_align_method_not_avail(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
         with pytest.raises(SystemExit):
-            align(self.inputs[0], tmp_path, markerset="poxviridae_odb10", method="InvalidName")
+            align(self.inputs[0], tmp_path, markerset="tests/database/poxviridae_odb10/hmms", method="InvalidName")
 
         assert any(record.levelname == "ERROR" for record in caplog.records)
         assert "Invalid method" in caplog.text
@@ -83,19 +78,19 @@ class TestAlign:
 
 class TestTree:
     inputs_pep = (
-        "tests/pep_align",
+        "tests/data/pep_align",
         [
-            "tests/pep_align/10at10240.aa.mfa",
-            "tests/pep_align/14at10240.aa.mfa",
-            "tests/pep_align/43at10240.aa.mfa",
+            "tests/data/pep_align/10at10240.aa.mfa",
+            "tests/data/pep_align/14at10240.aa.mfa",
+            "tests/data/pep_align/43at10240.aa.mfa",
         ],
     )
     inputs_cds = (
-        "tests/cds_align",
+        "tests/data/cds_align",
         [
-            "tests/cds_align/10at10240.cds.mfa",
-            "tests/cds_align/14at10240.cds.mfa",
-            "tests/cds_align/22at10240.cds.mfa",
+            "tests/data/cds_align/10at10240.cds.mfa",
+            "tests/data/cds_align/14at10240.cds.mfa",
+            "tests/data/cds_align/22at10240.cds.mfa",
         ],
     )
     method = ("ft", "raxml", "iqtree")
@@ -104,7 +99,7 @@ class TestTree:
     partition = (None, "seq", "codon", "seq+codon")
     figure = (False, True)
 
-    # @pytest.mark.skip(reason="Skipping Tree pipeline since they're quite time consuming.")
+    @pytest.mark.slow
     @pytest.mark.parametrize("inputs, top_n, concat, partition", list(product(inputs_pep, top_n, concat, partition[:2])))
     def test_tree_pep(
         self, inputs: str | list[str], tmp_path: Path, top_n: int, concat: bool, partition: str, caplog: pytest.LogCaptureFixture
@@ -113,12 +108,10 @@ class TestTree:
             tree(inputs, tmp_path, top_n_toverr=top_n, concat=concat, partition=partition)
 
         msg = "Partition is forced to be disabled since it only works when using raxml and iqtree."
-        if partition and concat:
+        if partition:
             assert msg in caplog.text
-        else:
-            assert msg not in caplog.text
 
-    # @pytest.mark.skip(reason="Skipping Tree pipeline since they're quite time consuming.")
+    @pytest.mark.slow
     @pytest.mark.parametrize("inputs, top_n, concat, partition", list(product(inputs_cds, top_n, concat, partition)))
     def test_tree_cds(
         self, inputs: str | list[str], tmp_path: Path, top_n: int, concat: bool, partition: str, caplog: pytest.LogCaptureFixture
@@ -127,12 +120,10 @@ class TestTree:
             tree(inputs, tmp_path, top_n_toverr=top_n, concat=concat, partition=partition)
 
         msg = "Partition is forced to be disabled since it only works when using raxml and iqtree."
-        if partition and concat:
+        if partition:
             assert msg in caplog.text
-        else:
-            assert msg not in caplog.text
 
-    # @pytest.mark.skip(reason="Skipping Tree pipeline since they're quite time consuming.")
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "inputs, method, concat, partition",
         list(product((inputs_pep[1], inputs_cds[1]), method[1:], concat, partition[:2])),
@@ -149,6 +140,7 @@ class TestTree:
         else:
             assert msg not in caplog.text
 
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "input, method",
         list(product((inputs_pep[1][0], inputs_cds[1][0]), method)),
@@ -159,6 +151,7 @@ class TestTree:
 
         assert "Only one MSA is selected. Report the tree directly." in caplog.text
 
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "inputs, method, concat",
         list(product((inputs_pep[1], inputs_cds[1]), method[1:], concat)),

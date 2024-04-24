@@ -5,15 +5,15 @@ import sys
 from pathlib import Path
 from urllib.error import URLError
 
+import phyling._utils as _utils
 import phyling.config as config
 import phyling.exception as exception
 import phyling.libdownload as libdownload
 import phyling.libphyling as libphyling
 import phyling.phylotree as phylotree
-import phyling.utils as utils
 
 
-@utils.timing
+@_utils.timing
 def download(markerset, **kwargs) -> None:
     """
     Help to download/update BUSCO v5 markerset to a local folder.
@@ -52,7 +52,7 @@ def download(markerset, **kwargs) -> None:
         logging.info(e)
 
 
-@utils.timing
+@_utils.timing
 def align(
     inputs: str | Path | list[str | Path],
     output: str | Path,
@@ -116,8 +116,7 @@ def align(
     params = {
         "inputs": inputs.checksum,
         "markerset": markerset.checksum,
-        "markerset_cutoff": markerset.have_cutoff,
-        "evalue": evalue,
+        "markerset_cutoff": "markerset cutoff" if markerset.have_cutoff else evalue,
         "method": method,
         "non_trim": non_trim,
     }
@@ -178,7 +177,7 @@ def align(
     libphyling.OutputPrecheck.save_checkpoint(params, inputs, orthologs)
 
 
-@utils.timing
+@_utils.timing
 def tree(
     inputs: str | Path | list[str | Path],
     output: str | Path,
@@ -225,14 +224,16 @@ def tree(
             input_dir = inputs
             inputs = tuple(file for file in input_dir.glob(f"*.{config.aln_ext}"))
 
-    inputs_checksum = utils.get_multifiles_checksum(inputs)
+    inputs_checksum = _utils.get_multifiles_checksum(inputs)
     logging.info(f"Found {len(inputs)} MSA fasta.")
-    try:
-        samples, seqtype = phylotree.determine_samples_and_seqtype(inputs, input_dir)
-    except Exception as e:
-        logging.error(e)
-        sys.exit(1)
-    logging.info(f"Inputs are {seqtype} sequences.")
+    samples, seqtype = phylotree.determine_samples_and_seqtype(input_dir)
+
+    if method not in ("raxml", "iqtree") and partition:
+        logging.warning("Partition is forced to be disabled since it only works when using raxml and iqtree.")
+        partition = None
+
+    if top_n_toverr > len(inputs) or top_n_toverr == 0:
+        top_n_toverr = len(inputs)
 
     params = {
         "method": method,
@@ -252,10 +253,8 @@ def tree(
 
     try:
         if len(inputs) == 1:
-            tree, wrapper = phylotree.single_mfa(
-                inputs, output, method=method, seqtype=seqtype, threads=threads, rerun=rerun, wrapper=wrapper
-            )
-            params.update(top_n_toverr=0, concat=False, partition=None)
+            tree, wrapper = phylotree.single_mfa(inputs, output, method=method, seqtype=seqtype, threads=threads)
+            params.update(top_n_toverr=1, concat=False, partition=None)
         else:
             if concat:
                 tree, wrapper = phylotree.concat(
@@ -278,8 +277,6 @@ def tree(
                     seqtype=seqtype,
                     top_n_toverr=top_n_toverr,
                     threads=threads,
-                    rerun=rerun,
-                    wrapper=wrapper,
                 )
             params.update(partition=phylotree.OutputPrecheck.partition)
     except Exception as e:

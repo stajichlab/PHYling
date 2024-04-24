@@ -50,19 +50,20 @@ class TestSampleSeqs:
         a = SampleSeqs("tests/data/Monkeypox_virus.faa.gz")
         assert type(len(a)) is int
 
-    def test_eq(self):
+    def test_eq_lt(self):
         a = SampleSeqs("tests/data/Monkeypox_virus.faa.gz")
         b = SampleSeqs("tests/data/Monkeypox_virus.faa.gz")
-        c = SampleSeqs("tests/data/Monkeypox_virus.fna.gz")
-        assert a == b != c
+        c = SampleSeqs("tests/data/pep/Anomala_cuprea_entomopoxvirus.faa.gz")
+        assert a == b > c
 
-    def test_lt(self):
-        a = SampleSeqs("tests/data/pep/Anomala_cuprea_entomopoxvirus.faa.gz")
-        b = SampleSeqs("tests/data/Monkeypox_virus.faa.gz")
-        c = SampleSeqs("tests/data/Monkeypox_virus.fna.gz")
-        assert a < b
+    def test_eq_lt_seqtypeerror(self):
+        a = SampleSeqs("tests/data/Monkeypox_virus.faa.gz")
+        b = SampleSeqs("tests/data/Monkeypox_virus.fna.gz")
+        c = SampleSeqs("tests/data/pep/Anomala_cuprea_entomopoxvirus.faa.gz")
         with pytest.raises(exception.SeqtypeError, match="Items represent different seqtypes"):
-            a < c
+            a == b
+        with pytest.raises(exception.SeqtypeError, match="Items represent different seqtypes"):
+            assert b > c
 
     def test_getitem(self):
         a = SampleSeqs("tests/data/Monkeypox_virus.faa.gz")
@@ -307,7 +308,7 @@ class TestOrthologs:
         r = ortho.query(b"455at10240")
         assert type(r) is list
         assert len(r) == 2
-        assert isinstance(r[0], DigitalSequence) and isinstance(type(r[1]), DigitalSequence)
+        assert isinstance(r[0], DigitalSequence) and isinstance(r[1], DigitalSequence)
         assert r[0].alphabet.is_amino() is True
 
     def test_query_cds(self):
@@ -323,12 +324,12 @@ class TestOrthologs:
         r = ortho.query(b"455at10240")
         assert type(r) is list
         assert len(r) == 2
-        assert isinstance(r[0], DigitalSequence) and isinstance(type(r[1]), DigitalSequence)
+        assert isinstance(r[0], DigitalSequence) and isinstance(r[1], DigitalSequence)
         assert r[0].alphabet.is_amino() is True
         r = ortho.query(b"455at10240", seqtype="cds")
         assert type(r) is list
         assert len(r) == 2
-        assert isinstance(r[0], DigitalSequence) and isinstance(type(r[1]), DigitalSequence)
+        assert isinstance(r[0], DigitalSequence) and isinstance(r[1], DigitalSequence)
         assert r[0].alphabet.is_dna() is True
 
     def test_query_keyerror(self):
@@ -379,8 +380,6 @@ class TestOrthologs:
         assert r.is_mapped is False
 
 
-@pytest.mark.skip()
-@pytest.mark.usefixtures("copy_libphyling_ckp")
 class TestOutputPrecheck:
     inputs = SampleList(Path("tests/data/pep").iterdir())
     markerset_path = Path("tests/database/poxviridae_odb10/hmms")
@@ -389,12 +388,31 @@ class TestOutputPrecheck:
     params = {
         "inputs": inputs.checksum,
         "markerset": markerset.checksum,
-        "markerset_cutoff": markerset.have_cutoff,
-        "evalue": 1e-10,
+        "markerset_cutoff": "markerset cutoff" if markerset.have_cutoff else 1e-10,
         "method": "hmmalign",
         "non_trim": False,
     }
 
+    def test_precheck_new(self, tmp_path: Path):
+        assert (tmp_path / "output").exists() is False
+        OutputPrecheck.setup(folder=tmp_path / "output")
+        _, r = OutputPrecheck.precheck(self.params, self.inputs)
+        assert r is None
+        assert (tmp_path / "output").is_dir() is True
+
+    def test_precheck_folder_exists(self, tmp_path: Path):
+        OutputPrecheck.setup(folder=tmp_path)
+        _, r = OutputPrecheck.precheck(self.params, self.inputs)
+        assert r is None
+        assert (tmp_path).is_dir() is True
+
+    def test_precheck_notadirectoryerror(self, tmp_path: Path):
+        (tmp_path / "output").touch()
+        OutputPrecheck.setup(folder=tmp_path / "output")
+        with pytest.raises(NotADirectoryError, match="already existed but not a folder"):
+            OutputPrecheck.precheck(self.params, self.inputs)
+
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_dropsample(self, caplog: pytest.LogCaptureFixture):
         inputs = deepcopy(self.inputs)
         popped_sample = inputs.pop(-1)
@@ -402,10 +420,10 @@ class TestOutputPrecheck:
         params.update(inputs=inputs.checksum)
         with caplog.at_level(logging.INFO):
             updated_inputs, _ = OutputPrecheck.precheck(params, inputs)
-        print(caplog.text)
         assert f"Remove hits corresponding to {popped_sample.name} from orthologs" in caplog.text
         assert need_search(updated_inputs) == 0
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_addsample(self):
         inputs = deepcopy(self.inputs)
         inputs.append(SampleSeqs(Path("tests/data/Monkeypox_virus.faa.gz")))
@@ -414,6 +432,7 @@ class TestOutputPrecheck:
         updated_inputs, _ = OutputPrecheck.precheck(params, inputs)
         assert need_search(updated_inputs) == 1
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_change_method(self):
         inputs = deepcopy(self.inputs)
         params = self.params.copy()
@@ -421,6 +440,7 @@ class TestOutputPrecheck:
         updated_inputs, _ = OutputPrecheck.precheck(params, inputs)
         assert need_search(updated_inputs) == 0
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_change_non_trim(self):
         inputs = deepcopy(self.inputs)
         params = self.params.copy()
@@ -428,19 +448,22 @@ class TestOutputPrecheck:
         updated_inputs, _ = OutputPrecheck.precheck(params, inputs)
         assert need_search(updated_inputs) == 0
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_change_hmm_cutoff(self):
         inputs = deepcopy(self.inputs)
         markerset = HMMMarkerSet(self.markerset_path)
         params = self.params.copy()
-        params.update(markerset=markerset.checksum, markerset_cutoff=markerset.have_cutoff)
+        params.update(markerset=markerset.checksum, markerset_cutoff=1e-10)
         updated_inputs, _ = OutputPrecheck.precheck(params, inputs)
         assert need_search(updated_inputs) == 5
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_params_error(self):
         params = {"Invalid_key": "Invalid_value"}
         with pytest.raises(KeyError, match="Params should contain keys"):
             OutputPrecheck.precheck(params, self.inputs)
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_seqtype_error(self):
         inputs = SampleList(Path("tests/data/cds").iterdir())
         params = self.params.copy()
@@ -448,10 +471,12 @@ class TestOutputPrecheck:
         with pytest.raises(SystemExit, match="Seqtype is changed. Aborted."):
             OutputPrecheck.precheck(params, inputs)
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_file_not_changed_error(self):
         with pytest.raises(SystemExit, match="Files not changed and parameters are identical to the previous run. Aborted."):
             OutputPrecheck.precheck(self.params, self.inputs)
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
     def test_precheck_markerset_error(self):
         markerset = HMMMarkerSet(Path("tests/database/alphaherpesvirinae_odb10/hmms"))
         params = self.params.copy()
@@ -459,8 +484,24 @@ class TestOutputPrecheck:
         with pytest.raises(SystemExit, match="Markerset is changed. Aborted."):
             OutputPrecheck.precheck(params, self.inputs)
 
+    @pytest.mark.usefixtures("copy_libphyling_ckp")
+    def test_load_checkpoint(self):
+        params, samplelist, orthologs = OutputPrecheck.load_checkpoint()
+        assert isinstance(params, dict)
+        assert isinstance(samplelist, SampleList)
+        assert isinstance(orthologs, Orthologs)
 
-@pytest.mark.skip()
+    def test_save_checkpoint(self, tmp_path):
+        OutputPrecheck.setup(folder=tmp_path)
+
+        OutputPrecheck.save_checkpoint(self.params, self.inputs, Orthologs())
+        a, b, c = OutputPrecheck.load_checkpoint()
+        assert isinstance(a, dict)
+        assert b == self.inputs
+        assert isinstance(c, Orthologs)
+
+
+@pytest.mark.slow
 @pytest.mark.usefixtures("copy_libphyling_ckp")
 class TestSearch:
     inputs = SampleList(Path("tests/data/pep").iterdir())
@@ -494,8 +535,7 @@ class TestSearch:
         params = {
             "inputs": inputs.checksum,
             "markerset": self.markerset.checksum,
-            "markerset_cutoff": self.markerset.have_cutoff,
-            "evalue": 1e-10,
+            "markerset_cutoff": "markerset cutoff" if self.markerset.have_cutoff else 1e-10,
             "method": "hmmalign",
             "non_trim": False,
         }
@@ -514,8 +554,7 @@ class TestSearch:
         params = {
             "inputs": inputs.checksum,
             "markerset": self.markerset.checksum,
-            "markerset_cutoff": self.markerset.have_cutoff,
-            "evalue": 1e-10,
+            "markerset_cutoff": "markerset cutoff" if self.markerset.have_cutoff else 1e-10,
             "method": "hmmalign",
             "non_trim": False,
         }
@@ -625,7 +664,6 @@ class Testtrim:
     )
 
     def test_trim_pep(self):
-        print([self.pep_msa])
         (result_msa,) = trim([self.pep_msa])
         assert result_msa.get_alignment_length() == 5
         assert str(result_msa[0].seq) == "MI-TC"
@@ -634,97 +672,3 @@ class Testtrim:
         (result_msa,) = trim([self.pep_msa], [self.cds_msa])
         assert result_msa.get_alignment_length() == 15
         assert str(result_msa[0].seq) == "ATGATC---ACGTGT"
-
-
-# class TestMSAGenerator:
-#     test_inputs = [x for x in (Path("example") / "pep").iterdir()]
-
-#     @pytest.fixture
-#     def msa_instance(self):
-#         return msa_generator(self.test_inputs)
-
-#     def test_filter_orthologs_with_orthologs(self, msa_instance):
-#         # Simulate having orthologs in the instance
-#         msa_instance.orthologs = {
-#             "hmm_1": {
-#                 "species_1_gene_100",
-#                 "species_2_gene_211",
-#                 "species_3_gene_311",
-#                 "species_4_gene_414",
-#                 "species_5_gene_219",
-#             },
-#             "hmm_2": {"species_1_gene_105", "species_2_gene_223", "species_3_gene_323", "species_5_gene_558"},
-#             "hmm_3": {"species_1_gene_155", "species_2_gene_253", "species_4_gene_432", "species_6_gene_338"},
-#             "hmm_4": {"species_3_gene_344", "species_4_gene_466", "species_6_gene_212"},
-#         }
-#         msa_instance.filter_orthologs()
-#         assert len(msa_instance.orthologs) == 3
-#         assert "hmm_4" not in msa_instance.orthologs
-#         assert len(msa_instance.orthologs["hmm_1"]) == 5  # Number of samples
-
-#     def test_filter_orthologs_with_insufficient_orthologs(self, msa_instance):
-#         # Simulate having small orthologs in the instance
-#         msa_instance.orthologs = {
-#             "hmm_1": {"species_1_gene_100", "species_2_gene_211", "species_3_gene_311"},
-#             "hmm_2": {"species_1_gene_105", "species_2_gene_223", "species_3_gene_323"},
-#             "hmm_3": {"species_1_gene_155", "species_2_gene_253", "species_4_gene_432"},
-#             "hmm_4": {"species_3_gene_344", "species_4_gene_466", "species_6_gene_212"},
-#         }
-#         with pytest.raises(SystemExit) as pytest_wrapped_e:
-#             msa_instance.filter_orthologs()
-#         assert len(msa_instance.orthologs) == 0  # No orthologs should remain
-#         assert pytest_wrapped_e.type == SystemExit
-#         assert pytest_wrapped_e.value.code == 1
-
-#     def test_filter_orthologs_attribute_error(self, msa_instance):
-#         # Simulate not having orthologs attribute in the instance
-#         with pytest.raises(AttributeError):
-#             msa_instance.filter_orthologs()
-
-
-# class Testbpmrtrans:
-#     pep_msa = create_msa(["-MSLR-L-", "-M-LRQL-", "-MS--QL-"], ["Species_A", "Species_B", "Species_C"])
-
-#     def test_bp_mrtrans_basic(self):
-#         cds_seqs = [
-#             SeqRecord(Seq("ATGTCATTGCGACTA"), id="Species_A"),
-#             SeqRecord(Seq("ATGTTGCGACAACTA"), id="Species_B"),
-#             SeqRecord(Seq("ATGTCACAACTA"), id="Species_C"),
-#         ]
-#         results = bp_mrtrans(pep_msa=self.pep_msa, cds_seqs=cds_seqs)
-#         assert str(results[0].seq) == "---ATGTCATTGCGA---CTA---"
-#         assert str(results[1].seq) == "---ATG---TTGCGACAACTA---"
-#         assert str(results[2].seq) == "---ATGTCA------CAACTA---"
-
-#     def test_bp_mrtrans_with_stop_codon(self):
-#         cds_seqs = [
-#             SeqRecord(Seq("ATGTCATTGCGACTA")),
-#             SeqRecord(Seq("ATGTGATTGCGACAACTA")),
-#             SeqRecord(Seq("ATGTCACAACTA")),
-#         ]
-#         results = bp_mrtrans(pep_msa=self.pep_msa, cds_seqs=cds_seqs)
-#         assert str(results[0].seq) == "---ATGTCATTGCGA---CTA---"
-#         assert str(results[1].seq) == "---ATG---TTGCGACAACTA---"
-#         assert str(results[2].seq) == "---ATGTCA------CAACTA---"
-
-#     def test_bp_mrtrans_with_cds_msa_id(self):
-#         cds_seqs = [
-#             SeqRecord(Seq("ATGTCATTGCGACTA"), id="Species_A_cds"),
-#             SeqRecord(Seq("ATGTTGCGACAACTA"), id="Species_B_cds"),
-#             SeqRecord(Seq("ATGTCACAACTA"), id="Species_C_cds"),
-#         ]
-#         results = bp_mrtrans(pep_msa=self.pep_msa, cds_seqs=cds_seqs)
-#         assert str(results[0].id) == "Species_A_cds"
-#         assert str(results[1].id) == "Species_B_cds"
-#         assert str(results[2].id) == "Species_C_cds"
-
-#     # def test_bp_mrtrans_wo_cds_msa_id(self):
-#     #     cds_seqs = [
-#     #         SeqRecord(Seq("ATGTCATTGCGACTA")),
-#     #         SeqRecord(Seq("ATGTTGCGACAACTA")),
-#     #         SeqRecord(Seq("ATGTCACAACTA")),
-#     #     ]
-#     #     results = bp_mrtrans(pep_msa=self.pep_msa, cds_seqs=cds_seqs)
-#     #     assert str(results[0].id) == "Species_A"
-#     #     assert str(results[1].id) == "Species_B"
-#     #     assert str(results[2].id) == "Species_C"

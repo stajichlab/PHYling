@@ -25,9 +25,9 @@ from clipkit.msa import MSA
 from pyhmmer.easel import DigitalSequenceBlock
 
 import phyling._abc as _abc
+import phyling._utils as _utils
 import phyling.config as config
 import phyling.exception as exception
-import phyling.utils as utils
 
 
 class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
@@ -67,12 +67,11 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
     def __eq__(self, other: SampleSeqs) -> bool:
         """Return true if the two objects have the same name."""
         super().__eq__(other)
-        return (self.name == other.name) and (self.seqtype == other.seqtype)
+        return self.name == other.name
 
     def __lt__(self, other: SampleSeqs) -> bool:
         """Return true if the sample name of the current object is alphabatically prior to another object."""
-        if self.seqtype != other.seqtype:
-            raise exception.SeqtypeError("Items represent different seqtypes.")
+        super().__lt__(other)
         return str(self.name) < str(other.name)
 
     def __hash__(self) -> int:
@@ -500,10 +499,11 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
         """Check the output folder and determine what orthologs should be removed and what samples should be rerun."""
         if params.keys() != config.libphyling_precheck_params:
             raise KeyError(f"Params should contain keys {config.libphyling_precheck_params}")
-        results = super().precheck(params, (samplelist), force_rerun=force_rerun)
-        if results:
-            return results
-        return samplelist, None
+        super().precheck(params, (samplelist), force_rerun=force_rerun)
+        if not any(cls.folder.iterdir()):
+            return samplelist, None
+        results = cls._determine_rerun(*(params, samplelist), *cls.load_checkpoint())
+        return results
 
     @classmethod
     def load_checkpoint(cls) -> tuple[dict, SampleList, Orthologs]:
@@ -520,7 +520,7 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
         return super().save_checkpoint(params, samplelist, orthologs)
 
     @classmethod
-    @utils.check_cls_vars("folder")
+    @_utils.check_cls_vars("folder")
     def output_results(cls, msa: MultipleSeqAlignment, filename: str) -> None:
         """Output the MSA results in separate files."""
         msa.sort()
@@ -529,11 +529,9 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
 
     @classmethod
     def _determine_rerun(
-        cls, cur: tuple[dict, SampleList], prev: tuple[dict, SampleList, Orthologs]
+        cls, cur_params: dict, cur_samples: SampleList, prev_params: dict, prev_samples: SampleList, prev_orthologs: Orthologs
     ) -> tuple[SampleList, Orthologs]:
         """Define the actions that need to do when found a checkpoint file in the given output folder."""
-        cur_params, cur_samples = cur
-        prev_params, prev_samples, prev_orthologs = prev
         if prev_samples.seqtype != cur_samples.seqtype:
             raise SystemExit("Seqtype is changed. Aborted.")
         diff_params = {param[0] for param in set(cur_params.items()) ^ set(prev_params.items())}
@@ -541,7 +539,7 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
             raise SystemExit("Files not changed and parameters are identical to the previous run. Aborted.")
         if "markerset" in diff_params:
             raise SystemExit("Markerset is changed. Aborted.")
-        if ("markerset_cutoff" in diff_params) or (not cur_params["markerset_cutoff"] and "evalue" in diff_params):
+        if "markerset_cutoff" in diff_params:
             return cur_samples, None
         rm_files = [x for x in cls.folder.iterdir() if x.is_file() if x.name != cls.ckp]
         droplist = cur_samples.update(prev_samples)
@@ -555,7 +553,7 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
         return cur_samples, cur_orthologs
 
 
-@utils.timing
+@_utils.timing
 def search(
     inputs: SampleList,
     markerset: HMMMarkerSet,
@@ -612,7 +610,7 @@ def search(
     return orthologs
 
 
-@utils.timing
+@_utils.timing
 def align(
     orthologs: Orthologs, markerset: HMMMarkerSet | None = None, *, method: str = "hmmalign", threads: int = 1
 ) -> tuple[list[MultipleSeqAlignment]] | tuple[list[MultipleSeqAlignment], list[MultipleSeqAlignment]]:
@@ -663,7 +661,7 @@ def align(
     return pep_msa_list, cds_msa_list
 
 
-@utils.timing
+@_utils.timing
 def trim(
     pep_msa_list: list[MultipleSeqAlignment],
     cds_msa_list: list[MultipleSeqAlignment] | None = None,
@@ -702,7 +700,7 @@ def _run_hmmsearch(hmms: HMMMarkerSet, input: SampleSeqs, evalue: float = 1e-10,
                 yield hmm, input.name, hit.name
                 break  # The first hit in hits is the best hit
     logging.info(f"hmmsearch on {input.path.name} is done.")
-    input.scanned = True
+    input.scanned()
 
 
 def _run_hmmalign(seqs: list[pyhmmer.easel.DigitalSequence], hmm_profile: pyhmmer.plan7.HMM) -> MultipleSeqAlignment:
