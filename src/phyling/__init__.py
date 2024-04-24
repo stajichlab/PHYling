@@ -1,8 +1,5 @@
 """Placeholder init file for Python purposes."""
-try:
-    from importlib.metadata import version
-except ImportError:
-    from importlib_metadata import version
+from importlib.metadata import version
 
 import phyling.config as config
 

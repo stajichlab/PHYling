@@ -1,4 +1,6 @@
 """Utilities that commonly used in different modules."""
+from __future__ import annotations
+
 import logging
 import time
 from functools import wraps

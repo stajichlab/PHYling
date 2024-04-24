@@ -313,9 +313,14 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
     def _with_IQTree(self, output: Path, *, threads: int, verbose: bool) -> Tree:
         """Run the tree calculation using IQTree."""
-        iqtree = shutil.which("iqtree")
-        if iqtree and verbose:
-            logging.debug(f"Found IQTree at {iqtree}")
+        iqtree_bins = ("iqtree", "iqtree2")
+
+        for iqtree in iqtree_bins:
+            iqtree = shutil.which(iqtree)
+            if iqtree and verbose:
+                logging.debug(f"Found IQTree at {iqtree}")
+                break
+
         if not iqtree:
             raise exception.BinaryNotFoundError('IQTree not found. Please install it through "conda install -c bioconda iqtree"')
 
