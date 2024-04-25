@@ -1,0 +1,36 @@
+name: Build muscle
+
+on: workflow_call
+
+jobs:
+  build_muscle:
+    name: Build muscle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cache muscle
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/muscle
+          key: ${{ runner.os }}-muscle
+
+      - name: Download muscle executable
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install wget
+          wget https://github.com/rcedgar/muscle/releases/download/5.1.0/muscle5.1.linux_intel64
+          mv muscle5.1.linux_intel64 muscle
+
+      - name: Move executable
+        if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p ~/.local/bin
+          cp muscle ~/.local/bin/
+          chmod +x ~/.local/bin/muscle
+
+      - name: Export muscle to PATH and verify
+        run: |
+          export PATH=$PATH:$HOME/.local/bin
+          which muscle

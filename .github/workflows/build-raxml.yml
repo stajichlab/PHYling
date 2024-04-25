@@ -1,0 +1,41 @@
+name: Build RAxML
+
+on: workflow_call
+
+jobs:
+  build_RAxML:
+    name: Build RAxML
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cache RAxML
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/raxmlHPC-PTHREADS-AVX2
+          key: ${{ runner.os }}-RAxML
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get install build-essential g++ wget unzip
+
+      - name: Compile RAxML
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          wget https://github.com/stamatak/standard-RAxML/archive/refs/tags/v8.2.13.zip
+          unzip v8.2.13.zip
+          cd standard-RAxML-8.2.13
+          make -f Makefile.AVX2.PTHREADS.gcc
+
+      - name: Move executable
+        if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p ~/.local/bin
+          cp standard-RAxML-8.2.13/raxmlHPC-PTHREADS-AVX2 ~/.local/bin/
+          chmod +x ~/.local/bin/raxmlHPC-PTHREADS-AVX2
+
+      - name: Export RAxML to PATH and verify
+        run: |
+          export PATH=$PATH:$HOME/.local/bin
+          which raxmlHPC-PTHREADS-AVX2

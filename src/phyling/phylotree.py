@@ -220,7 +220,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
         if not fasttree:
             raise exception.BinaryNotFoundError(
-                'FastTree not found. Please install it through "conda install -c bioconda fasttree"'
+                'FastTree not found. Please install it through "conda install bioconda::fasttree"'
             )
 
         cmd = [fasttree, "-gamma", str(self.path)]
@@ -260,7 +260,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 break
 
         if not raxml:
-            raise exception.BinaryNotFoundError('RAxML not found. Please install it through "conda install -c bioconda raxml"')
+            raise exception.BinaryNotFoundError('RAxML not found. Please install it through "conda install bioconda::raxml"')
 
         if output is None:
             tempdir = Path(tempfile.mkdtemp())
@@ -322,7 +322,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 break
 
         if not iqtree:
-            raise exception.BinaryNotFoundError('IQTree not found. Please install it through "conda install -c bioconda iqtree"')
+            raise exception.BinaryNotFoundError('IQTree not found. Please install it through "conda install bioconda::iqtree"')
 
         if output is None:
             tempdir = Path(tempfile.mkdtemp())
@@ -508,7 +508,8 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         if not shutil.which("astral"):
             raise exception.BinaryNotFoundError(
                 "ASTRAL not found. "
-                "Please build the C++ version from the source following the instruction on https://github.com/chaoszhang/ASTER"
+                'Please install it through "conda install bioconda::aster" '
+                "or build the source following the instruction on https://github.com/chaoszhang/ASTER"
             )
 
         logging.info("Run ASTRAL to resolve consensus among multiple trees.")

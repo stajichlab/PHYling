@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import logging
+import shutil
 from copy import deepcopy
 from itertools import permutations, product
 from pathlib import Path
-import shutil
 
 import pytest
 from Bio.AlignIO import MultipleSeqAlignment

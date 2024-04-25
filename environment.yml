@@ -4,6 +4,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - aster>=1.16
   - biopython>=1.81
   - clipkit>=2.1.1
   - fasttree>=2.1.11
@@ -13,5 +14,5 @@ dependencies:
   - numpy>=1.26.0
   - phykit>=1.12.5
   - pyhmmer>=0.10.4
-  - python>=3.7.12
+  - python>=3.9
   - raxml>=8.2.12
