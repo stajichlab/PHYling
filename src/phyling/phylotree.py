@@ -15,7 +15,7 @@ from io import StringIO
 from itertools import product
 from multiprocessing.dummy import Pool
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Union
 
 import matplotlib.pyplot as plt
 from Bio import AlignIO, Phylo, SeqIO
@@ -408,7 +408,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         """Initialize the wrapper object."""
         super().__init__(files)
         for file in files:
-            if isinstance(file, str | Path):
+            if isinstance(file, Union[str, Path]):
                 data = MFA2Tree(file, seqtype=seqtype)
             elif isinstance(file, MFA2Tree):
                 data = file
