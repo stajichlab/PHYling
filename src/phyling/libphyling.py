@@ -693,14 +693,16 @@ def _run_hmmsearch(hmms: HMMMarkerSet, input: SampleSeqs, evalue: float = 1e-10,
     four (4) CPU threads are used so the default supposed to be the best.
     """
     bit_cutoffs = "trusted" if hmms.have_cutoff else None
+    r = []
     for hits in pyhmmer.hmmsearch(hmms, input["pep"], E=evalue, bit_cutoffs=bit_cutoffs, cpus=threads):
         hmm = hits.query_name
         for hit in hits:
             if hit.reported:
-                yield hmm, input.name, hit.name
+                r.append((hmm, input.name, hit.name))
                 break  # The first hit in hits is the best hit
     logging.info(f"hmmsearch on {input.path.name} is done.")
     input.scanned()
+    return r
 
 
 def _run_hmmalign(seqs: list[pyhmmer.easel.DigitalSequence], hmm_profile: pyhmmer.plan7.HMM) -> MultipleSeqAlignment:

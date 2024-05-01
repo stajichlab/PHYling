@@ -117,7 +117,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
         "-t",
         "--threads",
         type=int,
-        default=1,
+        default=config.avail_cpus // 4 * 4,
         help="Threads for hmmsearch and the number of parallelized jobs in MSA step. "
         + "Better be multiple of 4 if using more than 8 threads",
     )
@@ -191,7 +191,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
         "-t",
         "--threads",
         type=int,
-        default=1,
+        default=config.avail_cpus,
         help="Threads for tree construction",
     )
     p_tree.set_defaults(func=tree)
