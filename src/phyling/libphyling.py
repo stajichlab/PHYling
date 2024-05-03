@@ -12,7 +12,7 @@ from collections import UserDict
 from io import BytesIO, StringIO
 from multiprocessing.dummy import Pool
 from pathlib import Path
-from typing import AnyStr, Iterable, Sequence, Union
+from typing import AnyStr, Iterable, Sequence
 
 import numpy as np
 import pyhmmer
@@ -190,7 +190,7 @@ class SampleList(_abc.DataListABC[SampleSeqs]):
         for item in files:
             if isinstance(item, SampleSeqs):
                 self.data.append(item)
-            elif isinstance(item, Union[str, Path]):
+            elif isinstance(item, (str, Path)):
                 self.data.append(SampleSeqs(item))
             else:
                 raise TypeError(f"{self.__class__.__qualname__} only accepts list of str/Path/SampleSeqs")
@@ -285,7 +285,7 @@ class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
 
     def __init__(self, folder: str | Path, cutoff: str | Path | None = None, *, raise_err: bool = True):
         """Initialize the object and perform seqtype and duplicated name checks."""
-        if isinstance(folder, Union[str, Path]):
+        if isinstance(folder, (str, Path)):
             folder = Path(folder)
         else:
             raise TypeError('Argument "folder" only accepts of str or Path.')

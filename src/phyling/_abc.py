@@ -6,7 +6,7 @@ import shutil
 import textwrap
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Generic, Iterable, Iterator, Sequence, TypeVar, Union
+from typing import Generic, Iterable, Iterator, Sequence, TypeVar
 
 import phyling.config as config
 import phyling.exception as exception
@@ -103,7 +103,7 @@ class DataListABC(ABC, Generic[T]):
     def __init__(self, files: Iterator[str | Path | T] | Sequence[str | Path | T]) -> None:
         """Initialize the object and store data into a list."""
         self.data: list[T] = []
-        if not isinstance(files, Union[Iterator, tuple, list]):
+        if not isinstance(files, (Iterator, tuple, list)):
             raise TypeError(f"{self.__class__.__qualname__} is not an iterator/tuple/list")
 
     def __repr__(self) -> str:

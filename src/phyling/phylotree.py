@@ -15,7 +15,7 @@ from io import StringIO
 from itertools import product
 from multiprocessing.dummy import Pool
 from pathlib import Path
-from typing import Iterable, Union
+from typing import Iterator, Sequence
 
 import matplotlib.pyplot as plt
 from Bio import AlignIO, Phylo, SeqIO
@@ -393,7 +393,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         """Initialize the wrapper object."""
         super().__init__(files)
         for file in files:
-            if isinstance(file, Union[str, Path]):
+            if isinstance(file, (str, Path)):
                 data = MFA2Tree(file, seqtype=seqtype)
             elif isinstance(file, MFA2Tree):
                 data = file
@@ -512,7 +512,9 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
     @_utils.timing
     @Decorator.check_sorted
     @Decorator.check_single_file
-    def concat(self, output: Path, samples: Iterable[str] | None, *, partition: str | None = None, threads: int = 1) -> MFA2Tree:
+    def concat(
+        self, output: Path, samples: Iterator[str] | Sequence[str] | None, *, partition: str | None = None, threads: int = 1
+    ) -> MFA2Tree:
         """Concatenate selected MSAs to a single mfa file and return the corresponding MFA2Tree object."""
         alignmentList = [mfa2tree.msa for mfa2tree in self]
         # Sort by MSA length, since shorter MSA might have higher chances to have missing states
@@ -563,7 +565,7 @@ class MFA2TreeWrapper(_abc.DataListABC[MFA2Tree]):
         return MFA2Tree(concat_file, partition=partition_file, seqtype=self.seqtype)
 
     @staticmethod
-    def _fill_missing_taxon(samples: Iterable[str], alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
+    def _fill_missing_taxon(samples: Iterator[str] | Sequence[str], alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
         """Include empty gap-only strings to the alignment for taxa lacking an ortholog."""
         missing = set(samples) - {seq.id for seq in alignment}
         for sample in missing:
