@@ -28,6 +28,8 @@ jobs:
   build-pythons-and-test:
     name: Build different versions of python and test
     runs-on: ubuntu-latest
+    env:
+      OS: Linux
     needs:
       [build-muscle, build-aster, build-fasttree, build-raxml, build-iqtree]
     strategy:
@@ -94,4 +96,13 @@ jobs:
           key: ${{ runner.os }}-IQTree
 
       - name: Pytest
-        run: pytest --runslow -vv
+        run: pytest --runslow -vv --cov=./src/phyling --cov-report=xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.3.1
+        with:
+          flags: ${{ matrix.python-version }}
+          env_vars: OS
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
