@@ -63,14 +63,40 @@ class TestAlign:
     def test_align_inputs(self, inputs: str, tmp_path: Path, method: str, nontrim: bool):
         align(inputs, tmp_path, markerset="tests/database/poxviridae_odb10/hmms", method=method, non_trim=nontrim)
 
-    def test_align_markerset_not_avail(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+    def test_align_too_few_inputs(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+        with pytest.raises(SystemExit):
+            align(self.inputs[2][2:], tmp_path, markerset="tests/database/poxviridae_odb10/hmms")
+
+        assert any(record.levelname == "ERROR" for record in caplog.records)
+        assert "Should have at least 4 input files" in caplog.text
+
+    def test_align_invalid_inputs(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+        invalid_inputs = [x for x in Path("tests/data/pep_align").glob("*.mfa")]
+        with pytest.raises(SystemExit):
+            align(invalid_inputs, tmp_path, markerset="tests/database/poxviridae_odb10/hmms")
+
+        assert any(record.levelname == "ERROR" for record in caplog.records)
+
+    def test_align_invalid_markerset(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
         with pytest.raises(SystemExit):
             align(self.inputs[0], tmp_path, markerset="InvalidName")
 
         assert any(record.levelname == "ERROR" for record in caplog.records)
         assert "Markerset folder does not exist" in caplog.text
 
-    def test_align_method_not_avail(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+    def test_align_invalid_evalue(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+        with pytest.raises(SystemExit):
+            align(
+                self.inputs[0],
+                tmp_path,
+                markerset="tests/database/poxviridae_odb10/hmms",
+                evalue=1,
+            )
+
+        assert any(record.levelname == "ERROR" for record in caplog.records)
+        assert "Invalid evalue" in caplog.text
+
+    def test_align_invalid_method(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
         with pytest.raises(SystemExit):
             align(self.inputs[0], tmp_path, markerset="tests/database/poxviridae_odb10/hmms", method="InvalidName")
 

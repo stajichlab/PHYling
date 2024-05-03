@@ -105,7 +105,7 @@ def align(
     logging.info(f"Loading markerset from {markerset}...")
     markerset: libphyling.HMMMarkerSet = libphyling.HMMMarkerSet(markerset, markerset.parent / "scores_cutoff", raise_err=False)
 
-    if evalue > 1:
+    if evalue >= 1:
         logging.error(f"Invalid evalue: {evalue}")
         sys.exit(1)
     if method not in config.avail_align_methods:
