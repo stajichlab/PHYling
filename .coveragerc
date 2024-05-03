@@ -1,0 +1,10 @@
+[run]
+omit =
+    src/phyling/__init__.py
+    src/phyling/config.py
+    src/phyling/exception.py
+    src/phyling/phyling.py
+
+[path]
+source =
+    src/phyling/
