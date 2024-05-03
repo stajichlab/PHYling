@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "phyling"
-version = "2.0.0-beta"
+version = "2.0.0"
 authors = [
   { name = "Jason Stajich", email = "jasonstajich.phd@gmail.com" },
   { name = "Cheng-Hung Tsai", email = "chenghung.tsai@email.ucr.edu" },
@@ -28,8 +28,8 @@ dynamic = ["dependencies"]
 phyling = "phyling.phyling:main"
 
 [project.urls]
-"Homepage" = "https://github.com/stajichlab/PHYling_unified"
-"Bug Tracker" = "https://github.com/stajichlab/PHYling_unified/issues"
+"Homepage" = "https://github.com/stajichlab/PHYling"
+"Bug Tracker" = "https://github.com/stajichlab/PHYling/issues"
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
