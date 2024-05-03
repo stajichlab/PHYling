@@ -12,7 +12,7 @@ from collections import UserDict
 from io import BytesIO, StringIO
 from multiprocessing.dummy import Pool
 from pathlib import Path
-from typing import AnyStr, Iterable, Iterator, Sequence, Union
+from typing import AnyStr, Iterable, Sequence, Union
 
 import numpy as np
 import pyhmmer
@@ -442,7 +442,7 @@ class Orthologs(UserDict):
             return self._pep_seqs[key]
         elif seqtype == config.seqtype_cds:
             if not self._cds_seqs:
-                raise AttributeError("Orthologs was mapped to a SampleList with peptide seqeunces where cds is not available.")
+                raise AttributeError("Orthologs was mapped to a SampleList with peptide sequences where cds is not available.")
             return self._cds_seqs[key]
         else:
             raise KeyError('seqtype only accepts "pep" or "cds"')
@@ -685,7 +685,9 @@ def trim(
     return cds_msa_trimmed_list if cds_msa_list else pep_msa_trimmed_list
 
 
-def _run_hmmsearch(hmms: HMMMarkerSet, input: SampleSeqs, evalue: float = 1e-10, threads: int = 4) -> Iterator[str, str, bytes]:
+def _run_hmmsearch(
+    hmms: HMMMarkerSet, input: SampleSeqs, evalue: float = 1e-10, threads: int = 4
+) -> list[tuple[str, str, bytes]]:
     """
     Run the hmmsearch process using the pyhmmer library.
 
