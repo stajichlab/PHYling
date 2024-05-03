@@ -185,28 +185,10 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
             raise exception.SeqtypeError("Cannot determine seqtype. Aborted.")
 
     def _with_phylo_module(self, *, method: str) -> Tree:
-        """Run the tree calculation using a simple distance method."""
+        """[Deprecated] Run the tree calculation using a simple distance method."""
         calculator = DistanceCalculator("identity")
         constructor = DistanceTreeConstructor(calculator, method)
         return constructor.build_tree(self.msa)
-
-    def _with_VeryFastTree(self, *, threads: int) -> Tree:
-        """Run the tree calculation using VeryFastTree."""
-        if self._seqtype == config.seqtype_cds:
-            cmd = ["VeryFastTree", "-nt", "-gamma", "-threads", str(threads), self.path]
-        else:
-            cmd = ["VeryFastTree", "-lg", "-gamma", "-threads", str(threads), self.path]
-        p = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        tree, err = p.communicate()
-        if not tree:
-            raise RuntimeError(err)
-        return Phylo.read(StringIO(tree), "newick")
 
     def _with_FastTree(self, *, verbose: bool) -> Tree:
         """Run the tree calculation using FastTree."""
@@ -214,8 +196,9 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
         for fasttree in fasttree_bins:
             fasttree = shutil.which(fasttree)
-            if fasttree and verbose:
-                logging.debug(f"Found FastTree at {fasttree}")
+            if fasttree:
+                if verbose:
+                    logging.debug(f"Found FastTree at {fasttree}")
                 break
 
         if not fasttree:
@@ -255,8 +238,9 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         )
         for raxml in raxml_bins:
             raxml = shutil.which(raxml)
-            if raxml and verbose:
-                logging.debug(f"Found RAxML at {raxml}")
+            if raxml:
+                if verbose:
+                    logging.debug(f"Found RAxML at {raxml}")
                 break
 
         if not raxml:
@@ -317,8 +301,9 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
         for iqtree in iqtree_bins:
             iqtree = shutil.which(iqtree)
-            if iqtree and verbose:
-                logging.debug(f"Found IQTree at {iqtree}")
+            if iqtree:
+                if verbose:
+                    logging.debug(f"Found IQTree at {iqtree}")
                 break
 
         if not iqtree:
