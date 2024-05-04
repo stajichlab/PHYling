@@ -3,7 +3,7 @@ name: Publish release
 on:
   push:
     tags:
-      - v[0-9]+.[0-9]+.[0-9]+*
+      - v*
   workflow_dispatch:
 
 jobs:
@@ -56,10 +56,8 @@ jobs:
       - name: Push changes
         if: steps.sub_readme.conclusion == 'success' && steps.sub_pyproject.conclusion == 'success'
         run: |
-          git config author.name Cheng-Hung Tsai
-          git config author.email chenghung.tsai@email.ucr.edu
-          git config committer.name GitHub Actions
-          git config committer.email actions@github.com
+          git config author.name GitHub Actions
+          git config author.email actions@github.com
           git add .
           git commit -m "Update version in README.md"
           git tag --annotate v${{ steps.tag.outputs.version }} -m "Version bump to v${{ steps.tag.outputs.version }}" --force
@@ -67,6 +65,7 @@ jobs:
           git push --tags --force
 
   publish_release:
+    environment: GitHub releases
     runs-on: ubuntu-latest
     needs: version_check
     steps:

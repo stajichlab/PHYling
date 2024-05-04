@@ -2,10 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic
+Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2024-05-03
+
+### Added
+
+- `phyling download list` now will also print out the markersets that have already been downloaded.
+
+- Use `PhyKIT` to calculate the treeness/RCV scores which can be used to filter the uninformative markers. Use `-n/--top_n_toverr`
+  to specify the number of markers selected for final tree building.
+
+- `RAxML` and `IQTree` are now available for final tree building.
+
+### Removed
+
+- Output option in download module. Now all the BUSCO datasets will be saved in the config folder `~/.phyling/HMM`.
+
+- Remove `--from_checkpoint` feature. Output to the previous output folder will trigger the check and automatically determine the
+  rerun status.
+
+- Remove tree building methods `UPGMA` and `Neighbor Joining`.
+
+### Changed
+
+- Change the align module -m/--markerset behavior. It firstly searches against the given path and the config folder
+  `~/.phyling/HMM` if the path doesn't exist. Users can also directly specify the markerset name that has already been downloaded
+  and saved in the config folder.
+
+- Use timestamp for default output folder in align and tree module.
+
+- Use `FastTree` to replace the `UPGMA` for the default tree building method.
+
+- Since adding the treeness/RCV score filtering, the concat strategy now perform 2 rounds of tree building - 1st round using
+  `FastTree` to generate the treeness/RCV for filtereing and 2nd round using the user-specified method.
+
+### Fixed
+
+- Fix the multiprocessing issue.
 
 ## [2.0.0-beta] - 2023-11-14
 
@@ -21,7 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use ClipKIT to replace the self-defined function for trimming off the sites that display poor phylogenetic signal.
 
-- Move the MSA concatenate function from align module to tree module. Users who want to try different tree building strategy won't have to rerun the align module again.
+- Move the MSA concatenate function from align module to tree module. Users who want to try different tree building strategy won't
+  have to rerun the align module again.
 
 - Replace the VeryFastTree with FastTree for stability.
 

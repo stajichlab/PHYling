@@ -10,16 +10,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  call-build-aster:
+  build-muscle:
+    uses: ./.github/workflows/build-muscle.yml
+
+  build-aster:
     uses: ./.github/workflows/build-aster.yml
 
-  call-build-fasttree:
+  build-fasttree:
     uses: ./.github/workflows/build-fasttree.yml
 
-  test_pythons:
-    name: Test on different python versions
+  build-raxml:
+    uses: ./.github/workflows/build-raxml.yml
+
+  build-iqtree:
+    uses: ./.github/workflows/build-iqtree.yml
+
+  build-pythons-and-test:
+    name: Build different versions of python and test
     runs-on: ubuntu-latest
-    needs: [call-build-aster, call-build-fasttree]
+    env:
+      OS: Linux
+    needs:
+      [build-muscle, build-aster, build-fasttree, build-raxml, build-iqtree]
     strategy:
       fail-fast: false
       matrix:
@@ -42,16 +54,22 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install flake8 pytest
+          python -m pip install flake8 pytest pytest-cov
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Lint with flake8
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=130 --statistics
+          flake8 . --count --exit-zero --max-complexity=30 --max-line-length=130 --statistics --ignore=E203,W503,E402
 
       - name: Install package
         run: pip install .
+
+      - name: Cache muscle
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/muscle
+          key: ${{ runner.os }}-muscle
 
       - name: Cache ASTER
         uses: actions/cache@v4
@@ -65,5 +83,26 @@ jobs:
           path: ~/.local/bin/FastTree
           key: ${{ runner.os }}-FastTree
 
-      - name: Test with pytest
-        run: pytest
+      - name: Cache RAxML
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/raxmlHPC-PTHREADS-AVX2
+          key: ${{ runner.os }}-RAxML
+
+      - name: Cache IQTree
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/iqtree2
+          key: ${{ runner.os }}-IQTree
+
+      - name: Pytest
+        run: pytest --runslow -vv --cov=phyling --cov-report=xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.3.1
+        with:
+          flags: ${{ matrix.python-version }}
+          env_vars: OS
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
