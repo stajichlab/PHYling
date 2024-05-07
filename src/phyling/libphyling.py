@@ -10,7 +10,8 @@ import subprocess
 import textwrap
 from collections import UserDict
 from io import BytesIO, StringIO
-from multiprocessing.dummy import Pool
+from multiprocessing import Manager, Pool
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from typing import AnyStr, Iterable, Sequence
 
@@ -176,9 +177,9 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
             problematic_seqs_name = ", ".join(problematic_seqs_name)
             logging.warning(
                 f"In the file {self.name}, {problematic_seqs_size}/{original_size} seqs has invalid length. "
-                "The seq names are listed below:"
+                # "The seq names are listed below:"
             )
-            logging.warning(problematic_seqs_name)
+            # logging.warning(problematic_seqs_name)
 
 
 class SampleList(_abc.DataListABC[SampleSeqs]):
@@ -447,7 +448,7 @@ class Orthologs(UserDict):
         else:
             raise KeyError('seqtype only accepts "pep" or "cds"')
 
-    def map(self, sample_list: SampleList) -> None:
+    def map(self, sample_list: SampleList, threads: int = 1) -> None:
         """Map to the SampleList object for sequence retrieval."""
         self._pep_seqs, self._cds_seqs = {}, {}
         for key, item in self.data.items():
@@ -577,36 +578,37 @@ def search(
     if not orthologs:
         orthologs = Orthologs({})
 
-    if threads < 8:
-        # Single process mode
-        logging.debug(f"Sequential mode with {threads} threads.")
-        search_res = []
-        for input in inputs:
-            # Select the sequences of each sample
-            search_res.append(_run_hmmsearch(markerset, input, evalue, threads))
-    else:
-        # Multi processes mode
-        threads_per_process = 4
-        processes = threads // threads_per_process
-        logging.debug(f"Multiprocesses mode: {processes} jobs with 4 threads for each are run concurrently.")
-        with Pool(processes) as pool:
-            search_res = pool.starmap(
-                _run_hmmsearch,
-                [
-                    (
-                        markerset,
-                        input,
-                        evalue,
-                        threads_per_process,
-                    )
-                    for input in inputs
-                ],
-            )
+    if inputs:
+        if threads < 8:
+            # Single process mode
+            logging.debug(f"Sequential mode with {threads} threads.")
+            search_res = []
+            for input in inputs:
+                # Select the sequences of each sample
+                search_res.append(_run_hmmsearch(markerset, input, evalue, threads))
+        else:
+            # Multi processes mode
+            threads_per_process = 4
+            processes = threads // threads_per_process
+            logging.debug(f"Multiprocesses mode: {processes} jobs with 4 threads for each are run concurrently.")
+            with ThreadPool(processes) as pool:
+                search_res = pool.starmap(
+                    _run_hmmsearch,
+                    [
+                        (
+                            markerset,
+                            input,
+                            evalue,
+                            threads_per_process,
+                        )
+                        for input in inputs
+                    ],
+                )
 
-    for res in search_res:
-        for hmm, sample_id, seq_id in res:
-            orthologs[hmm] = (sample_id, seq_id)
-    logging.info("Done.")
+        for res in search_res:
+            for hmm, sample_id, seq_id in res:
+                orthologs[hmm] = (sample_id, seq_id)
+        logging.info("Done.")
     return orthologs
 
 
@@ -634,13 +636,14 @@ def align(
             pep_msa_list = [_run_hmmalign(orthologs.query(hmm, config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
     else:
         logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
+        manager = Manager()
         with Pool(threads) as pool:
+            sharedmem_pep_seqs = manager.list([orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
             if method == "muscle":
-                pep_msa_list = pool.map(_run_muscle, [orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
+                pep_msa_list = pool.map(_run_muscle, sharedmem_pep_seqs)
             else:
-                pep_msa_list = pool.starmap(
-                    _run_hmmalign, [(orthologs.query(hmm, config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
-                )
+                sharedmem_markerset = manager.list([markerset[hmm] for hmm in orthologs.keys()])
+                pep_msa_list = pool.starmap(_run_hmmalign, zip(sharedmem_pep_seqs, sharedmem_markerset))
     logging.info("Done.")
 
     if orthologs.seqtype == config.seqtype_pep:
@@ -653,9 +656,11 @@ def align(
         cds_msa_list = [_bp_mrtrans(pep_msa, cds_seq) for pep_msa, cds_seq in zip(pep_msa_list, cds_seqs_list)]
     else:
         logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
-        with Pool(threads) as pool:
+        with ThreadPool(threads) as pool:
             cds_seqs_list = pool.map(_to_seqrecord, [orthologs.query(hmm, config.seqtype_cds) for hmm in orthologs.keys()])
-            cds_msa_list = pool.starmap(_bp_mrtrans, zip(pep_msa_list, cds_seqs_list))
+        with Pool(threads) as pool:
+            sharedmem_items = manager.list(zip(pep_msa_list, cds_seqs_list))
+            cds_msa_list = pool.starmap(_bp_mrtrans, sharedmem_items)
     logging.info("Done.")
 
     return pep_msa_list, cds_msa_list
@@ -675,11 +680,14 @@ def trim(
         else:
             pep_msa_trimmed_list = [_trim_gaps(pep_msa) for pep_msa in pep_msa_list]
     else:
+        manager = Manager()
+        sharedmem_pep_msa = manager.list(pep_msa_list)
         with Pool(threads) as pool:
             if cds_msa_list:
-                cds_msa_trimmed_list = pool.starmap(_trim_gaps, zip(pep_msa_list, cds_msa_list))
+                sharedmem_cds_msa = manager.list(cds_msa_list)
+                cds_msa_trimmed_list = pool.starmap(_trim_gaps, zip(sharedmem_pep_msa, sharedmem_cds_msa))
             else:
-                pep_msa_trimmed_list = pool.map(_trim_gaps, pep_msa_list)
+                pep_msa_trimmed_list = pool.map(_trim_gaps, sharedmem_pep_msa)
     logging.info("Trimming done.")
 
     return cds_msa_trimmed_list if cds_msa_list else pep_msa_trimmed_list
