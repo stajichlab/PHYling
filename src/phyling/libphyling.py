@@ -637,13 +637,17 @@ def align(
     else:
         logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
         manager = Manager()
-        with Pool(threads) as pool:
-            sharedmem_pep_seqs = manager.list([orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
+        with ThreadPool(threads) as pool:
+            # sharedmem_pep_seqs = manager.list([orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
             if method == "muscle":
-                pep_msa_list = pool.map(_run_muscle, sharedmem_pep_seqs)
+                # pep_msa_list = pool.map(_run_muscle, sharedmem_pep_seqs)
+                pep_msa_list = pool.map(_run_muscle, [orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
             else:
-                sharedmem_markerset = manager.list([markerset[hmm] for hmm in orthologs.keys()])
-                pep_msa_list = pool.starmap(_run_hmmalign, zip(sharedmem_pep_seqs, sharedmem_markerset))
+                # sharedmem_markerset = manager.list([markerset[hmm] for hmm in orthologs.keys()])
+                # pep_msa_list = pool.starmap(_run_hmmalign, zip(sharedmem_pep_seqs, sharedmem_markerset))
+                pep_msa_list = pool.starmap(
+                    _run_hmmalign, [(orthologs.query(hmm, config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
+                )
     logging.info("Done.")
 
     if orthologs.seqtype == config.seqtype_pep:
