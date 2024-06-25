@@ -1,16 +1,19 @@
 [build-system]
-requires = ["setuptools>=61.0", "pytest>=8.0"]
+requires = ["setuptools>=61.0", "pytest>=6.0", "versioningit"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "phyling"
-version = "2.0.0"
 authors = [
   { name = "Jason Stajich", email = "jasonstajich.phd@gmail.com" },
   { name = "Cheng-Hung Tsai", email = "chenghung.tsai@email.ucr.edu" },
 ]
+maintainers = [
+  { name = "Jason Stajich", email = "jasonstajich.phd@gmail.com" },
+  { name = "Cheng-Hung Tsai", email = "chenghung.tsai@email.ucr.edu" },
+]
 license = { file = "LICENSE" }
-description = "A lightweight phylogenetic tree builder from annotated genomes"
+description = "A lightweight phylogenetic tree builder from annotated genomes."
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -22,7 +25,7 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-dynamic = ["dependencies"]
+dynamic = ["dependencies", "version"]
 
 [project.scripts]
 phyling = "phyling.phyling:main"
@@ -38,3 +41,7 @@ dependencies = { file = ["requirements.txt"] }
 minversion = "8.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
+
+[tool.versioningit.vcs]
+method = "git"
+default-tag = "0.0.0"
