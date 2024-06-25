@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import argparse
-import logging
+import re
 import sys
 import textwrap
 import time
 from pathlib import Path
 
-import phyling.config as config
-from phyling import __name__, __version__
+import phyling._internal._config as _config
+from phyling import __author__, __name__, __version__, logger
 from phyling.pipeline import align, download, tree
 
 
@@ -29,7 +29,8 @@ class _CustomHelpFormatter(argparse.HelpFormatter):
 
     def _get_help_string(self, action):
         help = action.help
-        if "%(default)" not in action.help:
+        pattern = r"\(default: .+\)"
+        if re.search(pattern, action.help) is None:
             if action.default not in [argparse.SUPPRESS, None, False]:
                 defaulting_nargs = [argparse.OPTIONAL, argparse.ZERO_OR_MORE]
                 if action.option_strings or action.nargs in defaulting_nargs:
@@ -37,15 +38,13 @@ class _CustomHelpFormatter(argparse.HelpFormatter):
         return help
 
 
-def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.ArgumentParser) -> None:
-    """Parser for command line inputs."""
-    subparsers = parser.add_subparsers()
-
-    # Each subparser would finally called the corresponding function
-    # (function "download" is called at the end in this case)
-    p_download = subparsers.add_parser(
+def _menu_download(
+    subparser: argparse._SubParsersAction, parent_parser: argparse.ArgumentParser | None = None
+) -> argparse.ArgumentParser:
+    """Menu for download module."""
+    p_download: argparse.ArgumentParser = subparser.add_parser(
         "download",
-        parents=[parent_parser],
+        parents=[parent_parser] if parent_parser else [],
         formatter_class=_CustomHelpFormatter,
         help="Download HMM markers",
         description=download.__doc__,
@@ -53,9 +52,14 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
     p_download.add_argument("markerset", metavar='HMM markerset or "list"', help="Name of the HMM markerset")
     p_download.set_defaults(func=download)
 
-    p_aln = subparsers.add_parser(
+
+def _menu_align(
+    subparser: argparse._SubParsersAction, parent_parser: argparse.ArgumentParser | None = None
+) -> argparse.ArgumentParser:
+    """Menu for align module."""
+    p_aln: argparse.ArgumentParser = subparser.add_parser(
         "align",
-        parents=[parent_parser],
+        parents=[parent_parser] if parent_parser else [],
         formatter_class=_CustomHelpFormatter,
         help="Run multiple sequence alignments against orthologs found among samples",
         description=align.__doc__,
@@ -82,8 +86,8 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
         "--output",
         metavar="directory",
         type=Path,
-        default=f'phyling-align-{time.strftime("%Y%m%d-%H%M%S%z", time.localtime())}',
-        help="Output directory of the alignment results (default: %(default)s [current timestamp])",
+        default=f'phyling-align-{time.strftime("%Y%m%d-%H%M%S", time.gmtime())}',
+        help="Output directory of the alignment results (default: phyling-align-[YYYYMMDD-HHMMSS] (UTC timestamp))",
     )
     p_aln.add_argument(
         "-m",
@@ -104,7 +108,7 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
     p_aln.add_argument(
         "-M",
         "--method",
-        choices=config.avail_align_methods,
+        choices=_config.avail_align_methods,
         default="hmmalign",
         help="Program used for multiple sequence alignment",
     )
@@ -117,15 +121,20 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
         "-t",
         "--threads",
         type=int,
-        default=config.avail_cpus // 4 * 4,
+        default=_config.avail_cpus // 4 * 4,
         help="Threads for hmmsearch and the number of parallelized jobs in MSA step. "
         + "Better be multiple of 4 if using more than 8 threads",
     )
     p_aln.set_defaults(func=align)
 
-    p_tree = subparsers.add_parser(
+
+def _menu_tree(
+    subparser: argparse._SubParsersAction, parent_parser: argparse.ArgumentParser | None = None
+) -> argparse.ArgumentParser:
+    """Menu for tree module."""
+    p_tree: argparse.ArgumentParser = subparser.add_parser(
         "tree",
-        parents=[parent_parser],
+        parents=[parent_parser] if parent_parser else [],
         formatter_class=_CustomHelpFormatter,
         help="Build a phylogenetic tree based on multiple sequence alignment results",
         description=tree.__doc__,
@@ -153,17 +162,17 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
         "--output",
         metavar="directory",
         type=Path,
-        default=f'phyling-tree-{time.strftime("%Y%m%d-%H%M%S%z", time.localtime())}',
-        help="Output directory of the newick treefile (default: %(default)s [current timestamp])",
+        default=f'phyling-tree-{time.strftime("%Y%m%d-%H%M%S", time.gmtime())}',
+        help="Output directory of the newick treefile (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))",
     )
     p_tree.add_argument(
         "-M",
         "--method",
-        choices=config.avail_tree_methods.keys(),
+        choices=_config.avail_tree_methods.keys(),
         default="ft",
         help="Algorithm used for tree building. (default: %(default)s)\n"
         + "Available options:\n"
-        + "\n".join(f"{value}: {key}" for key, value in config.avail_tree_methods.items()),
+        + "\n".join(f"{value}: {key}" for key, value in _config.avail_tree_methods.items()),
     )
     p_tree.add_argument(
         "-n",
@@ -191,13 +200,36 @@ def parser_submodule(parser: argparse.ArgumentParser, parent_parser: argparse.Ar
         "-t",
         "--threads",
         type=int,
-        default=config.avail_cpus,
+        default=_config.avail_cpus,
         help="Threads for tree construction",
     )
     p_tree.set_defaults(func=tree)
 
 
-def main():
+def _menu() -> argparse.ArgumentParser:
+    """Menu for this entry point."""
+    parser = argparse.ArgumentParser(
+        prog=__name__,
+        formatter_class=_CustomHelpFormatter,
+        description=main.__doc__,
+        epilog=f"Written by {__author__}",
+    )
+
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode for debug")
+
+    subparsers = parser.add_subparsers()
+
+    parser.add_argument("-V", "--version", action="version", version=__version__)
+
+    _menu_download(subparsers, parent_parser)
+    _menu_align(subparsers, parent_parser)
+    _menu_tree(subparsers, parent_parser)
+
+    return parser
+
+
+def main(args: list[str] | None = None) -> int:
     """
     Package will extract phylogenomic markers and build a phylogenetic tree with these.
 
@@ -205,47 +237,44 @@ def main():
     from BUSCO. The align module is the core element of this package which generate multiple sequence alignment among
     the orthologs found across samples. The tree module help to build a phylogenetic tree.
     """
-    epilog = """
-    Written by Jason Stajich (jason.stajich[at]ucr.edu or jasonstajich.phd[at]gmail.com).
-    Rewritten by Cheng-Hung Tsai (chenghung.tsai[at]email.ucr.edu).
+    parser = _menu()
 
-    Initially written https://github.com/1KFG/Phylogenomics and https://github.com/stajichlab/phyling.
-    """
-    logging.basicConfig(format=f"%(asctime)s {__name__} %(levelname)s %(message)s", level="INFO", force=True)
-    logger = logging.getLogger()
+    try:
+        args = args or sys.argv[1:]
+        if not args:
+            parser.print_help(sys.stderr)
+            raise SystemExit(0)
+        args = parser.parse_args(args)
 
-    # Implement shared arguments between sub-menu, reference from
-    # https://stackoverflow.com/questions/33645859/how-to-add-common-arguments-to-argparse-subcommands
-    # Build parent_parser which contains shared arguments, and do not use it directly
-    parent_parser = argparse.ArgumentParser(add_help=False)
+        args = parser.parse_args()
 
-    parent_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode for debug")
+        if hasattr(args, "threads"):
+            if args.threads > _config.avail_cpus:
+                args.threads = _config.avail_cpus
 
-    # The real parser for user
-    parser = argparse.ArgumentParser(
-        prog=__name__,
-        formatter_class=_CustomHelpFormatter,
-        description=main.__doc__,
-        epilog=epilog,
-    )
+        if args.verbose:
+            logger.setLevel("DEBUG")
+            for handler in logger.handlers:
+                handler.setLevel("DEBUG")
+            logger.debug("Debug mode enabled.")
+            logger.debug(vars(args))
 
-    parser.add_argument("-V", "--version", action="version", version=__version__)
+        args.func(**vars(args))
 
-    parser_submodule(parser, parent_parser)
+    except KeyboardInterrupt:
+        logger.warning("Terminated by user.")
+        return 1
 
-    if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(1)
+    except Exception as err:
+        logger.error(err)
+        return 1
 
-    args = parser.parse_args()
+    except SystemExit as err:
+        if err.code != 0:
+            logger.error(err)
+            return 1
 
-    if args.verbose:
-        logger.setLevel("DEBUG")
-        for handler in logger.handlers:
-            handler.setLevel("DEBUG")
-
-    logging.debug(args)
-    args.func(**vars(args))
+    return 0
 
 
 if __name__ == "__main__":

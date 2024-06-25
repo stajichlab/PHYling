@@ -1,13 +1,15 @@
-"""Utilities that commonly used in different modules."""
+"""Utilities that commonly used in phyling."""
+
 from __future__ import annotations
 
-import logging
 import time
 from functools import wraps
 from hashlib import md5
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 from zlib import crc32
+
+from phyling import logger
 
 
 def get_file_checksum(file: str | Path) -> int:
@@ -33,7 +35,7 @@ def get_multifiles_checksum(files: Iterable[str | Path]) -> str:
     return md5(str(crcsum).encode()).hexdigest()
 
 
-def timing(func):
+def timing(func: Callable):
     """A decorator to measure the elapsed time of a function."""
 
     @wraps(func)
@@ -49,7 +51,7 @@ def timing(func):
         msg = f"{secs:.3f} seconds"
         msg = f"{mins} minutes " + msg if mins > 0 else msg
         msg = f"{hours} hours " + msg if hours > 0 else msg
-        logging.debug(f"{func.__module__}.{func.__name__} finished in {msg}.")
+        logger.debug(f"{func.__module__}.{func.__name__} finished in {msg}.")
         return result
 
     return wrapper
@@ -58,11 +60,11 @@ def timing(func):
 def check_cls_vars(*vars: str):
     """A decorator to check whether a class variable is already defined before calling a class method."""
 
-    def decorator(func):
+    def decorator(func: Callable):
         """The actual decorator function that wraps the class method."""
 
         @wraps(func)
-        def wrapper(cls: type, *args, **kwargs):
+        def wrapper(cls, *args, **kwargs):
             """The wrapper function that checks the class variable and calls the method."""
             for var in vars:
                 if not hasattr(cls, var):

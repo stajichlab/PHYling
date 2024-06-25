@@ -28,7 +28,7 @@ classifiers = [
 dynamic = ["dependencies", "version"]
 
 [project.scripts]
-phyling = "phyling.phyling:main"
+phyling = "phyling.__main__:main"
 
 [project.urls]
 "Homepage" = "https://github.com/stajichlab/PHYling"

@@ -10,9 +10,9 @@ import pytest
 from Bio.AlignIO import MultipleSeqAlignment
 from Bio.Phylo.BaseTree import Tree
 
-import phyling.config as config
+import phyling._internal._config as _config
 import phyling.exception as exception
-from phyling.phylotree import MFA2Tree, MFA2TreeWrapper, OutputPrecheck, determine_samples_and_seqtype
+from phyling._internal._libtree import MFA2Tree, MFA2TreeWrapper, OutputPrecheck, determine_samples_and_seqtype
 
 
 class TestMFA2Tree:
@@ -199,9 +199,9 @@ class TestMFA2TreeWrapper:
     def test_concat(self, tmp_path: Path, wrapper: MFA2TreeWrapper, samples: tuple, partition: str):
         w = deepcopy(wrapper)
         r = w.concat(tmp_path, samples, partition=partition)
-        assert (tmp_path / f"concat_alignments.{config.aln_ext}").is_file() is True
+        assert (tmp_path / f"concat_alignments.{_config.aln_ext}").is_file() is True
         assert isinstance(r, MFA2Tree)
-        assert r.name == f"concat_alignments.{config.aln_ext}"
+        assert r.name == f"concat_alignments.{_config.aln_ext}"
         if partition:
             assert (tmp_path / "concat_alignments.partition").is_file() is True
 
@@ -434,7 +434,7 @@ class TestOutputPrecheck:
         with open(tmp_path / "final_tree.nw") as f:
             content = f.read()
         strategy = "concatenate" if concat else "consensus"
-        assert f"Final tree is built using {config.avail_tree_methods[method]} with {strategy} strategy" in content
+        assert f"Final tree is built using {_config.avail_tree_methods[method]} with {strategy} strategy" in content
 
         if concat and partition:
             assert f"Partition is enabled using {partition} mode" in content

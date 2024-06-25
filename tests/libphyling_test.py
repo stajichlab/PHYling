@@ -13,7 +13,7 @@ from pyhmmer.easel import DigitalSequence, DigitalSequenceBlock
 from pyhmmer.plan7 import HMM
 
 import phyling.exception as exception
-from phyling.libphyling import HMMMarkerSet, Orthologs, OutputPrecheck, SampleList, SampleSeqs, align, search, trim
+from phyling._internal._libphyling import HMMMarkerSet, Orthologs, OutputPrecheck, SampleList, SampleSeqs, align, search, trim
 
 
 @pytest.fixture(scope="class")

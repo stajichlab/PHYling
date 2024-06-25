@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import logging
 import re
 import subprocess
 import textwrap
@@ -25,13 +24,14 @@ from clipkit.modes import TrimmingMode
 from clipkit.msa import MSA
 from pyhmmer.easel import DigitalSequenceBlock
 
-import phyling._abc as _abc
-import phyling._utils as _utils
-import phyling.config as config
+import phyling._internal._abc as _abc
+import phyling._internal._config as _config
+import phyling._internal._utils as _utils
 import phyling.exception as exception
+from phyling import logger
 
 
-class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
+class SampleSeqs(_abc._SeqFileWrapperABC, Sequence):
     """A wrapper of pyhmmer.easel.DigitalSequenceBlock with convenient implementation to retrieve sequence by name."""
 
     def __init__(self, file: str | Path) -> None:
@@ -41,13 +41,13 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
         seqblock: DigitalSequenceBlock = pyhmmer.easel.SequenceFile(self.path, digital=True).read_block()
 
         if seqblock.alphabet.is_amino():
-            self._set_seqtype(config.seqtype_pep)
-            logging.debug(f"{self.name} is {self._seqtype} sequences.")
+            self._set_seqtype(_config.seqtype_pep)
+            logger.debug(f"{self.name} is {self._seqtype} sequences.")
             self._process_pep_seqs(seqblock)
 
         elif seqblock.alphabet.is_dna():
-            self._set_seqtype(config.seqtype_cds)
-            logging.debug(f"{self.name} is {self._seqtype} sequences.")
+            self._set_seqtype(_config.seqtype_cds)
+            logger.debug(f"{self.name} is {self._seqtype} sequences.")
             self._process_cds_seqs(seqblock)
 
         else:
@@ -63,7 +63,7 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
 
     def __len__(self) -> int:
         """Return the number of sequences contain in this object."""
-        return len(self._cds_seqs) if self.seqtype == config.seqtype_cds else len(self._pep_seqs)
+        return len(self._cds_seqs) if self.seqtype == _config.seqtype_cds else len(self._pep_seqs)
 
     def __eq__(self, other: SampleSeqs) -> bool:
         """Return true if the two objects have the same name."""
@@ -102,15 +102,15 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
                     f"Too many keys are given. {self.__class__.__qualname__} accepts at most 2 keys but {len(keys)} were indexed."
                 )
 
-        if key1 == config.seqtype_pep:
+        if key1 == _config.seqtype_pep:
             seqs = self._pep_seqs
-        elif key1 == config.seqtype_cds:
-            if self.seqtype == config.seqtype_cds:
+        elif key1 == _config.seqtype_cds:
+            if self.seqtype == _config.seqtype_cds:
                 seqs = self._cds_seqs
             else:
                 raise AttributeError("Cannot obtain the CDS sequences from a peptide inputs.")
         else:
-            raise KeyError(f'First key only accepts "{config.seqtype_pep}" or "{config.seqtype_cds}" but got "{key1}".')
+            raise KeyError(f'First key only accepts "{_config.seqtype_pep}" or "{_config.seqtype_cds}" but got "{key1}".')
 
         return seqs[self._kh[key2]] if key2 else seqs
 
@@ -122,7 +122,7 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
     @property
     def checksum(self) -> str:
         """Compute md5 checksum based on the checksums of the sequences."""
-        if self.seqtype == config.seqtype_pep:
+        if self.seqtype == _config.seqtype_pep:
             seqs = self._pep_seqs
         else:
             seqs = self._cds_seqs
@@ -175,14 +175,14 @@ class SampleSeqs(_abc.SeqFileWrapperABC, Sequence):
         if problematic_seqs_name:
             problematic_seqs_size = len(problematic_seqs_name)
             problematic_seqs_name = ", ".join(problematic_seqs_name)
-            logging.warning(
+            logger.warning(
                 f"In the file {self.name}, {problematic_seqs_size}/{original_size} seqs has invalid length. "
                 # "The seq names are listed below:"
             )
-            # logging.warning(problematic_seqs_name)
+            # logger.warning(problematic_seqs_name)
 
 
-class SampleList(_abc.DataListABC[SampleSeqs]):
+class SampleList(_abc._DataListABC[SampleSeqs]):
     """A wrapper that stores all the SampleSeqs for an analysis."""
 
     def __init__(self, files: Iterable[str | Path | SampleSeqs]) -> None:
@@ -251,9 +251,9 @@ class SampleList(_abc.DataListABC[SampleSeqs]):
                 droplist.append(prev_data.name)
             elif prev_data.checksum == self[prev_data.name].checksum and prev_data.is_scanned:
                 self[prev_data.name].scanned()
-                logging.info(f"Skip hmmsearch for {self[prev_data.name].path.name} since it was already done.")
+                logger.info(f"Skip hmmsearch for {self[prev_data.name].path.name} since it was already done.")
             else:
-                logging.info(f"Sample {self[prev_data.name].path.name} has changes in its fasta file. Redo hmmsearch.")
+                logger.info(f"Sample {self[prev_data.name].path.name} has changes in its fasta file. Redo hmmsearch.")
 
         return droplist if droplist else None
 
@@ -281,7 +281,7 @@ class SampleList(_abc.DataListABC[SampleSeqs]):
             raise exception.IdenticalKeyError(f"The following files share the same sample name: [{msgs}]")
 
 
-class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
+class HMMMarkerSet(_abc._DataListABC[pyhmmer.plan7.HMM]):
     """A wrapper that stores the selected HMM markers."""
 
     def __init__(self, folder: str | Path, cutoff: str | Path | None = None, *, raise_err: bool = True):
@@ -296,7 +296,7 @@ class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
             with pyhmmer.plan7.HMMFile(file) as hmm_profile:
                 self.data.append(hmm_profile.read())
 
-        logging.info(f"Found {len(self.data)} hmm markers.")
+        logger.info(f"Found {len(self.data)} hmm markers.")
 
         self._cutoff = self._load_cutoffs(cutoff, cutoff_exit=raise_err) if cutoff else False
 
@@ -335,24 +335,24 @@ class HMMMarkerSet(_abc.DataListABC[pyhmmer.plan7.HMM]):
                         continue
                     cutoff = float(line[1])
                     self[line[0].encode()].cutoffs.trusted = (cutoff, cutoff)
-            logging.info("Load model-specific bit-score cutoff for each hmm marker.")
+            logger.info("Load model-specific bit-score cutoff for each hmm marker.")
         except FileNotFoundError:
             msg = "HMM cutoff file not found."
             if cutoff_exit:
                 raise FileNotFoundError(msg)
             else:
-                logging.warning(msg + evalue_hint)
+                logger.warning(msg + evalue_hint)
         except KeyError:
             msg = "HMM cutoff file doesn't match the markerset."
             if cutoff_exit:
                 raise KeyError(msg)
             else:
-                logging.warning(msg + evalue_hint)
+                logger.warning(msg + evalue_hint)
 
         if not all(hmm.cutoffs.trusted for hmm in self.data):
-            logging.warning("HMM cutoff file is incomplete." + evalue_hint)
+            logger.warning("HMM cutoff file is incomplete." + evalue_hint)
             return False
-        logging.info("Use HMM cutoff file to determine cutoff.")
+        logger.info("Use HMM cutoff file to determine cutoff.")
         return True
 
 
@@ -435,13 +435,13 @@ class Orthologs(UserDict):
         for key, value in kwds.items():
             setitem(value)
 
-    def query(self, key: bytes, seqtype: str = config.seqtype_pep) -> list[pyhmmer.easel.DigitalSequence]:
+    def query(self, key: bytes, seqtype: str = _config.seqtype_pep) -> list[pyhmmer.easel.DigitalSequence]:
         """Query the mapped SampleList object and retrieve all the sequences from a given key."""
         if not hasattr(self, "_pep_seqs"):
             raise AttributeError("Need to map to the SampleList object to retrieve the peptide sequences.")
-        if seqtype == config.seqtype_pep:
+        if seqtype == _config.seqtype_pep:
             return self._pep_seqs[key]
-        elif seqtype == config.seqtype_cds:
+        elif seqtype == _config.seqtype_cds:
             if not self._cds_seqs:
                 raise AttributeError("Orthologs was mapped to a SampleList with peptide sequences where cds is not available.")
             return self._cds_seqs[key]
@@ -454,15 +454,15 @@ class Orthologs(UserDict):
         for key, item in self.data.items():
             pep_seqs, cds_seqs = [], []
             for sample_id, seq_id in item:
-                seq = sample_list[sample_id][config.seqtype_pep, seq_id].copy()
+                seq = sample_list[sample_id][_config.seqtype_pep, seq_id].copy()
                 seq.name, seq.description = seq.description, seq.name
                 pep_seqs.append(seq)
-                if sample_list.seqtype == config.seqtype_cds:
-                    seq = sample_list[sample_id][config.seqtype_cds, seq_id].copy()
+                if sample_list.seqtype == _config.seqtype_cds:
+                    seq = sample_list[sample_id][_config.seqtype_cds, seq_id].copy()
                     seq.name, seq.description = seq.description, seq.name
                     cds_seqs.append(seq)
             self._pep_seqs[key] = pep_seqs
-            if sample_list.seqtype == config.seqtype_cds:
+            if sample_list.seqtype == _config.seqtype_cds:
                 self._cds_seqs[key] = cds_seqs
         self._is_mapped = True
         self._seqtype = sample_list.seqtype
@@ -472,11 +472,11 @@ class Orthologs(UserDict):
         ortho_dict = self.data
         if droplist:
             ortho_dict = {key: set(filter(lambda hit: hit[0] not in droplist, value)) for key, value in ortho_dict.items()}
-            logging.info(f'Remove hits corresponding to {", ".join([str(sample) for sample in droplist])} from orthologs.')
+            logger.info(f'Remove hits corresponding to {", ".join([str(sample) for sample in droplist])} from orthologs.')
 
         if min_taxa and ortho_dict:
             ortho_dict = dict(filter(lambda item: len(item[1]) >= min_taxa, ortho_dict.items()))
-            logging.info(f"{len(ortho_dict)} orthologs shared among at least {min_taxa} samples.")
+            logger.info(f"{len(ortho_dict)} orthologs shared among at least {min_taxa} samples.")
 
         if not ortho_dict:
             raise exception.EmptyWarning("None of the ortholog left after filtering.")
@@ -484,22 +484,22 @@ class Orthologs(UserDict):
         return Orthologs(ortho_dict)
 
 
-class OutputPrecheck(_abc.OutputPrecheckABC):
+class OutputPrecheck(_abc._OutputPrecheckABC):
     """A class that provides features for input/output precheck, checkpoint loading/saving and final MSA output."""
 
     folder: Path
     ckp: str
 
     @classmethod
-    def setup(cls, *, folder: Path, ckp: str = config.libphyling_checkpoint) -> None:
+    def setup(cls, *, folder: Path, ckp: str = _config.libphyling_checkpoint) -> None:
         """Setup the class variable."""
         super().setup(folder, ckp)
 
     @classmethod
     def precheck(cls, params: dict, samplelist: SampleList, *, force_rerun: bool = False) -> tuple[SampleList, Orthologs | None]:
         """Check the output folder and determine what orthologs should be removed and what samples should be rerun."""
-        if params.keys() != config.libphyling_precheck_params:
-            raise KeyError(f"Params should contain keys {config.libphyling_precheck_params}")
+        if params.keys() != _config.libphyling_precheck_params:
+            raise KeyError(f"Params should contain keys {_config.libphyling_precheck_params}")
         super().precheck(params, (samplelist), force_rerun=force_rerun)
         if not any(cls.folder.iterdir()):
             return samplelist, None
@@ -545,7 +545,7 @@ class OutputPrecheck(_abc.OutputPrecheckABC):
         rm_files = [x for x in cls.folder.iterdir() if x.is_file() if x.name != cls.ckp]
         droplist = cur_samples.update(prev_samples)
         if droplist:
-            logging.info("Remove samples that no longer exist from the orthologs collection retrieved from the checkpoint.")
+            logger.info("Remove samples that no longer exist from the orthologs collection retrieved from the checkpoint.")
             cur_orthologs = prev_orthologs.filter(droplist=droplist)
         else:
             cur_orthologs = prev_orthologs
@@ -573,7 +573,7 @@ def search(
 
     After the hmmsearch, all the results will be rearrange to a dictionary with dict["hmm", ["sample"]].
     """
-    logging.info("Identify orthologs using hmmsearch...")
+    logger.info("Identify orthologs using hmmsearch...")
     inputs = [input for input in inputs if not input.is_scanned]
     if not orthologs:
         orthologs = Orthologs({})
@@ -581,7 +581,7 @@ def search(
     if inputs:
         if threads < 8:
             # Single process mode
-            logging.debug(f"Sequential mode with {threads} threads.")
+            logger.debug(f"Sequential mode with {threads} threads.")
             search_res = []
             for input in inputs:
                 # Select the sequences of each sample
@@ -590,7 +590,7 @@ def search(
             # Multi processes mode
             threads_per_process = 4
             processes = threads // threads_per_process
-            logging.debug(f"Multiprocesses mode: {processes} jobs with 4 threads for each are run concurrently.")
+            logger.debug(f"Multiprocesses mode: {processes} jobs with 4 threads for each are run concurrently.")
             with ThreadPool(processes) as pool:
                 search_res = pool.starmap(
                     _run_hmmsearch,
@@ -608,7 +608,7 @@ def search(
         for res in search_res:
             for hmm, sample_id, seq_id in res:
                 orthologs[hmm] = (sample_id, seq_id)
-        logging.info("Done.")
+        logger.info("Done.")
     return orthologs
 
 
@@ -624,48 +624,48 @@ def align(
     """
     if not orthologs.is_mapped:
         raise AttributeError("Need to map the orthologs to a SampleList first.")
-    logging.info(f"Run multiple sequence alignment on peptides using {method}...")
+    logger.info(f"Run multiple sequence alignment on peptides using {method}...")
     if method == "hmmalign" and not markerset:
         raise AttributeError(f'Need to specify a {HMMMarkerSet} object to argument "hmms" When using hmmalign.')
 
     if threads == 1:
-        logging.debug("Sequential mode with 1 thread.")
+        logger.debug("Sequential mode with 1 thread.")
         if method == "muscle":
-            pep_msa_list = [_run_muscle(orthologs.query(hmm, config.seqtype_pep)) for hmm in orthologs.keys()]
+            pep_msa_list = [_run_muscle(orthologs.query(hmm, _config.seqtype_pep)) for hmm in orthologs.keys()]
         else:
-            pep_msa_list = [_run_hmmalign(orthologs.query(hmm, config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
+            pep_msa_list = [_run_hmmalign(orthologs.query(hmm, _config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
     else:
-        logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
+        logger.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
         manager = Manager()
         with ThreadPool(threads) as pool:
             # sharedmem_pep_seqs = manager.list([orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
             if method == "muscle":
                 # pep_msa_list = pool.map(_run_muscle, sharedmem_pep_seqs)
-                pep_msa_list = pool.map(_run_muscle, [orthologs.query(hmm, config.seqtype_pep) for hmm in orthologs.keys()])
+                pep_msa_list = pool.map(_run_muscle, [orthologs.query(hmm, _config.seqtype_pep) for hmm in orthologs.keys()])
             else:
                 # sharedmem_markerset = manager.list([markerset[hmm] for hmm in orthologs.keys()])
                 # pep_msa_list = pool.starmap(_run_hmmalign, zip(sharedmem_pep_seqs, sharedmem_markerset))
                 pep_msa_list = pool.starmap(
-                    _run_hmmalign, [(orthologs.query(hmm, config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
+                    _run_hmmalign, [(orthologs.query(hmm, _config.seqtype_pep), markerset[hmm]) for hmm in orthologs.keys()]
                 )
-    logging.info("Done.")
+    logger.info("Done.")
 
-    if orthologs.seqtype == config.seqtype_pep:
+    if orthologs.seqtype == _config.seqtype_pep:
         return (pep_msa_list,)
 
-    logging.info(f"{config.seqtype_cds} found. Run back translation...")
+    logger.info(f"{_config.seqtype_cds} found. Run back translation...")
     if threads == 1:
-        logging.debug("Sequential mode with 1 thread.")
-        cds_seqs_list = [_to_seqrecord(orthologs.query(hmm, config.seqtype_cds)) for hmm in orthologs.keys()]
+        logger.debug("Sequential mode with 1 thread.")
+        cds_seqs_list = [_to_seqrecord(orthologs.query(hmm, _config.seqtype_cds)) for hmm in orthologs.keys()]
         cds_msa_list = [_bp_mrtrans(pep_msa, cds_seq) for pep_msa, cds_seq in zip(pep_msa_list, cds_seqs_list)]
     else:
-        logging.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
+        logger.debug(f"Multiprocesses mode: {threads} jobs are run concurrently.")
         with ThreadPool(threads) as pool:
-            cds_seqs_list = pool.map(_to_seqrecord, [orthologs.query(hmm, config.seqtype_cds) for hmm in orthologs.keys()])
+            cds_seqs_list = pool.map(_to_seqrecord, [orthologs.query(hmm, _config.seqtype_cds) for hmm in orthologs.keys()])
         with Pool(threads) as pool:
             sharedmem_items = manager.list(zip(pep_msa_list, cds_seqs_list))
             cds_msa_list = pool.starmap(_bp_mrtrans, sharedmem_items)
-    logging.info("Done.")
+    logger.info("Done.")
 
     return pep_msa_list, cds_msa_list
 
@@ -692,7 +692,7 @@ def trim(
                 cds_msa_trimmed_list = pool.starmap(_trim_gaps, zip(sharedmem_pep_msa, sharedmem_cds_msa))
             else:
                 pep_msa_trimmed_list = pool.map(_trim_gaps, sharedmem_pep_msa)
-    logging.info("Trimming done.")
+    logger.info("Trimming done.")
 
     return cds_msa_trimmed_list if cds_msa_list else pep_msa_trimmed_list
 
@@ -714,7 +714,7 @@ def _run_hmmsearch(
             if hit.reported:
                 r.append((hmm, input.name, hit.name))
                 break  # The first hit in hits is the best hit
-    logging.info(f"hmmsearch on {input.path.name} is done.")
+    logger.info(f"hmmsearch on {input.path.name} is done.")
     input.scanned()
     return r
 

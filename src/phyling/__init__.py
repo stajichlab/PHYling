@@ -1,10 +1,18 @@
-"""Placeholder init file for Python purposes."""
-from importlib.metadata import version
+"""Required actions when initiating the package."""
 
-import phyling.config as config
+import logging
+from importlib.metadata import metadata
 
-__name__ = "PHYling"
-__version__ = version("phyling")
+import phyling._internal._config as _config
+
+_meta = metadata("phyling")
+__version__ = _meta["Version"]
+__author__ = _meta["Author-email"]
+__all__ = []
+
+# Create logger for the package
+logger = logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s", level="INFO")
+logger = logging.getLogger(__name__)
 
 # Create config folder in $HOME/.phyling
-config.cfg_dir.mkdir(exist_ok=True)
+_config.cfg_dir.mkdir(exist_ok=True)

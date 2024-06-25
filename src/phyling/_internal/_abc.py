@@ -1,6 +1,7 @@
+"""Abstract class for phyling."""
+
 from __future__ import annotations
 
-import logging
 import pickle
 import shutil
 import textwrap
@@ -8,15 +9,16 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Generic, Iterable, Iterator, Sequence, TypeVar
 
-import phyling.config as config
+import phyling._internal._config as _config
 import phyling.exception as exception
-from phyling._utils import check_cls_vars
+from phyling import logger
+from phyling._internal._utils import check_cls_vars
 
 T = TypeVar("T")
-SFW = TypeVar("SFW", bound="SeqFileWrapperABC")
+SFW = TypeVar("SFW", bound="_SeqFileWrapperABC")
 
 
-class SeqFileWrapperABC(ABC):
+class _SeqFileWrapperABC(ABC):
     """An abstract class for sequence files."""
 
     class Decorator:
@@ -90,13 +92,13 @@ class SeqFileWrapperABC(ABC):
 
     def _set_seqtype(self, seqtype: str):
         """Set the self._seqtype."""
-        supported_seqtype = (config.seqtype_pep, config.seqtype_cds)
+        supported_seqtype = (_config.seqtype_pep, _config.seqtype_cds)
         if seqtype not in supported_seqtype:
             raise KeyError(f'Argument "seqtype" not falling in {supported_seqtype}')
         self._seqtype = seqtype
 
 
-class DataListABC(ABC, Generic[T]):
+class _DataListABC(ABC, Generic[T]):
     """A list-like abstract class which have partial list methods."""
 
     @abstractmethod
@@ -158,7 +160,7 @@ class DataListABC(ABC, Generic[T]):
         return tuple(data.name for data in self.data)
 
 
-class OutputPrecheckABC(ABC):
+class _OutputPrecheckABC(ABC):
     """A abstract class that provides features for input/output precheck and checkpoint loading/saving."""
 
     folder: Path
@@ -211,7 +213,7 @@ class OutputPrecheckABC(ABC):
 
         This should be run before output precheck.
         """
-        logging.info("Loading from checkpoint...")
+        logger.info("Loading from checkpoint...")
         try:
             with open(cls.folder / cls.ckp, "rb") as f:
                 params, *data = pickle.load(f)

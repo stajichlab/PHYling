@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import logging
 import shutil
 import tarfile
 import tempfile
@@ -13,7 +12,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-import phyling.config as config
+import phyling._internal._config as _config
+from phyling import logger
 
 
 class BuscoMetadata(ContextDecorator):
@@ -21,7 +21,7 @@ class BuscoMetadata(ContextDecorator):
 
     def __init__(self, database_url: str, metadata: str | Path) -> None:
         """Initiate the object and download the latest metadata from online database."""
-        self._hmm_folder = config.cfg_dir / config.default_HMM
+        self._hmm_folder = _config.cfg_dir / _config.default_HMM
         self._metadata_file = Path(metadata)
         self._get_metadata_online(database_url)
 
@@ -58,8 +58,8 @@ class BuscoMetadata(ContextDecorator):
         if markerset in self._local_metadata:
             if self._local_metadata[markerset]["md5"] == self._online_metadata[markerset]["md5"]:
                 raise FileExistsError("Markerset already exists and update to date.")
-            logging.info("Local markerset outdated. Update from online database...")
-        logging.debug("Markerset not found. Download from online database...")
+            logger.info("Local markerset outdated. Update from online database...")
+        logger.debug("Markerset not found. Download from online database...")
         data = fetch_url(self._online_metadata[markerset]["url"])
         md5 = hashlib.md5(data).hexdigest()
         if md5 != self._online_metadata[markerset]["md5"]:
@@ -76,7 +76,7 @@ class BuscoMetadata(ContextDecorator):
         with tempfile.NamedTemporaryFile("wb", delete=False) as fp:
             fp.write(data)
             fp.close()
-            logging.debug(f"Extract files to {output}.")
+            logger.debug(f"Extract files to {output}.")
             with tarfile.open(fp.name, "r:gz") as f:
                 f.extractall(output.parent, filter="data")
         Path(fp.name).unlink()
@@ -90,7 +90,7 @@ class BuscoMetadata(ContextDecorator):
             line = line.split("\t")
             if line[-1] == "lineages":
                 self._online_metadata[line[0]] = {
-                    "url": f"{config.database}/lineages/{line[0]}.{line[1]}.tar.gz",
+                    "url": f"{_config.database}/lineages/{line[0]}.{line[1]}.tar.gz",
                     "md5": line[2],
                 }
 
@@ -106,7 +106,7 @@ class BuscoMetadata(ContextDecorator):
                         continue
                     self._local_metadata[line[0]] = {"path": line[1], "md5": line[2]}
         else:
-            logging.debug("Local metadata not found. Please download from the online database.")
+            logger.debug("Local metadata not found. Please download from the online database.")
 
 
 def fetch_url(url: str) -> bytes:
@@ -122,7 +122,7 @@ def fetch_url(url: str) -> bytes:
     bytes
     """
     try:
-        logging.debug(f"Download from {url} ...")
+        logger.debug(f"Download from {url} ...")
         with urlopen(url) as response:
             content = response.read()
     except HTTPError as e:
