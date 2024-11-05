@@ -2,5 +2,5 @@ biopython>=1.81
 clipkit>=2.1.1
 matplotlib>=3.5.3
 numpy>=1.26.0
-phykit>=1.12.5
+phykit>=1.19.4
 pyhmmer>=0.10.4
