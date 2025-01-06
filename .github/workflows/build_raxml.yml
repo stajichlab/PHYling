@@ -1,41 +1,39 @@
-name: Build RAxML
+name: Build raxml-ng
 
 on: workflow_call
 
 jobs:
-  build_RAxML:
-    name: Build RAxML
+  build_raxml:
+    name: Build raxml-ng
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cache RAxML
+      - name: Cache raxml-ng
         id: cache
         uses: actions/cache@v4
         with:
           path: ~/.local/bin/raxmlHPC-PTHREADS-AVX2
-          key: ${{ runner.os }}-RAxML
+          key: ${{ runner.os }}-raxml-ng
 
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: sudo apt-get install build-essential g++ wget unzip
 
-      - name: Compile RAxML
+      - name: Download raxml-ng executable
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          wget https://github.com/stamatak/standard-RAxML/archive/refs/tags/v8.2.13.zip
-          unzip v8.2.13.zip
-          cd standard-RAxML-8.2.13
-          make -f Makefile.AVX2.PTHREADS.gcc
+          wget https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_linux_x86_64.zip
+          unzip raxml-ng_v1.2.2_linux_x86_64.zip
 
       - name: Move executable
         if: steps.cache.outputs.cache-hit != 'true'
         working-directory: ${{ github.workspace }}
         run: |
           mkdir -p ~/.local/bin
-          cp standard-RAxML-8.2.13/raxmlHPC-PTHREADS-AVX2 ~/.local/bin/
-          chmod +x ~/.local/bin/raxmlHPC-PTHREADS-AVX2
+          cp raxml-ng ~/.local/bin/
+          chmod +x ~/.local/bin/raxml-ng
 
-      - name: Export RAxML to PATH and verify
+      - name: Export raxml-ng to PATH and verify
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          which raxmlHPC-PTHREADS-AVX2
+          which raxml-ng

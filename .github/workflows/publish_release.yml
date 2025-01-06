@@ -1,0 +1,38 @@
+name: CD/release
+
+on:
+  repository_dispatch:
+    types: [release]
+
+jobs:
+  build-and-test:
+    uses: ./.github/workflows/build_and_test.yml
+
+  conda-build-and-test:
+    uses: ./.github/workflows/conda_build_and_test.yml
+
+  publish_release:
+    name: Publish release
+    environment: GitHub releases
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-test
+      - conda-build-and-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: query-release-info
+        uses: release-flow/keep-a-changelog-action@v3
+        with:
+          command: query
+          version: latest
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.query-release-info.outputs.release-notes }}
+          tag_name: v${{ steps.query-release-info.outputs.version }}
+          prerelease: ${{ github.event.client_payload.bump_type == 'prerelease' }}
+          make_latest: ${{ github.event.client_payload.bump_type != 'prerelease' }}

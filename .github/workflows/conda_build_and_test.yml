@@ -1,4 +1,4 @@
-name: Conda build test
+name: CI/Conda build and test
 
 on:
   push:
@@ -8,16 +8,22 @@ on:
     branches: ["main", "dev"]
     paths: ["**.py", "environment.yml"]
   workflow_dispatch:
+  workflow_call:
 
 jobs:
-  build-conda-and-test:
-    name: Build conda env and test
+  conda-build-and-test:
+    name: Conda build and test
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
 
-      - uses: mamba-org/setup-micromamba@v1
+      - run: git fetch --tags
+
+      - uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
           create-args: >-

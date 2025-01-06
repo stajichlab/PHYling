@@ -3,7 +3,7 @@ name: Build FastTree
 on: workflow_call
 
 jobs:
-  build_FastTree:
+  build_fasttree:
     name: Build FastTree
     runs-on: ubuntu-latest
 
