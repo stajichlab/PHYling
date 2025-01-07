@@ -45,3 +45,9 @@ testpaths = ["tests"]
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.0"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = ["E203", "E701"]
