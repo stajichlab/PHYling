@@ -28,15 +28,11 @@ jobs:
           environment-file: environment.yml
           create-args: >-
             python=3.10
-            flake8
             pytest
             pytest-cov
 
-      - name: Lint with flake8
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=30 --max-line-length=130 --statistics --ignore=E203,W503,E402
-        shell: micromamba-shell {0}
+      - name: Lint with Ruff
+        uses: astral-sh/ruff-action@v3
 
       - name: Install package
         run: pip install .
