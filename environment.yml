@@ -15,4 +15,4 @@ dependencies:
   - phykit>=1.19.4
   - pyhmmer>=0.10.4
   - python>=3.9
-  - raxml>=8.2.12
+  - raxml-ng>=1.2.2
