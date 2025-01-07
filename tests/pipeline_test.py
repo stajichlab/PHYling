@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import logging
 from itertools import product
+from os import cpu_count
 from pathlib import Path
 
 import pytest
 
-from phyling.pipeline import align, download, tree
+from phyling.libphyling import ALIGN_METHODS, TreeMethods, TreeOutputFiles
+from phyling.pipeline.align import align
+from phyling.pipeline.download import download
+from phyling.pipeline.filter import filter
+from phyling.pipeline.tree import tree
 
 
 @pytest.mark.usefixtures("hide_metadata_wo_download")
@@ -27,13 +32,10 @@ class TestDownload:
             download("poxviridae_odb10")
         assert "Markerset already exists and update to date." in caplog.text
 
-    def test_download_with_invalid_name(self, caplog: pytest.LogCaptureFixture):
-        with caplog.at_level(logging.ERROR):
-            with pytest.raises(SystemExit):
-                download("InvalidName")
-
-        assert any(record.levelname == "ERROR" for record in caplog.records)
-        assert "Markerset InvalidName not available" in caplog.text
+    def test_download_with_invalid_name(self):
+        with pytest.raises(RuntimeError) as excinfo:
+            download("InvalidName")
+        assert "Markerset not available" in str(excinfo.value)
 
 
 class TestAlign:
@@ -55,53 +57,85 @@ class TestAlign:
             "tests/data/cds/Variola_virus.fna.gz",
         ],
     )
-    method = ("hmmalign", "muscle")
     nontrim = (True, False)
 
     @pytest.mark.slow
-    @pytest.mark.parametrize("inputs, method, nontrim", list(product(inputs, method, nontrim)))
+    @pytest.mark.parametrize("inputs, method, nontrim", list(product(inputs, ALIGN_METHODS, nontrim)))
     def test_align_inputs(self, inputs: str, tmp_path: Path, method: str, nontrim: bool):
-        align(inputs, tmp_path, markerset="tests/database/poxviridae_odb10/hmms", method=method, non_trim=nontrim)
+        align(
+            inputs,
+            tmp_path,
+            markerset="tests/database/poxviridae_odb10/hmms",
+            method=method,
+            non_trim=nontrim,
+            threads=cpu_count(),
+        )
 
-    def test_align_too_few_inputs(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
-        with pytest.raises(SystemExit):
+    def test_align_too_few_inputs(self, tmp_path: Path):
+        with pytest.raises(ValueError) as excinfo:
             align(self.inputs[2][2:], tmp_path, markerset="tests/database/poxviridae_odb10/hmms")
+        assert "Requires at least 4 samples" in str(excinfo.value)
 
-        assert any(record.levelname == "ERROR" for record in caplog.records)
-        assert "Should have at least 4 input files" in caplog.text
-
-    def test_align_invalid_inputs(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
-        invalid_inputs = [x for x in Path("tests/data/pep_align").glob("*.mfa")]
-        with pytest.raises(SystemExit):
-            align(invalid_inputs, tmp_path, markerset="tests/database/poxviridae_odb10/hmms")
-
-        assert any(record.levelname == "ERROR" for record in caplog.records)
-
-    def test_align_invalid_markerset(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
-        with pytest.raises(SystemExit):
+    def test_align_invalid_markerset(self, tmp_path: Path):
+        with pytest.raises(FileNotFoundError) as excinfo:
             align(self.inputs[0], tmp_path, markerset="InvalidName")
+        assert "Markerset folder does not exist" in str(excinfo.value)
 
-        assert any(record.levelname == "ERROR" for record in caplog.records)
-        assert "Markerset folder does not exist" in caplog.text
+    def test_align_invalid_evalue(self, tmp_path: Path):
+        with pytest.raises(ValueError) as excinfo:
+            align(self.inputs[0], tmp_path, markerset="tests/database/poxviridae_odb10/hmms", evalue=1)
+        assert "Invalid evalue" in str(excinfo.value)
 
-    def test_align_invalid_evalue(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
-        with pytest.raises(SystemExit):
-            align(
-                self.inputs[0],
-                tmp_path,
-                markerset="tests/database/poxviridae_odb10/hmms",
-                evalue=1,
-            )
-
-        assert any(record.levelname == "ERROR" for record in caplog.records)
-        assert "Invalid evalue" in caplog.text
-
-    def test_align_invalid_method(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
-        with pytest.raises(SystemExit):
+    def test_align_invalid_method(self, tmp_path: Path):
+        with pytest.raises(ValueError) as excinfo:
             align(self.inputs[0], tmp_path, markerset="tests/database/poxviridae_odb10/hmms", method="InvalidName")
+        assert "Invalid method" in str(excinfo.value)
 
-        assert any(record.levelname == "ERROR" for record in caplog.records)
-        assert "Invalid method" in caplog.text
+
+class TestFilter:
+    inputs_pep = (
+        "tests/data/pep_align",
+        [
+            "tests/data/pep_align/10at10240.aa.mfa",
+            "tests/data/pep_align/14at10240.aa.mfa",
+            "tests/data/pep_align/43at10240.aa.mfa",
+        ],
+    )
+    inputs_cds = (
+        "tests/data/cds_align",
+        [
+            "tests/data/cds_align/10at10240.cds.mfa",
+            "tests/data/cds_align/14at10240.cds.mfa",
+            "tests/data/cds_align/22at10240.cds.mfa",
+        ],
+    )
+    top_n = (0, 4, 50)
+
+    @pytest.mark.parametrize("inputs, top_n", list(product(inputs_pep, top_n)))
+    def test_tree_pep(self, inputs: str | list[str], tmp_path: Path, top_n: int):
+        filter(inputs, tmp_path, top_n_toverr=top_n, threads=cpu_count())
+        treeness = tmp_path / TreeOutputFiles.TREENESS
+        msas_dir = tmp_path / TreeOutputFiles.MSAS_DIR
+        assert treeness.exists()
+        assert treeness.is_file()
+        assert msas_dir.exists()
+        assert msas_dir.is_dir()
+
+    @pytest.mark.parametrize("inputs, top_n", list(product(inputs_cds, top_n)))
+    def test_tree_cds(self, inputs: str | list[str], tmp_path: Path, top_n: int):
+        filter(inputs, tmp_path, top_n_toverr=top_n, threads=cpu_count())
+        treeness = tmp_path / TreeOutputFiles.TREENESS
+        msas_dir = tmp_path / TreeOutputFiles.MSAS_DIR
+        assert treeness.exists()
+        assert treeness.is_file()
+        assert msas_dir.exists()
+        assert msas_dir.is_dir()
+
+    @pytest.mark.parametrize("input", list((inputs_pep[1][0], inputs_cds[1][0])))
+    def test_tree_single_input(self, input: str, tmp_path: Path):
+        with pytest.raises(ValueError) as excinfo:
+            filter(input, tmp_path)
+        assert "Found only 1 MSA fasta" in str(excinfo.value)
 
 
 class TestTree:
@@ -121,77 +155,61 @@ class TestTree:
             "tests/data/cds_align/22at10240.cds.mfa",
         ],
     )
-    method = ("ft", "raxml", "iqtree")
-    top_n = (0, 4, 50)
+    method = tuple(m.name.lower() for m in TreeMethods)
     concat = (False, True)
-    partition = (None, "seq", "codon", "seq+codon")
+    partition = (False, True)
     figure = (False, True)
 
     @pytest.mark.slow
-    @pytest.mark.parametrize("inputs, top_n, concat, partition", list(product(inputs_pep, top_n, concat, partition[:2])))
-    def test_tree_pep(
-        self, inputs: str | list[str], tmp_path: Path, top_n: int, concat: bool, partition: str, caplog: pytest.LogCaptureFixture
-    ):
-        with caplog.at_level(logging.WARNING):
-            tree(inputs, tmp_path, top_n_toverr=top_n, concat=concat, partition=partition)
-
-        msg = "Partition is forced to be disabled since it only works when using raxml and iqtree."
-        if partition:
-            assert msg in caplog.text
+    @pytest.mark.parametrize("inputs, method, concat", list(product(inputs_pep, method, concat)))
+    def test_tree_pep(self, inputs: str | list[str], tmp_path: Path, method: str, concat: bool):
+        tree(inputs, tmp_path, method=method, concat=concat, threads=cpu_count())
+        treefile = tmp_path / TreeOutputFiles.TREE_NW
+        assert treefile.exists()
+        assert treefile.is_file()
 
     @pytest.mark.slow
-    @pytest.mark.parametrize("inputs, top_n, concat, partition", list(product(inputs_cds, top_n, concat, partition)))
-    def test_tree_cds(
-        self, inputs: str | list[str], tmp_path: Path, top_n: int, concat: bool, partition: str, caplog: pytest.LogCaptureFixture
-    ):
-        with caplog.at_level(logging.WARNING):
-            tree(inputs, tmp_path, top_n_toverr=top_n, concat=concat, partition=partition)
-
-        msg = "Partition is forced to be disabled since it only works when using raxml and iqtree."
-        if partition:
-            assert msg in caplog.text
+    @pytest.mark.parametrize("inputs, method, concat", list(product(inputs_cds, method, concat)))
+    def test_tree_cds(self, inputs: str | list[str], tmp_path: Path, method: str, concat: bool):
+        tree(inputs, tmp_path, method=method, concat=concat, threads=cpu_count())
+        treefile = tmp_path / TreeOutputFiles.TREE_NW
+        assert treefile.exists()
+        assert treefile.is_file()
 
     @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "inputs, method, concat, partition",
-        list(product((inputs_pep[1], inputs_cds[1]), method[1:], concat, partition[:2])),
-    )
-    def test_tree_raxml_iqtree(
-        self, inputs: list, tmp_path: Path, method: str, concat: bool, partition: str, caplog: pytest.LogCaptureFixture
-    ):
-        with caplog.at_level(logging.WARNING):
-            tree(inputs, tmp_path, method=method, concat=concat, partition=partition)
-
-        msg = 'Peptide sequence detected. Force to use "seq" mode for partitioning.'
-        if inputs in self.inputs_pep and concat and partition in self.partition[2:]:
-            assert msg in caplog.text
-        else:
-            assert msg not in caplog.text
+    @pytest.mark.parametrize("inputs, method", list(product((inputs_pep[1],), method[1:])))
+    def test_tree_pep_partition(self, inputs: str | list[str], tmp_path: Path, method: str):
+        tree(inputs, tmp_path, method=method, concat=True, partition=True, threads=cpu_count())
+        treefile = tmp_path / TreeOutputFiles.TREE_NW
+        assert treefile.exists()
+        assert treefile.is_file()
 
     @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "input, method",
-        list(product((inputs_pep[1][0], inputs_cds[1][0]), method)),
-    )
-    def test_tree_single_input(self, input: list, tmp_path: Path, method: str, caplog: pytest.LogCaptureFixture):
-        with caplog.at_level(logging.INFO):
+    @pytest.mark.parametrize("inputs, method", list(product((inputs_cds[1],), method[1:])))
+    def test_tree_cds_partition(self, inputs: str | list[str], tmp_path: Path, method: str):
+        tree(inputs, tmp_path, method=method, concat=True, partition=True, threads=cpu_count())
+        treefile = tmp_path / TreeOutputFiles.TREE_NW
+        assert treefile.exists()
+        assert treefile.is_file()
+
+    @pytest.mark.parametrize("inputs, method", list(product((inputs_pep[1],), method[1:])))
+    def test_partition_no_concat(self, inputs: str | list[str], tmp_path: Path, method: str):
+        with pytest.raises(ValueError) as excinfo:
+            tree(inputs, tmp_path, method=method, concat=False, partition=True)
+        assert "Partition is not allowed in consensus mode" in str(excinfo.value)
+
+    def test_partition_invalid_method(self, tmp_path: Path):
+        with pytest.raises(ValueError) as excinfo:
+            tree(self.inputs_pep[1], tmp_path, concat=True, partition=True)
+        assert f"Partition is not allowed with {TreeMethods.FT.method}" in str(excinfo.value)
+
+    @pytest.mark.parametrize("input, method", list(product((inputs_pep[1][0], inputs_cds[1][0]), method)))
+    def test_tree_single_input(self, input: list, tmp_path: Path, method: str):
+        with pytest.raises(ValueError) as excinfo:
             tree(input, tmp_path, method=method)
-
-        assert "Only one MSA is selected. Report the tree directly." in caplog.text
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "inputs, method, concat",
-        list(product((inputs_pep[1], inputs_cds[1]), method[1:], concat)),
-    )
-    def test_tree_top_1(self, inputs: list, tmp_path: Path, method: str, concat: bool, caplog: pytest.LogCaptureFixture):
-        with caplog.at_level(logging.ERROR):
-            with pytest.raises(SystemExit):
-                tree(inputs, tmp_path, method=method, top_n_toverr=1, concat=concat)
-
-        assert "cannot be run since only single mfa found after filtering by toverr." in caplog.text
+        assert "Found only 1 MSA fasta" in str(excinfo.value)
 
     @pytest.mark.parametrize("inputs", inputs_pep)
     def test_tree_figure(self, inputs, tmp_path: Path):
         tree(inputs, tmp_path, figure=True)
-        assert tmp_path / "inal_tree.png"
+        assert tmp_path / TreeOutputFiles.TREE_IMG
