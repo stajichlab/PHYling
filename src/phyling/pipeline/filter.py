@@ -37,6 +37,13 @@ def menu(parser: argparse.ArgumentParser) -> None:
         type=Path,
         help="Directory containing multiple sequence alignment fasta of the markers",
     )
+    req_args.add_argument(
+        "-n",
+        "--top_n_toverr",
+        type=int,
+        required=True,
+        help="Select the top n markers based on their treeness/RCV for final tree building",
+    )
     opt_args = parser.add_argument_group("Options")
     opt_args.add_argument(
         "-o",
@@ -45,14 +52,6 @@ def menu(parser: argparse.ArgumentParser) -> None:
         type=Path,
         default="phyling-filter-%s" % time.strftime("%Y%m%d-%H%M%S", time.gmtime()),
         help="Output directory of the treeness.tsv and selected MSAs (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))",
-    )
-    opt_args.add_argument(
-        "-n",
-        "--top_n_toverr",
-        type=int,
-        default=50,
-        help="Select the top n markers based on their treeness/RCV for final tree building "
-        + "(default: %(default)s. Specify 0 to use all markers)",
     )
     opt_args.add_argument(
         "-t",
@@ -71,15 +70,22 @@ def menu(parser: argparse.ArgumentParser) -> None:
 def filter(
     inputs: str | Path | list[str | Path],
     output: str | Path,
+    top_n_toverr: int,
     *,
-    top_n_toverr: int = 50,
     threads: int = 1,
     **kwargs,
 ) -> None:
     """A pipeline that filter the multiple sequence alignment results through their treeness/RCVs."""
 
     inputs = _input_check(inputs)
-    top_n_toverr = len(inputs) if top_n_toverr > len(inputs) or top_n_toverr == 0 else top_n_toverr
+    if not 1 < top_n_toverr < len(inputs):
+        if top_n_toverr == len(inputs):
+            raise SystemExit("Argument top_n_toverr is equal to the number of inputs. Do not need filtering.")
+        elif len(inputs) == 3:
+            detail_msg = "can only be 2 since there are only 3 inputs"
+        else:
+            detail_msg = f"should between 2 to {len(inputs) - 1}"
+        raise ValueError(f"Argument top_n_toverr out of range. ({detail_msg})")
 
     logger.info("Found %s MSA fasta.", len(inputs))
     # samples, seqtype = _libtree.determine_samples_and_seqtype(input_dir)
@@ -142,6 +148,6 @@ def _input_check(inputs: str | Path | list) -> tuple[Path]:
             if not inputs:
                 raise FileNotFoundError("Empty input directory.")
 
-    if len(inputs) == 1:
-        raise ValueError("Found only 1 MSA fasta. Please directly build tree with your desired tree building software.")
+    if len(inputs) < 3:
+        raise ValueError("Fewer than 3 inputs. Please directly build tree with your desired tree building software.")
     return inputs
