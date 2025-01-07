@@ -13,12 +13,6 @@ class SeqtypeError(TypeError):
     pass
 
 
-class IdenticalKeyError(KeyError):
-    """Attempting to add a key that already exists to a dictionary."""
-
-    pass
-
-
 class EmptyWarning(UserWarning):
     """An empty item returned which will cause potential error in the following step."""
 
