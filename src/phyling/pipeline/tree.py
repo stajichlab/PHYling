@@ -20,10 +20,9 @@ import matplotlib.pyplot as plt
 from Bio import Phylo
 
 from .. import AVAIL_CPUS, logger
-from ..libphyling import TreeMethods, TreeOutputFiles
+from ..libphyling import FileExts, TreeMethods, TreeOutputFiles
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.tree import MFA2TreeList
-from .filter import _input_check
 
 
 def menu(parser: argparse.ArgumentParser) -> None:
@@ -66,6 +65,13 @@ def menu(parser: argparse.ArgumentParser) -> None:
         + "\n".join(f"{m.name.lower()}: {m.method}" for m in TreeMethods),
     )
     opt_args.add_argument(
+        "-b",
+        "--bootstrap",
+        type=int,
+        default=100,
+        help="Specify number of bootstrap replicates",
+    )
+    opt_args.add_argument(
         "-c",
         "--concat",
         action="store_true",
@@ -97,6 +103,7 @@ def tree(
     output: str | Path,
     *,
     method: Literal["ft", "raxml", "iqtree"] = "ft",
+    bs: int = 100,
     concat: bool = False,
     partition: bool = False,
     figure: bool = False,
@@ -111,9 +118,14 @@ def tree(
 
     if concat:
         concat_tree = mfa2treelist.concat(output=output, partition=partition, threads=threads)
-        tree, tree_building_cmd = concat_tree.build(method, output=output, threads=threads, capture_cmd=True)
+        tree, tree_building_cmd = concat_tree.build(method, output=output, threads=threads, bs=bs, capture_cmd=True)
     else:
-        mfa2treelist.build(method, output=output, threads=threads)
+        if method in (TreeMethods.RAXML.name, TreeMethods.IQTREE.name) and bs > 100:
+            logger.warning(
+                "Set the bootstrap > %s for consensus mode may take a significant of time. Please consider using a lower value.",
+                "100",
+            )
+        mfa2treelist.build(method, output=output, bs=bs, threads=threads)
         tree = mfa2treelist.get_consensus_tree()
 
     """Output the tree in newick format and figure."""
@@ -138,6 +150,27 @@ def tree(
         logger.info("Output figure to %s", output_fig)
         Phylo.draw(tree, do_show=False, axes=ax)
         fig.savefig(output_fig)
+
+
+def _input_check(inputs: str | Path | list) -> tuple[Path]:
+    """Check and adjust the arguments passed in."""
+    if isinstance(inputs, list):
+        inputs = tuple(Path(file) for file in inputs)
+        input_dir = {file.parent for file in inputs}
+        if len(input_dir) > 1:
+            raise RuntimeError("The inputs aren't in the same folder, which indicates it might come from different analysis.")
+    else:
+        inputs = Path(inputs)
+        if inputs.is_file():
+            inputs = (inputs,)
+        else:
+            inputs = tuple(file for file in inputs.glob(f"*.{FileExts.ALN}"))
+            if not inputs:
+                raise FileNotFoundError("Empty input directory.")
+
+    if len(inputs) == 1:
+        raise ValueError("Found only 1 MSA fasta. Please directly build tree with your desired tree building software.")
+    return inputs
 
 
 def _validate_partition(partition: bool, method: str, concat: bool) -> bool:

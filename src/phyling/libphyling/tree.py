@@ -275,6 +275,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         output: str | Path | None = None,
         partition_file: str | Path | None = None,
         *,
+        bs: int = 100,
         threads: int = 1,
         capture_cmd: bool = False,
     ) -> tuple[Tree, str]: ...
@@ -286,6 +287,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         output: str | Path | None = None,
         partition_file: str | Path | None = None,
         *,
+        bs: int = 100,
         threads: int = 1,
         capture_cmd: bool = False,
     ) -> tuple[Tree, str]: ...
@@ -297,6 +299,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         output: str | Path | None = None,
         partition_file: str | Path | None = None,
         *,
+        bs: int = 100,
         threads: int = 1,
         capture_cmd: bool = False,
     ) -> Tree:
@@ -311,6 +314,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 Optional for raxml-ng and IQ-TREE.
             partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
                 object's partition_file if None.
+            bs (int): Bootstrap value. Defaults to 100.
             threads (int): Number of threads to use. Applicable for raxml-ng and IQ-TREE. Defaults to 1.
             capture_cmd (bool): If True, returns the command string used. Defaults to False.
 
@@ -329,9 +333,9 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         if method == TreeMethods.FT.name:
             self._tree, cmd = run_fasttree(self, capture_cmd=True)
         elif method == TreeMethods.RAXML.name:
-            self._tree, cmd = run_raxml(self, output, partition_file, threads=threads, capture_cmd=True)
+            self._tree, cmd = run_raxml(self, output, partition_file, bs=bs, threads=threads, capture_cmd=True)
         elif method == TreeMethods.IQTREE.name:
-            self._tree, cmd = run_iqtree(self, output, partition_file, threads=threads, capture_cmd=True)
+            self._tree, cmd = run_iqtree(self, output, partition_file, bs=bs, threads=threads, capture_cmd=True)
         else:
             raise NotImplementedError(f"Method not implemented yet: {TreeMethods[method.upper()].name}.")
         logger.debug("Tree building on %s is done.", self.name)
@@ -462,11 +466,17 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
         super().sort(reverse=True)
 
     @Timer.timer
-    def build(self, method: str, *, threads: int = 1, capture_cmd: bool = False, **kwargs) -> None:
+    def build(
+        self, method: Literal["ft", "raxml", "iqtree"], *, bs: int = 100, threads: int = 1, capture_cmd: bool = False, **kwargs
+    ) -> None:
         """Build trees for each MFA2Tree object.
 
         Args:
-            method (str): Tree-building method to use.
+            method (Literal["ft", "raxml", "iqtree"]): Tree-building method.
+                - "ft": Use FastTree.
+                - "raxml": Use raxml-ng.
+                - "iqtree": Use IQ-TREE.
+            bs (int): Bootstrap value. Defaults to 100.
             threads (int, optional): Number of parallel threads. Defaults to 1.
             capture_cmd (bool, optional): Capture command-line output. Defaults to False.
         """
@@ -478,6 +488,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                     method,
                     kwargs.get("output"),
                     kwargs.get("partition_file"),
+                    bs,
                     threads,
                     capture_cmd,
                 )
@@ -492,6 +503,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                             method,
                             kwargs.get("output"),
                             kwargs.get("partition_file"),
+                            bs,
                             threads,
                             capture_cmd,
                         )
@@ -678,8 +690,8 @@ def run_fasttree(mfa2tree: MFA2Tree, *, capture_cmd: bool = False) -> Tree:
     """Runs FastTree to build a phylogenetic tree from the given MFA2Tree object.
 
     Args:
-        mfa2tree: The MFA2Tree object containing multiple sequence alignment data.
-        capture_cmd: If True, returns the FastTree command along with the resulting tree.
+        mfa2tree (MFA2Tree): The MFA2Tree object containing multiple sequence alignment data.
+        capture_cmd (bool): If True, returns the FastTree command along with the resulting tree.
 
     Returns:
         If capture_cmd is False (default), returns a Tree object.
@@ -718,6 +730,7 @@ def run_raxml(
     output: str | Path | None = None,
     partition_file: str | Path | None = None,
     *,
+    bs: int = 50,
     threads: int = 1,
 ) -> Tree: ...
 
@@ -728,6 +741,7 @@ def run_raxml(
     output: str | Path | None = None,
     partition_file: str | Path | None = None,
     *,
+    bs: int = 50,
     threads: int = 1,
     capture_cmd: bool = True,
 ) -> tuple[Tree, str]: ...
@@ -739,17 +753,19 @@ def run_raxml(
     output: str | Path | None = None,
     partition_file: str | Path | None = None,
     *,
+    bs: int = 50,
     threads: int = 1,
     capture_cmd: bool = False,
 ) -> Tree:
     """Runs raxml-ng to build a phylogenetic tree from the given MFA2Tree object.
 
     Args:
-        mfa2tree: The MFA2Tree object containing alignment data.
-        output: Path to save the resulting tree file. If not provided, a temporary path is used.
-        partition_file: Path to a partition file for model partitioning. Optional.
-        threads: Number of threads to use for raxml-ng computation.
-        capture_cmd: If True, returns the raxml-ng command along with the resulting tree.
+        mfa2tree (MFA2Tree): The MFA2Tree object containing alignment data.
+        output (str | Path | None, optional): Path to save the resulting tree file. If not provided, a temporary path is used.
+        partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Optional.
+        bs (int): Bootstrap value. Defaults to 50.
+        threads (int): Number of threads to use for raxml-ng computation.
+        capture_cmd (bool): If True, returns the raxml-ng command along with the resulting tree.
 
     Returns:
         If capture_cmd is False (default), returns a Tree object.
@@ -793,9 +809,9 @@ def run_raxml(
             "--prefix",
             str(output / mfa2tree.name),
             "--bs-trees",
-            "1000",
+            str(bs),
             "--threads",
-            str(threads),
+            f"auto{{{threads}}}",
         ]
         if partition_file:
             cmd.extend(["--model", str(partition_file)])
@@ -827,6 +843,7 @@ def run_iqtree(
     output: str | Path | None = None,
     partition_file: str | Path | None = None,
     *,
+    bs: int = 100,
     threads: int = 1,
 ) -> Tree: ...
 
@@ -837,6 +854,7 @@ def run_iqtree(
     output: str | Path | None = None,
     partition_file: str | Path | None = None,
     *,
+    bs: int = 100,
     threads: int = 1,
     capture_cmd: bool = True,
 ) -> tuple[Tree, str]: ...
@@ -848,17 +866,19 @@ def run_iqtree(
     output: str | Path | None = None,
     partition_file: str | Path | None = None,
     *,
+    bs: int = 100,
     threads: int = 1,
     capture_cmd: bool = False,
 ) -> Tree | tuple[Tree, str]:
     """Runs IQ-TREE to construct a phylogenetic tree from the given MFA2Tree object.
 
     Args:
-        mfa2tree: The MFA2Tree object containing alignment data.
-        output: Path to save the resulting tree file. If not provided, a temporary path is used.
-        partition_file: Path to a partition file for model partitioning. Optional.
-        threads: Number of threads to use for IQ-TREE computation.
-        capture_cmd: If True, returns the IQ-TREE command along with the resulting tree.
+        mfa2tree (MFA2Tree): The MFA2Tree object containing alignment data.
+        output (str | Path | None, optional): Path to save the resulting tree file. If not provided, a temporary path is used.
+        partition_file (str | Path | None, optional):: Path to a partition file for model partitioning. Optional.
+        bs (int): Bootstrap value. Defaults to 100.
+        threads (int): Number of threads to use for IQ-TREE computation.
+        capture_cmd (bool): If True, returns the IQ-TREE command along with the resulting tree.
 
     Returns:
         If capture_cmd is False (default), returns a Tree object.
@@ -898,8 +918,8 @@ def run_iqtree(
             str(mfa2tree.file),
             "--prefix",
             str(output / mfa2tree.name),
-            "-bb",
-            "1000",
+            "-b",
+            str(bs),
             "-T",
             "AUTO",
             "-ntmax",
@@ -954,8 +974,9 @@ def _build_helper(
     method: Literal["ft", "raxml", "iqtree"],
     output: str | Path | None,
     partition_file: str | Path | None,
+    bs: int,
     threads: int,
-    verbose: bool,
+    capture_cmd: bool,
 ) -> Tree:
     """Helper function to run the `build` method on an MFA2Tree instance.
 
@@ -969,6 +990,7 @@ def _build_helper(
                 Optional for raxml-ng and IQ-TREE.
         partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
             object's partition_file if None.
+        bs (int): Bootstrap value. Defaults to 100.
         threads (int): Number of threads to use. Applicable for raxml-ng and IQ-TREE. Defaults to 1.
         capture_cmd (bool): If True, returns the command string used. Defaults to False.
 
@@ -979,8 +1001,9 @@ def _build_helper(
         method,
         output=output,
         partition_file=partition_file,
+        bs=bs,
         threads=threads,
-        capture_cmd=verbose,
+        capture_cmd=capture_cmd,
     )
 
 
