@@ -870,8 +870,6 @@ class OutputPrecheckABC(ABC):
         params (dict): A dictionary of parameters.
     """
 
-    __slots__ = ("_instance", "output", "ckp", "params")
-
     _instance = None
     output: Path
     ckp: str
