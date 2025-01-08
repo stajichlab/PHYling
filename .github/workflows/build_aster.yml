@@ -3,7 +3,7 @@ name: Build ASTER
 on: workflow_call
 
 jobs:
-  build_ASTER:
+  build_aster:
     name: Build ASTER
     runs-on: ubuntu-latest
 

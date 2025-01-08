@@ -3,7 +3,7 @@ name: Build IQTree
 on: workflow_call
 
 jobs:
-  build_IQTree:
+  build_iqtree:
     name: Build IQTree
     runs-on: ubuntu-latest
 
@@ -19,15 +19,15 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install wget
-          wget https://github.com/iqtree/iqtree2/releases/download/v2.3.2/iqtree-2.3.2-Linux-intel.tar.gz
-          tar zxf iqtree-2.3.2-Linux-intel.tar.gz
+          wget https://github.com/iqtree/iqtree2/releases/download/v2.3.6/iqtree-2.3.6-Linux-intel.tar.gz
+          tar zxf iqtree-2.3.6-Linux-intel.tar.gz
 
       - name: Move executable
         if: steps.cache.outputs.cache-hit != 'true'
         working-directory: ${{ github.workspace }}
         run: |
           mkdir -p ~/.local/bin
-          cp iqtree-2.3.2-Linux-intel/bin/iqtree2 ~/.local/bin/
+          cp iqtree-2.3.6-Linux-intel/bin/iqtree2 ~/.local/bin/
           chmod +x ~/.local/bin/iqtree2
 
       - name: Export IQTree to PATH and verify

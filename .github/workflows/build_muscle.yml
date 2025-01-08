@@ -19,8 +19,8 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install wget
-          wget https://github.com/rcedgar/muscle/releases/download/5.1.0/muscle5.1.linux_intel64
-          mv muscle5.1.linux_intel64 muscle
+          wget https://github.com/rcedgar/muscle/releases/download/v5.3/muscle-linux-x86.v5.3
+          mv muscle-linux-x86.v5.3 muscle
 
       - name: Move executable
         if: steps.cache.outputs.cache-hit != 'true'

@@ -1,4 +1,4 @@
-name: Python versions build test
+name: CI/build and test
 
 on:
   push:
@@ -8,25 +8,26 @@ on:
     branches: ["main", "dev"]
     paths: ["**.py", "requirements.txt"]
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   build-muscle:
-    uses: ./.github/workflows/build-muscle.yml
+    uses: ./.github/workflows/build_muscle.yml
 
   build-aster:
-    uses: ./.github/workflows/build-aster.yml
+    uses: ./.github/workflows/build_aster.yml
 
   build-fasttree:
-    uses: ./.github/workflows/build-fasttree.yml
+    uses: ./.github/workflows/build_fasttree.yml
 
   build-raxml:
-    uses: ./.github/workflows/build-raxml.yml
+    uses: ./.github/workflows/build_raxml.yml
 
   build-iqtree:
-    uses: ./.github/workflows/build-iqtree.yml
+    uses: ./.github/workflows/build_iqtree.yml
 
-  build-pythons-and-test:
-    name: Build different versions of python and test
+  build-and-test:
+    name: Build and test
     runs-on: ubuntu-latest
     env:
       OS: Linux
@@ -35,21 +36,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+
+      - run: git fetch --tags
 
       - name: Cache Python packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
+          key: pip-${{ runner.os }}-${{ matrix.python }}-${{ hashFiles('requirements.txt') }}
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python }}
 
       - name: Install dependencies
         run: |
@@ -95,13 +101,15 @@ jobs:
           path: ~/.local/bin/iqtree2
           key: ${{ runner.os }}-IQTree
 
-      - name: Pytest
-        run: pytest --runslow -vv --cov=phyling --cov-report=xml
+      - name: Test with pytest
+        run: |
+          package_name=$(grep '^name = ' pyproject.toml | sed 's/name = "\(.*\)"/\1/' | tr -d '[:space:]')
+          pytest -vv --cov=$package_name --cov-report=xml --runslow
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5.0.2
+        uses: codecov/codecov-action@v5.1.2
         with:
-          flags: ${{ matrix.python-version }}
+          flags: ${{ matrix.python }}
           env_vars: OS
           files: ./coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}

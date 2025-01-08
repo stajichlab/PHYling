@@ -1,0 +1,68 @@
+name: CD/version bump
+run-name: Version bump - ${{ github.event.inputs.version }} ${{ github.event.inputs.preid }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version bump types"
+        required: true
+        type: choice
+        default: "patch"
+        options:
+          - major
+          - premajor
+          - minor
+          - preminor
+          - patch
+          - prepatch
+          - prerelease
+      preid:
+        description: "Prerelease identifier"
+        type: string
+
+jobs:
+  version_check:
+    name: Update Readme and Changelog
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            README.md
+            CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
+      - name: Bump changelog version
+        uses: release-flow/keep-a-changelog-action@v3
+        with:
+          command: bump
+          version: ${{ github.event.inputs.version }}
+          preid: ${{ github.event.inputs.preid }}
+          keep-unreleased-section: true
+          fail-on-empty-release-notes: true
+
+      - name: Get version
+        id: query-release-info
+        uses: release-flow/keep-a-changelog-action@v3
+        with:
+          command: query
+          version: latest
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Release v${{ steps.query-release-info.outputs.version }}"
+
+      - name: Push changes
+        run: git push
+
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: release
+          client-payload: '{"bump_type": "${{ github.event.inputs.version }}"}'
