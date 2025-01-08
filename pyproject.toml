@@ -50,4 +50,4 @@ default-tag = "0.0.0"
 line-length = 120
 
 [tool.ruff.lint]
-ignore = ["E203", "E701"]
+ignore = ["E203", "E402", "E701"]
