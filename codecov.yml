@@ -1,0 +1,9 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 70
+        threshold: 10
+        base: auto
+        paths:
+          - "src"
