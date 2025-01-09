@@ -10,6 +10,8 @@ with hmmalign or muscle. The resulting alignments are further trimmed using clip
 to skip the trimming step. Finally, The alignment results are output separately for each hmm marker.
 """
 
+from __future__ import annotations
+
 import argparse
 import re
 import time

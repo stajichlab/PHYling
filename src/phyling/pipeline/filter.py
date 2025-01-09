@@ -5,6 +5,8 @@ Treeness/RCV value computed by PhyKIT is used to estimate how informative the ma
 set to 50 to select only the top 50 markers.
 """
 
+from __future__ import annotations
+
 import argparse
 import time
 from pathlib import Path

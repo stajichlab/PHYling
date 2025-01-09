@@ -7,6 +7,8 @@ Passing "list" to markerset argument will list all the available/already downloa
 markerset argument will download the markerset to the config folder ~/.phyling/HMM.
 """
 
+from __future__ import annotations
+
 import argparse
 import shutil
 from urllib.error import URLError

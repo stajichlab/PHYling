@@ -11,6 +11,8 @@ Once the tree is built, an ASCII figure representing the tree will be displayed,
 as output. Additionally, users can choose to obtain a matplotlib-style figure using the -f/--figure option.
 """
 
+from __future__ import annotations
+
 import argparse
 import time
 from pathlib import Path

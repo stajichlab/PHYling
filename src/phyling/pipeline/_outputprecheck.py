@@ -1,5 +1,7 @@
 """Output precheck subclasses for align and tree modules."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from .. import logger
