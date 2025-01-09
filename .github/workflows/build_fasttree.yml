@@ -12,7 +12,7 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          path: ~/.local/bin/FastTree
+          path: ~/.local/bin/fasttree
           key: ${{ runner.os }}-FastTree
 
       - name: Download FastTree executable
@@ -27,9 +27,9 @@ jobs:
         run: |
           mkdir -p ~/.local/bin
           cp FastTree ~/.local/bin/
-          chmod +x ~/.local/bin/FastTree
+          chmod +x ~/.local/bin/fasttree
 
       - name: Export FastTree to PATH and verify
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          which FastTree
+          which fasttree
