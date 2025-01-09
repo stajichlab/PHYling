@@ -5,15 +5,15 @@ import tarfile
 
 import pytest
 
-import phyling._internal._config as _config
-from phyling.pipeline import download
+import phyling.libphyling
+from phyling.pipeline.download import download
 
 
 class PackMetadata:
     def __init__(self) -> None:
-        self.metadata = _config.cfg_dir / _config.metadata
-        self.data_folder = _config.cfg_dir / _config.default_HMM
-        self.temp_tar = _config.cfg_dir / "temp.tgz"
+        self.metadata = phyling.libphyling.METADATA_FILE
+        self.data_folder = phyling.libphyling.HMM_DIR
+        self.temp_tar = phyling.CFG_DIR / "temp.tgz"
 
     def pack_metadata(self):
         with tarfile.open(self.temp_tar, "w") as tar:
@@ -29,7 +29,7 @@ class PackMetadata:
             shutil.rmtree(self.data_folder)
         self.metadata.unlink(missing_ok=True)
         with tarfile.open(self.temp_tar, "r") as tar:
-            tar.extractall(_config.cfg_dir, filter="fully_trusted")
+            tar.extractall(phyling.CFG_DIR, filter="fully_trusted")
         self.temp_tar.unlink()
 
 

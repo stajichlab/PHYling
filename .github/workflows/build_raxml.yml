@@ -12,7 +12,7 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          path: ~/.local/bin/raxmlHPC-PTHREADS-AVX2
+          path: ~/.local/bin/raxml-ng
           key: ${{ runner.os }}-raxml-ng
 
       - name: Install dependencies

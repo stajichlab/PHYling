@@ -1,4 +1,4 @@
-"""Supporting routines for downloading data especially BUSCO markers."""
+"""Download module library."""
 
 from __future__ import annotations
 
@@ -12,20 +12,20 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-import phyling._internal._config as _config
-from phyling import logger
+from .. import logger
+from . import BUSCO_URL
 
 
-class BuscoMetadata(ContextDecorator):
+class BuscoParser(ContextDecorator):
     """Store/update local copy of HMM files into destination."""
 
-    def __init__(self, database_url: str, metadata: str | Path) -> None:
+    def __init__(self, output: str | Path, metadata_file: str | Path) -> None:
         """Initiate the object and download the latest metadata from online database."""
-        self._hmm_folder = _config.cfg_dir / _config.default_HMM
-        self._metadata_file = Path(metadata)
-        self._get_metadata_online(database_url)
+        self._hmm_folder = output
+        self._metadata_file = Path(metadata_file)
+        self._get_metadata_online()
 
-    def __enter__(self) -> BuscoMetadata:
+    def __enter__(self) -> BuscoParser:
         """Define the actions that will run when the object is created with `with` statement."""
         self._get_local_metadata()
         return self
@@ -57,40 +57,26 @@ class BuscoMetadata(ContextDecorator):
         """Download the given markerset from busco database."""
         if markerset in self._local_metadata:
             if self._local_metadata[markerset]["md5"] == self._online_metadata[markerset]["md5"]:
-                raise FileExistsError("Markerset already exists and update to date.")
+                logger.info("Markerset already exists and update to date.")
+                return
             logger.info("Local markerset outdated. Update from online database...")
         logger.debug("Markerset not found. Download from online database...")
-        data = fetch_url(self._online_metadata[markerset]["url"])
+        data = _fetch_url(self._online_metadata[markerset]["url"])
         md5 = hashlib.md5(data).hexdigest()
         if md5 != self._online_metadata[markerset]["md5"]:
             raise HTTPError("The checksum of the downloaded content doesn't match to the metadata.")
         file_path = self._save_markerset(data, markerset=markerset)
         self._local_metadata[markerset] = {"path": file_path, "md5": md5}
 
-    def _save_markerset(self, data: bytes, markerset: str) -> Path:
-        """Save the content of the markerset to a local folder."""
-        output = self._hmm_folder / markerset
-        if output.exists() and output.is_dir():
-            shutil.rmtree(output)
-        output.mkdir(parents=True)
-        with tempfile.NamedTemporaryFile("wb", delete=False) as fp:
-            fp.write(data)
-            fp.close()
-            logger.debug(f"Extract files to {output}.")
-            with tarfile.open(fp.name, "r:gz") as f:
-                f.extractall(output.parent, filter="data")
-        Path(fp.name).unlink()
-        return output
-
-    def _get_metadata_online(self, busco_database_url: str):
+    def _get_metadata_online(self):
         """Get the metadata from busco url."""
         self._online_metadata = {}
-        data = fetch_url(f"{busco_database_url}/file_versions.tsv")
+        data = _fetch_url(f"{BUSCO_URL}/file_versions.tsv")
         for line in data.decode().split("\n"):
             line = line.split("\t")
             if line[-1] == "lineages":
                 self._online_metadata[line[0]] = {
-                    "url": f"{_config.database}/lineages/{line[0]}.{line[1]}.tar.gz",
+                    "url": f"{BUSCO_URL}/lineages/{line[0]}.{line[1]}.tar.gz",
                     "md5": line[2],
                 }
 
@@ -108,37 +94,38 @@ class BuscoMetadata(ContextDecorator):
         else:
             logger.debug("Local metadata not found. Please download from the online database.")
 
+    def _save_markerset(self, data: bytes, markerset: str) -> Path:
+        """Save the content of the markerset to a local folder."""
+        output = self._hmm_folder / markerset
+        if output.exists() and output.is_dir():
+            shutil.rmtree(output)
+        output.mkdir(parents=True)
+        with tempfile.NamedTemporaryFile("wb", delete=False) as fp:
+            fp.write(data)
+            fp.close()
+            logger.debug("Extract files to %s.", {output})
+            with tarfile.open(fp.name, "r:gz") as f:
+                f.extractall(output.parent, filter="data")
+        Path(fp.name).unlink()
+        return output
 
-def fetch_url(url: str) -> bytes:
-    """Fetch URL data content.
 
-    Attributes
-    ----------
-    url : str
-        The url source.
+def _fetch_url(url: str) -> bytes:
+    """
+    Fetch URL data content.
 
-    Return
-    ------
-    bytes
+    Args:
+        url (`str`): The url source.
+
+    Returns:
+        `bytes`: The content fetched from the url.
     """
     try:
-        logger.debug(f"Download from {url} ...")
+        logger.debug("Download from %s ...", url)
         with urlopen(url) as response:
             content = response.read()
     except HTTPError as e:
-        raise HTTPError("URL currently unavailble.") from e
+        raise HTTPError("URL currently unavailable.") from e
     except URLError as e:
         raise URLError("URL not found or no internet connection available.") from e
     return content
-
-
-def wrapper(item_list: list[str], col: int, col_width: int, msg: str | None = None) -> None:
-    """Adjust databases display according to the terminal size."""
-    item_list = [item_list[x : x + col] for x in range(0, len(item_list), col)]
-    if msg:
-        print(msg)
-        print()
-    for row in item_list:
-        # Print the database list
-        print(" ".join(word.ljust(col_width) for word in row))
-    print()

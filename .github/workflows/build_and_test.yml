@@ -60,43 +60,42 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install flake8 pytest pytest-cov
+
+          python -m pip install pytest pytest-cov
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Lint with flake8
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=30 --max-line-length=130 --statistics --ignore=E203,W503,E402
+      - name: Lint with Ruff
+        uses: astral-sh/ruff-action@v3
 
       - name: Install package
         run: pip install .
 
       - name: Cache muscle
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.local/bin/muscle
           key: ${{ runner.os }}-muscle
 
       - name: Cache ASTER
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.local/bin/astral
           key: ${{ runner.os }}-ASTER
 
       - name: Cache FastTree
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.local/bin/FastTree
+          path: ~/.local/bin/fasttree
           key: ${{ runner.os }}-FastTree
 
       - name: Cache RAxML
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.local/bin/raxmlHPC-PTHREADS-AVX2
-          key: ${{ runner.os }}-RAxML
+          path: ~/.local/bin/raxml-ng
+          key: ${{ runner.os }}-raxml-ng
 
       - name: Cache IQTree
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.local/bin/iqtree2
           key: ${{ runner.os }}-IQTree
