@@ -30,7 +30,7 @@ ALIGN_METHODS = ("hmmalign", "muscle")
 # Tree
 class TreeMethods(Enum):
     FT = ("FastTree", ("fasttree", "Fasttree"))
-    RAXML = ("Raxml-ng", ("raxml-ng",))
+    RAXML = ("RAxML-NG", ("raxml-ng",))
     IQTREE = ("IQTree", ("iqtree", "iqtree2"))
 
     def __init__(self, method: str, bins: tuple) -> None:

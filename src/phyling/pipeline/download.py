@@ -1,10 +1,10 @@
 """Help to download/update BUSCO v5 markerset to a local folder.
 
-First it checks whether the metadata file is exist under the config folder ~/.phyling. A missing or outdated file
-will trigger the module to download/update the metadata.
+First it checks whether the metadata file is exist under the config folder ~/.phyling. A missing or outdated file will trigger the
+module to download/update the metadata.
 
-Passing "list" to markerset argument will list all the available/already downloaded markersets. Passing a valid
-name to the markerset argument will download the markerset to the config folder ~/.phyling/HMM.
+Passing "list" to markerset argument will list all the available/already downloaded markersets. Passing a valid name to the
+markerset argument will download the markerset to the config folder ~/.phyling/HMM.
 """
 
 import argparse

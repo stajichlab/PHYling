@@ -1,14 +1,14 @@
 """Construct a phylogenetic tree by the selected multiple sequence alignment (MSA) results.
 
-By default the consensus tree method will be employed which use a 50% cutoff to represent the majority of all the trees. You
-can use the -c/--concat option to concatenate the MSA and build a single tree instead. Note that enable the -p/--partition
-option will also output a partition file that compatible to raxml-ng and IQ-TREE.
+By default the consensus tree method will be employed which use a 50% cutoff to represent the majority of all the trees. You can
+use the -c/--concat option to concatenate the MSA and build a single tree instead. Note that enable the -p/--partition option will
+also output a partition file that compatible to RAxML-NG and IQ-TREE.
 
-For the tree building step, the Fasttree will be used as default algorithm. Users can switch to the raxml-ng or
-IQ-TREE by specifying the -m/--method raxml/iqtree.
+For the tree building step, the Fasttree will be used as default algorithm. Users can switch to the RAxML-NG or IQ-TREE by
+specifying the -m/--method raxml/iqtree.
 
-Once the tree is built, an ASCII figure representing the tree will be displayed, and a treefile in Newick format will be
-generated as output. Additionally, users can choose to obtain a matplotlib-style figure using the -f/--figure option.
+Once the tree is built, an ASCII figure representing the tree will be displayed, and a treefile in Newick format will be generated
+as output. Additionally, users can choose to obtain a matplotlib-style figure using the -f/--figure option.
 """
 
 import argparse
@@ -110,7 +110,7 @@ def tree(
     threads: int = 1,
     **kwargs,
 ) -> None:
-    """A pipeline that build phylogenetic tree through either FastTree, raxml-ng or IQ-TREE."""
+    """A pipeline that build phylogenetic tree through either FastTree, RAxML-NG or IQ-TREE."""
 
     inputs = _input_check(inputs)
     mfa2treelist = MFA2TreeList(inputs)

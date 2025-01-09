@@ -90,7 +90,7 @@ def _check_single_file(func: _C):
 class MFA2Tree(_abc.SeqFileWrapperABC):
     """Convert peptide/DNA multiple sequence alignment to Biopython Tree object.
 
-    Optionally take a partition file to build tree with partition mode with raxml-ng and IQ-TREE.
+    Optionally take a partition file to build tree with partition mode with RAxML-NG and IQ-TREE.
     """
 
     __slots__ = ("_method", "_tree", "_toverr", "_saturation", "partition_file")
@@ -308,14 +308,14 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         Args:
             method (Literal["ft", "raxml", "iqtree"]): Tree-building method.
                 - "ft": Use FastTree.
-                - "raxml": Use raxml-ng.
+                - "raxml": Use RAxML-NG.
                 - "iqtree": Use IQ-TREE.
             output (str | Path | None, optional): Path to save the resulting tree file. If None, a temporary path is used.
-                Optional for raxml-ng and IQ-TREE.
+                Optional for RAxML-NG and IQ-TREE.
             partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
                 object's partition_file if None.
             bs (int): Bootstrap value. Defaults to 100.
-            threads (int): Number of threads to use. Applicable for raxml-ng and IQ-TREE. Defaults to 1.
+            threads (int): Number of threads to use. Applicable for RAxML-NG and IQ-TREE. Defaults to 1.
             capture_cmd (bool): If True, returns the command string used. Defaults to False.
 
         Returns:
@@ -474,7 +474,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
         Args:
             method (Literal["ft", "raxml", "iqtree"]): Tree-building method.
                 - "ft": Use FastTree.
-                - "raxml": Use raxml-ng.
+                - "raxml": Use RAxML-NG.
                 - "iqtree": Use IQ-TREE.
             bs (int): Bootstrap value. Defaults to 100.
             threads (int, optional): Number of parallel threads. Defaults to 1.
@@ -757,15 +757,15 @@ def run_raxml(
     threads: int = 1,
     capture_cmd: bool = False,
 ) -> Tree:
-    """Runs raxml-ng to build a phylogenetic tree from the given MFA2Tree object.
+    """Runs RAxML-NG to build a phylogenetic tree from the given MFA2Tree object.
 
     Args:
         mfa2tree (MFA2Tree): The MFA2Tree object containing alignment data.
         output (str | Path | None, optional): Path to save the resulting tree file. If not provided, a temporary path is used.
         partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Optional.
         bs (int): Bootstrap value. Defaults to 50.
-        threads (int): Number of threads to use for raxml-ng computation.
-        capture_cmd (bool): If True, returns the raxml-ng command along with the resulting tree.
+        threads (int): Number of threads to use for RAxML-NG computation.
+        capture_cmd (bool): If True, returns the RAxML-NG command along with the resulting tree.
 
     Returns:
         If capture_cmd is False (default), returns a Tree object.
@@ -775,7 +775,7 @@ def run_raxml(
         raxml = CheckBinary.find(*TreeMethods.RAXML.bins)
     except BinaryNotFoundError:
         raise BinaryNotFoundError(
-            '{} not found. Please install it through "{}"'.format(TreeMethods.RAXML.method, "conda install bioconda::raxml-ng")
+            '{} not found. Please install it through "{}"'.format(TreeMethods.RAXML.method, "conda install bioconda::RAxML-NG")
         )
 
     if output:
@@ -984,14 +984,14 @@ def _build_helper(
         instance (MFA2Tree): The MFA2Tree instance on which to run the `build` method.
         method (Literal["ft", "raxml", "iqtree"]): Tree-building method.
                 - "ft": Use FastTree.
-                - "raxml": Use raxml-ng.
+                - "raxml": Use RAxML-NG.
                 - "iqtree": Use IQ-TREE.
         output (str | Path | None, optional): Path to save the resulting tree file. If None, a temporary path is used.
-                Optional for raxml-ng and IQ-TREE.
+                Optional for RAxML-NG and IQ-TREE.
         partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
             object's partition_file if None.
         bs (int): Bootstrap value. Defaults to 100.
-        threads (int): Number of threads to use. Applicable for raxml-ng and IQ-TREE. Defaults to 1.
+        threads (int): Number of threads to use. Applicable for RAxML-NG and IQ-TREE. Defaults to 1.
         capture_cmd (bool): If True, returns the command string used. Defaults to False.
 
     Returns:
@@ -1031,7 +1031,7 @@ def _fill_missing_taxon(samples: Sequence[str], msa: MultipleSeqAlignment) -> Mu
 
 
 def _generate_partition_record(msa: MultipleSeqAlignment, *, seqtype, start: int = 0) -> tuple[str, int]:
-    """Generate a partition record for raxml-ng or IQ-TREE.
+    """Generate a partition record for RAxML-NG or IQ-TREE.
 
     Args:
         msa (MultipleSeqAlignment): The multiple sequence alignment.
