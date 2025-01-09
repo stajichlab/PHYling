@@ -5,16 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2024-05-03
+## [Unreleased]
 
 ### Added
 
 - `phyling download list` now will also print out the markersets that have already been downloaded.
 
-- Use `PhyKIT` to calculate the treeness/RCV scores which can be used to filter the uninformative markers. Use `-n/--top_n_toverr`
-  to specify the number of markers selected for final tree building.
+- The filter module that calculate the treeness/RCV scores through `PhyKIT` to filter the uninformative markers. Use
+  `-n/--top_n_toverr` to specify the number of markers you which to use in the final tree building.
 
-- `RAxML` and `IQTree` are now available for final tree building.
+- `RAxML-NG` and `IQTree` are now available for final tree building.
 
 ### Removed
 
@@ -34,9 +34,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Use timestamp for default output folder in align and tree module.
 
 - Use `FastTree` to replace the `UPGMA` for the default tree building method.
-
-- Since adding the treeness/RCV score filtering, the concat strategy now perform 2 rounds of tree building - 1st round using
-  `FastTree` to generate the treeness/RCV for filtereing and 2nd round using the user-specified method.
 
 ### Fixed
 
