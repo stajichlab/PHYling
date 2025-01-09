@@ -1,5 +1,5 @@
-[![build](https://img.shields.io/github/actions/workflow/status/stajichlab/PHYling/python-versions.yml?logo=github&label=python%20build)](https://github.com/stajichlab/PHYling/actions/workflows/build_and_test.yml)
-[![Conda build](https://img.shields.io/github/actions/workflow/status/stajichlab/PHYling/conda-build.yml?logo=github&label=conda%20build)](https://github.com/stajichlab/PHYling/actions/workflows/conda_build_and_test.yml)
+[![CI/build and test](https://github.com/stajichlab/PHYling/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/stajichlab/PHYling/actions/workflows/build_and_test.yml)
+[![CI/Conda build and test](https://github.com/stajichlab/PHYling/actions/workflows/conda_build_and_test.yml/badge.svg?branch=main)](https://github.com/stajichlab/PHYling/actions/workflows/conda_build_and_test.yml)
 [![Python](https://img.shields.io/badge/python-3.9_%7C_3.10_%7C_3.11_%7C_3.12-blue?logo=python)](https://github.com/stajichlab/PHYling/actions/workflows/python-versions.yml)
 [![codecov](https://codecov.io/gh/stajichlab/PHYling/graph/badge.svg?token=ZH5GBQYKZ6)](https://codecov.io/gh/stajichlab/PHYling)
 [![License](https://img.shields.io/github/license/stajichlab/PHYling?label=license)](https://github.com/stajichlab/PHYling/blob/main/LICENSE)
