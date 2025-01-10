@@ -1011,7 +1011,7 @@ def run_hmmsearch(sample: SampleSeqs, hmms: HMMMarkerSet, evalue: float = 1e-10,
         cutoffs_args = {"E": evalue}
     r = []
     for hits in hmmsearch(hmms, sample, cpus=threads, **cutoffs_args):
-        hmm = hits.query_name
+        hmm = hits.query.name
         for hit in hits:
             if hit.reported:
                 r.append(SearchHit(hmm.decode(), sample.name, hit.name.decode()))
