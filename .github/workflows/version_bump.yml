@@ -65,4 +65,8 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           event-type: release
-          client-payload: '{"bump_type": "${{ github.event.inputs.version }}"}'
+          client-payload: >-
+            {
+              "bump_type": "${{ github.event.inputs.version }}",
+              "version": "${{ steps.query-release-info.outputs.version }}"
+            }

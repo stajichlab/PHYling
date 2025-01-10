@@ -1,4 +1,5 @@
 name: CD/release
+run-name: Release - v${{ github.event.client_payload.version }}
 
 on:
   repository_dispatch:
