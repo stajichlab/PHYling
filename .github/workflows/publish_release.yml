@@ -23,17 +23,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get version
+      - name: Restore cache to Changelog.md
+        uses: actions/cache/restore@v4
+        with:
+          path: CHANGELOG.md
+          key: version-bump-v${{ github.event.client_payload.version }}
+
+      - name: Get release info
         id: query-release-info
         uses: release-flow/keep-a-changelog-action@v3
         with:
           command: query
           version: latest
 
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Release v${{ github.event.client_payload.version }}"
+
+      - name: Push changes
+        run: git push
+
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           body: ${{ steps.query-release-info.outputs.release-notes }}
-          tag_name: v${{ steps.query-release-info.outputs.version }}
+          tag_name: v${{ github.event.client_payload.version }}
           prerelease: ${{ github.event.client_payload.bump_type == 'prerelease' }}
           make_latest: ${{ github.event.client_payload.bump_type != 'prerelease' }}

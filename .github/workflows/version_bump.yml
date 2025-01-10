@@ -1,10 +1,12 @@
 name: CD/version bump
-run-name: Version bump - ${{ github.event.inputs.version }} ${{ github.event.inputs.preid }}
+run-name: |
+  Version bump - ${{ github.event.inputs.bump_type }}
+  ${{ startsWith(github.event.inputs.bump_type, 'pre') && github.event.inputs.preid || '' }}
 
 on:
   workflow_dispatch:
     inputs:
-      version:
+      bump_type:
         description: "Version bump types"
         required: true
         type: choice
@@ -31,7 +33,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            README.md
             CHANGELOG.md
           sparse-checkout-cone-mode: false
 
@@ -39,7 +40,7 @@ jobs:
         uses: release-flow/keep-a-changelog-action@v3
         with:
           command: bump
-          version: ${{ github.event.inputs.version }}
+          version: ${{ github.event.inputs.bump_type }}
           preid: ${{ github.event.inputs.preid }}
           keep-unreleased-section: true
           fail-on-empty-release-notes: true
@@ -51,15 +52,11 @@ jobs:
           command: query
           version: latest
 
-      - name: Commit changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "actions@github.com"
-          git add .
-          git commit -m "Release v${{ steps.query-release-info.outputs.version }}"
-
-      - name: Push changes
-        run: git push
+      - name: Save cache to Changelog.md
+        uses: actions/cache/save@v4
+        with:
+          path: CHANGELOG.md
+          key: version-bump-v${{ steps.query-release-info.outputs.version }}
 
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v3
@@ -67,6 +64,6 @@ jobs:
           event-type: release
           client-payload: >-
             {
-              "bump_type": "${{ github.event.inputs.version }}",
+              "bump_type": "${{ github.event.inputs.bump_type }}",
               "version": "${{ steps.query-release-info.outputs.version }}"
             }
