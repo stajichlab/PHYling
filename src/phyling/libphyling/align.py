@@ -254,7 +254,7 @@ class SampleSeqs(_abc.SeqFileWrapperABC):
             raise SeqtypeError(f"{self.file} contains rna sequences, which is not supported. Please convert them to dna first.")
 
     @_abc.load_data
-    def search(self, hmms: HMMMarkerSet, evalue: float = 1e-10, threads: int = 1) -> list[SearchHit]:
+    def search(self, hmms: HMMMarkerSet, *, evalue: float = 1e-10, threads: int = 1) -> list[SearchHit]:
         """Run the hmmsearch process using the pyhmmer library.
 
         This supports multithreaded running. Empirical testing shows that efficiency drops off after more than 4 CPU threads are
@@ -268,7 +268,7 @@ class SampleSeqs(_abc.SeqFileWrapperABC):
         Returns:
             list[SearchHit]: A list of search hits.
         """
-        return run_hmmsearch(self, hmms, evalue, threads)
+        return run_hmmsearch(self, hmms, evalue=evalue, threads=threads)
 
     def _guess_seqtype(self) -> str:
         """Guess and return the sequence type."""
@@ -362,7 +362,7 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
         return super().__getitem__(key)
 
     @_abc.load_data
-    def search(self, hmms: HMMMarkerSet, evalue: float = 1e-10, jobs: int = 1, threads: int = 1) -> SearchHitsManager:
+    def search(self, hmms: HMMMarkerSet, *, evalue: float = 1e-10, jobs: int = 1, threads: int = 1) -> SearchHitsManager:
         """Search for HMM markers in each sample using multiple processes or threads.
 
         Args:
@@ -388,7 +388,7 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
             logger.debug("Sequential mode with %s threads.", threads)
             search_res = []
             for sample in self:
-                search_res.extend(sample.search(hmms, evalue, threads))
+                search_res.extend(_search_helper(sample, hmms, evalue, threads))
         else:
             logger.debug(
                 "Multiprocesses mode: %s jobs with %s threads for each are run concurrently.",
@@ -397,7 +397,7 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
             )
             with ThreadPool(jobs) as pool:
                 search_res = pool.starmap(
-                    run_hmmsearch,
+                    _search_helper,
                     [
                         (
                             sample,
@@ -810,15 +810,16 @@ class OrthologSeqs(SampleSeqs):
         raise NotImplementedError(f"Method is not implemented in {type(self).__qualname__} class.")
 
     @overload
-    def align(self, method: Literal["hmmalign"], hmm: HMM): ...
+    def align(self, method: Literal["hmmalign"], *, hmm: HMM): ...
 
     @overload
-    def align(self, method: Literal["muscle"], threads: int = 1): ...
+    def align(self, method: Literal["muscle"], *, threads: int = 1): ...
 
     @_abc.load_data
     def align(
         self,
         method: Literal["hmmalign", "muscle"],
+        *,
         hmm: HMM | None = None,
         threads: int = 1,
     ) -> MultipleSeqAlignment:
@@ -848,7 +849,7 @@ class OrthologSeqs(SampleSeqs):
         if method == "hmmalign":
             pep_msa = run_hmmalign(self, hmm)
         elif method == "muscle":
-            pep_msa = run_muscle(self, threads)
+            pep_msa = run_muscle(self, threads=threads)
         else:
             raise ValueError('Argument method only accepts "hmmalign" or "muscle".')
         if self.seqtype == SeqTypes.PEP:
@@ -984,7 +985,7 @@ class OrthologList(_abc.SeqDataListABC[OrthologSeqs]):
 
 
 @_abc.check_loaded
-def run_hmmsearch(sample: SampleSeqs, hmms: HMMMarkerSet, evalue: float = 1e-10, threads: int = 1) -> list[SearchHit]:
+def run_hmmsearch(sample: SampleSeqs, hmms: HMMMarkerSet, *, evalue: float = 1e-10, threads: int = 1) -> list[SearchHit]:
     """Run hmmsearch on a sample sequence against a set of HMM markers.
 
     Args:
@@ -1049,7 +1050,7 @@ def run_hmmalign(ortholog: OrthologSeqs, hmm: HMM) -> MultipleSeqAlignment:
 
 
 @_abc.check_loaded
-def run_muscle(ortholog: OrthologSeqs, threads: int = 1) -> MultipleSeqAlignment:
+def run_muscle(ortholog: OrthologSeqs, *, threads: int = 1) -> MultipleSeqAlignment:
     """Run MUSCLE to perform multiple sequence alignment.
 
     Args:
@@ -1205,6 +1206,26 @@ def trim_gaps(msa: MultipleSeqAlignment, gaps: int = 0.9) -> MultipleSeqAlignmen
         )
 
     return msa
+
+
+def _search_helper(instance: SampleSeqs, hmms: HMMMarkerSet, evalue: float = 1e-10, threads: int = 1) -> list[SearchHit]:
+    """Helper function to perform hmmsearch.
+
+    Args:
+        instance (SampleSeqs): The sample sequences to search within.
+        hmms (HMMMarkerSet): The set of HMM markers to search for.
+        evalue (float, optional): E-value threshold for HMM search. Defaults to 1e-10.
+        jobs (int, optional): Number of parallel processes. Defaults to 1.
+        threads (int, optional): Number of threads per process. Defaults to 1.
+
+    Returns:
+        list[SearchHit]: A list of search hits, each representing the best match for a marker.
+    """
+    return instance.search(
+        hmms=hmms,
+        evalue=evalue,
+        threads=threads,
+    )
 
 
 def _align_helper(instance: OrthologSeqs, method: str, hmm: HMM | None = None, threads: int = 1):

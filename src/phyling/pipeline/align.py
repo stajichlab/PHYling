@@ -146,7 +146,7 @@ def align(
         else:
             jobs = threads // 4
             threads = 4
-        for hit in remaining_samples.search(hmmmarkerset, evalue, jobs=jobs, threads=threads):
+        for hit in remaining_samples.search(hmmmarkerset, evalue=evalue, jobs=jobs, threads=threads):
             searchhits.add(hit)
         logger.info("Search done.")
 
