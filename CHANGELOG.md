@@ -7,6 +7,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The unload data when hmmsearch with multithreads.
+
+- The FileNotFoundError when rerun in a different working directory.
+
 ## [2.0.0] - 2025-01-10
 
 ### Added
