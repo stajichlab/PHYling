@@ -237,7 +237,7 @@ class FileWrapperABC(ABC):
             FileNotFoundError: If the specified file does not exist.
             RuntimeError: If the specified path is not a file.
         """
-        self._file = Path(file)
+        self._file = Path(file).absolute()
         if not self._file.exists():
             raise FileNotFoundError(f"{self._file}")
         if not self._file.is_file():

@@ -135,7 +135,7 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
 
         # Remove files
         rm_files = [x for x in self.output.iterdir() if x.is_file() if x.name != self.ckp]
-        drop_samples = [x.name for x in prev_samplelist if x not in self.samplelist]
+        drop_samples = [x.name for x in prev_samplelist if x.name not in self.samplelist]
         if drop_samples:
             logger.info("Remove samples that no longer exist from the orthologs collection retrieved from the checkpoint.")
             logger.debug("Removed samples: %s", ", ".join(drop_samples))

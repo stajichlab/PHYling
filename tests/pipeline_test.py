@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 from itertools import product
 from os import cpu_count
 from pathlib import Path
+from shutil import copytree
 
 import pytest
 
@@ -143,6 +144,30 @@ class TestAlign:
         with pytest.raises(ValueError) as excinfo:
             align.align(self.inputs[0], tmp_path, markerset="tests/database/poxviridae_odb10/hmms", method="InvalidName")
         assert "Invalid method" in str(excinfo.value)
+
+    def test_rerun(self, tmp_path: Path):
+        prev_output = "tests/data/pep_align"
+        copytree(prev_output, tmp_path, dirs_exist_ok=True)
+        inputs = [
+            "tests/data/Monkeypox_virus.faa.gz",  # Replace Anomala_cuprea with Monkeypox
+            "tests/data/pep/Canarypox_virus.faa.gz",
+            "tests/data/pep/Cowpox_virus.faa.gz",
+            "tests/data/pep/Goatpox_virus.faa.gz",
+            "tests/data/pep/Variola_virus.faa.gz",
+        ]
+        align.align(
+            inputs,
+            tmp_path,
+            markerset="tests/database/poxviridae_odb10/hmms",
+            method="hmmalign",
+            non_trim="False",
+            threads=1,
+        )
+        filenames = [file.name for file in tmp_path.iterdir()]
+        first_file = inputs if isinstance(inputs, str) else inputs[0]
+
+        if first_file.startswith("tests/data/pep"):
+            assert filenames == [file.name for file in Path("tests/data/pep_align").iterdir()]
 
 
 class TestFilter:

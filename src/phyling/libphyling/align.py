@@ -143,8 +143,7 @@ class HMMMarkerSet(_abc.DataListABC[HMM]):
         Returns:
             bool: True if all profiles have cutoffs, otherwise False.
         """
-        # no_cutoffs = [hmm.name for hmm in self if not hmm.cutoff]
-        no_cutoffs = [hmm.name for hmm in self if not hmm.cutoffs.trusted[0]]
+        no_cutoffs = [hmm.name.decode() for hmm in self if not hmm.cutoffs.trusted]
         if no_cutoffs:
             if verbose:
                 logger.warning(
