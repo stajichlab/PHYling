@@ -30,6 +30,9 @@ jobs:
             python=3.10
             pytest
             pytest-cov
+            pytest-dependency
+            pytest-env
+            pytest-order
 
       - name: Lint with Ruff
         uses: astral-sh/ruff-action@v3
