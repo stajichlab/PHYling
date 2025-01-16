@@ -125,7 +125,7 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
         if prev_samplelist.seqtype != self.samplelist.seqtype:
             raise SystemExit("Seqtype is changed. Aborted.")
         diff_params = {param[0] for param in set(self.params.items()) ^ set(prev_params.items())}
-        diff_inputs = set(prev_samplelist.names) ^ set(self.samplelist.names)
+        diff_inputs = set(prev_samplelist.checksums.items()) ^ set(self.samplelist.checksums.items())
         if not (diff_params or diff_inputs) and sum(1 for _ in self.output.iterdir()) > 1:
             raise SystemExit("Files not changed and parameters are identical to the previous run. Aborted.")
         if "markerset" in diff_params:
