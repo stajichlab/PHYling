@@ -20,8 +20,15 @@ VERSION = metadata("phyling")["Version"]
 AUTHOR = metadata("phyling")["Author-email"]
 
 # Create config folder in $HOME/.phyling
-CFG_DIR = Path.home() / ".phyling"
-CFG_DIR.mkdir(exist_ok=True)
+CFG_DIRS: list[Path] = []
+if os.getenv("PHYLING_DB"):
+    CFG_DIRS.extend([Path(path) for path in os.getenv("PHYLING_DB").split(":")])
+if CFG_DIRS and os.access(CFG_DIRS[0], os.W_OK):
+    pass
+else:
+    cfg_dir = Path.home() / ".phyling"
+    cfg_dir.mkdir(exist_ok=True)
+    CFG_DIRS.insert(0, cfg_dir)
 
 # Available CPUs
 AVAIL_CPUS = int(os.environ.get("SLURM_CPUS_ON_NODE", os.cpu_count()))

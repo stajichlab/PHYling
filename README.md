@@ -93,8 +93,8 @@ Firstly, use `download list` to show the available BUSCO markersets.
 phyling download list
 ```
 
-By default the downloaded markersets will be saved to the `~/.phyling/HMM`. The **Datasets available online** section lists the
-markersets that available on the [BUSCO][Busco] website.
+By default the downloaded markersets will be saved to the `~/.phyling` or the first path in `$PHYLING_DB` (if have been set) if it
+is writable. The **Datasets available online** section lists the markersets that available on the [BUSCO][Busco] website.
 
 And the **Datasets available on local** section lists the markersets that have already been downloaded.
 
@@ -451,6 +451,18 @@ Install the package through pip in the PHYling folder.
 ```
 pip install .
 ```
+
+By default, PHYling will create a `.phyling` folder under users' home directory to save the databases downloaded from [BUSCO]. To
+avoid cluttering the home directory, you can assign a different location by setting the `$PHYLING_DB` environment variable.
+
+```
+export PHYLING_DB=/path/user/phyling_db:/path/group/phyling_db:/path/sys/phyling_db
+```
+
+Similar to `$PATH`, `$PHYLING_DB` allows PHYling to search for databases across multiple specified paths when running align
+module. If the specified markerset is not found in the first path, phyling will keep looking for the rest of paths listed in
+`$PHYLING_DB`. However, the first path should be writable; otherwise, PHYling will default to creating a .phyling folder in the home
+directory to store databases.
 
 ### Install additional package for developing (developer only)
 

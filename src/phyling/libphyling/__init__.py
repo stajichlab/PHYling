@@ -2,8 +2,6 @@
 
 from enum import Enum
 
-from .. import CFG_DIR
-
 
 # General
 class SeqTypes:
@@ -20,8 +18,7 @@ class FileExts:
 
 # Download
 BUSCO_URL = "https://busco-data.ezlab.org/v5/data"
-HMM_DIR = CFG_DIR / "HMM"  # default directory for HMM downloads
-METADATA_FILE = CFG_DIR / "metadata.tsv"
+METADATA_FILE = ".metadata"
 
 # Align
 ALIGN_METHODS = ("hmmalign", "muscle")

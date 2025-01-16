@@ -13,7 +13,7 @@ import argparse
 import shutil
 from urllib.error import URLError
 
-from ..libphyling import HMM_DIR, METADATA_FILE
+from ..libphyling import CFG_DIRS
 from ..libphyling._utils import Timer
 from ..libphyling.download import BuscoParser
 
@@ -33,7 +33,7 @@ def menu(parser: argparse.ArgumentParser) -> None:
 def download(markerset: str, **kwargs) -> None:
     """A pipeline that list the available BUSCO HMM markerset and download it when specifying."""
     try:
-        with BuscoParser(HMM_DIR, METADATA_FILE) as metadata:
+        with BuscoParser(*CFG_DIRS) as metadata:
             markerset_list = metadata.online + metadata.local
             if markerset == "list":
                 width, _ = shutil.get_terminal_size((80, 24))
@@ -56,7 +56,7 @@ def download(markerset: str, **kwargs) -> None:
                     markerset,
                 )
     except URLError as e:
-        URLError("Connection lost or URL currently not available: %s", e)
+        raise URLError("Connection lost or URL currently not available: %s", e)
     # except FileExistsError as e:
     #     logger.info(e)
 

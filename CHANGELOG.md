@@ -7,6 +7,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Environment variable PHYLING_DB that can be set to retrieve the database across multiple paths.
+
 ### Fixed
 
 - The unload data when hmmsearch with multithreads.

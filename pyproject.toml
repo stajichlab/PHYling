@@ -37,6 +37,9 @@ phyling = "phyling.__main__:main"
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
 
+[tool.pytest_env]
+PHYLING_DB = { value = "{PWD}/tests/database", transform = true }
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra -q"

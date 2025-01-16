@@ -7,4 +7,5 @@ dependencies:
   - pre-commit>=3.4.0
   - pytest>=8.0.0
   - pytest-cov>=5.0.0
+  - pytest-env>=1.1.5
   - samtools>=1.21

@@ -23,7 +23,7 @@ from Bio import SeqIO
 
 from .. import AVAIL_CPUS, logger
 from ..exception import EmptyWarning
-from ..libphyling import ALIGN_METHODS, HMM_DIR, FileExts, SeqTypes
+from ..libphyling import ALIGN_METHODS, CFG_DIRS, FileExts, SeqTypes
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.align import HMMMarkerSet, OrthologList, SampleList, trim_gaps
 from ._outputprecheck import AlignPrecheck
@@ -210,7 +210,11 @@ def _args_check(
 
     hmmmarkerset = Path(hmmmarkerset)
     if not hmmmarkerset.exists():
-        hmmmarkerset = Path(HMM_DIR, hmmmarkerset, "hmms")
+        for cfg_dir in CFG_DIRS:
+            if Path(cfg_dir, hmmmarkerset).exists():
+                hmmmarkerset = Path(cfg_dir, hmmmarkerset)
+                if hmmmarkerset.name != "hmms" and [f for f in hmmmarkerset.glob("hmms") if f.is_dir()]:
+                    hmmmarkerset = hmmmarkerset / "hmms"
     if not hmmmarkerset.exists():
         raise FileNotFoundError(f"Markerset folder does not exist: {hmmmarkerset} - did you download BUSCO?")
 
