@@ -42,7 +42,7 @@ PHYLING_DB = { value = "{PWD}/tests/database", transform = true }
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra -q"
+addopts = "-ra -vv --order-dependencies"
 testpaths = ["tests"]
 
 [tool.versioningit.vcs]

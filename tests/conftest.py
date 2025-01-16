@@ -2,56 +2,45 @@ from __future__ import annotations
 
 import shutil
 import tarfile
+from pathlib import Path
 
 import pytest
 
-import phyling.libphyling
-from phyling.pipeline.download import download
+import phyling
 
 
 class PackMetadata:
-    def __init__(self) -> None:
-        self.metadata = phyling.libphyling.METADATA_FILE
-        self.data_folder = phyling.libphyling.HMM_DIR
-        self.temp_tar = phyling.CFG_DIR / "temp.tgz"
+    def __init__(self, persistent_tmp_path: Path) -> None:
+        self.cfg_dir = phyling.CFG_DIRS[0]
+        self.temp_tar = persistent_tmp_path / "temp.tgz"
 
     def pack_metadata(self):
         with tarfile.open(self.temp_tar, "w") as tar:
-            if self.metadata.exists() and self.metadata.is_file():
-                tar.add(self.metadata, arcname=self.metadata.name)
-                self.metadata.unlink()
-            if self.data_folder.exists() and self.data_folder.is_dir():
-                tar.add(self.data_folder, arcname=self.data_folder.name)
-                shutil.rmtree(self.data_folder)
+            if self.cfg_dir.exists() and self.cfg_dir.is_dir():
+                tar.add(self.cfg_dir, arcname=self.cfg_dir.name)
 
     def unpack_metadata(self):
-        if self.data_folder.exists() and self.data_folder.is_dir():
-            shutil.rmtree(self.data_folder)
-        self.metadata.unlink(missing_ok=True)
+        shutil.rmtree(self.cfg_dir)
         with tarfile.open(self.temp_tar, "r") as tar:
-            tar.extractall(phyling.CFG_DIR, filter="fully_trusted")
+            tar.extractall(self.cfg_dir.parent, filter="fully_trusted")
         self.temp_tar.unlink()
 
 
-@pytest.fixture(scope="class")
-def hide_metadata_wo_download():
-    obj = PackMetadata()
+@pytest.fixture(scope="session")
+def persistent_tmp_path(tmp_path_factory: pytest.TempPathFactory):
+    return tmp_path_factory.mktemp("persistent_tmpdir")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def hide_metadata(persistent_tmp_path: Path):
+    obj = PackMetadata(persistent_tmp_path)
     obj.pack_metadata()
     yield
     obj.unpack_metadata()
 
 
-@pytest.fixture(scope="module")
-def hide_metadata_with_download():
-    obj = PackMetadata()
-    obj.pack_metadata()
-    download("poxviridae_odb10")
-    yield
-    obj.unpack_metadata()
-
-
 @pytest.fixture(scope="class")
-def shared_tmpdir_class(tmp_path_factory: pytest.TempPathFactory):
+def class_shared_tmpdir(tmp_path_factory: pytest.TempPathFactory):
     return tmp_path_factory.mktemp("shared_tmpdir")
 
 
