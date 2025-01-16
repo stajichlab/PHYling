@@ -13,7 +13,7 @@ import argparse
 import shutil
 from urllib.error import URLError
 
-from ..libphyling import CFG_DIRS
+from .. import CFG_DIRS
 from ..libphyling._utils import Timer
 from ..libphyling.download import BuscoParser
 
