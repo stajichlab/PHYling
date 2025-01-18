@@ -30,6 +30,12 @@ def copied_pep_align_outputs(tmp_path: Path, persistent_tmp_path: Path) -> Path:
     return tmp_path
 
 
+@pytest.fixture
+def copied_pep_align_filtered(tmp_path: Path, persistent_tmp_path: Path) -> Path:
+    copytree(persistent_tmp_path / "pep_align_filtered", tmp_path, dirs_exist_ok=True)
+    return tmp_path
+
+
 @pytest.mark.order(1)
 class TestDownload:
     def test_menu(self, parser: ArgumentParser):
@@ -90,8 +96,8 @@ class TestAlign:
             "tests/data/cds/bgzf/Variola_virus.fna.gz",
         ],
     )
-    additional_inputs_pep = "tests/data/pep/Monkeypox_virus.faa.gz"
-    prob_inputs_cds = "tests/data/cds/Monkeypox_virus_with_bad_seq.fna"
+    additional_inputs_pep = ["tests/data/pep/Monkeypox_virus.faa.gz"]
+    prob_inputs_cds = ["tests/data/cds/Monkeypox_virus_with_bad_seq.fna"]
     nontrim = (True, False)
 
     def test_menu(self, parser: ArgumentParser):
@@ -190,7 +196,7 @@ class TestAlign:
 
     def test_align_inputs_cds_invalid_length(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
         with caplog.at_level(logging.DEBUG):
-            align.align(self.inputs_cds[1][1:4] + [self.prob_inputs_cds], tmp_path, markerset="poxviridae_odb10")
+            align.align(self.inputs_cds[1][1:4] + self.prob_inputs_cds, tmp_path, markerset="poxviridae_odb10")
         assert "seqs have invalid length." in caplog.text
         assert "lcl|NC_003310.1_cds_NP_536428.1_1" in caplog.text
 
@@ -212,7 +218,7 @@ class TestAlign:
     @pytest.mark.dependency(depends=["align"])
     def test_rerun(self, copied_pep_align_outputs: Path):
         prev_output = copied_pep_align_outputs
-        inputs = self.inputs_pep[1][1:] + [self.additional_inputs_pep]  # Replace Anomala_cuprea with Monkeypox
+        inputs = self.inputs_pep[1][1:] + self.additional_inputs_pep  # Replace Anomala_cuprea with Monkeypox
 
         align.align(
             inputs,
@@ -263,6 +269,7 @@ class TestFilter:
             "cds_align/53at10240.cds.mfa",
         ],
     )
+    additional_inputs_pep = ["pep_align/74at10240.aa.mfa", "pep_align/81at10240.aa.mfa", "pep_align/118at10240.aa.mfa"]
     invalid_top_n = (1, 7)
 
     def test_menu(self, parser: ArgumentParser):
@@ -289,6 +296,9 @@ class TestFilter:
         msas_dir = tmp_path / TreeOutputFiles.MSAS_DIR
         assert treeness.is_file()
         assert msas_dir.is_dir()
+        assert sum(1 for _ in msas_dir.iterdir()) == 5
+        if inputs == [persistent_tmp_path / f for f in self.inputs_pep[1]]:
+            copytree(tmp_path, persistent_tmp_path / "pep_align_filtered")
 
     @pytest.mark.parametrize("inputs", (inputs_pep[1][0:2], inputs_cds[1][0:2]))
     def test_filter_too_few_inputs(self, inputs: list[str], tmp_path: Path, persistent_tmp_path: Path):
@@ -309,6 +319,17 @@ class TestFilter:
         with pytest.raises(SystemExit) as excinfo:
             filter.filter(inputs, tmp_path, top_n_toverr=6)
         assert "Argument top_n_toverr is equal to the number of inputs" in str(excinfo.value)
+
+    def test_rerun(self, copied_pep_align_filtered: Path, persistent_tmp_path: Path):
+        prev_output = copied_pep_align_filtered
+        inputs = self.inputs_pep[1][1:] + self.additional_inputs_pep
+        inputs = [persistent_tmp_path / f for f in inputs]
+        filter.filter(inputs, prev_output, top_n_toverr=6)
+        treeness = prev_output / TreeOutputFiles.TREENESS
+        msas_dir = prev_output / TreeOutputFiles.MSAS_DIR
+        assert treeness.is_file()
+        assert msas_dir.is_dir()
+        assert sum(1 for _ in msas_dir.iterdir()) == 6
 
 
 @pytest.mark.dependency(depends=["align"])
