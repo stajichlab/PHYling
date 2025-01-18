@@ -146,11 +146,9 @@ def align(
         else:
             jobs = threads // 4
             threads = 4
-        for hit in remaining_samples.search(hmmmarkerset, evalue=evalue, jobs=jobs, threads=threads):
-            searchhits.add(hit)
+        hits = remaining_samples.search(hmmmarkerset, evalue=evalue, jobs=jobs, threads=threads)
+        searchhits.update(hits)
         logger.info("Search done.")
-
-    searchhits.update_samples(remaining_samples)
 
     output_precheck.save_checkpoint(searchhits)
     logger.debug("Save checkpoint done.")

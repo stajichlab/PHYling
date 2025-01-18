@@ -361,7 +361,7 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
         return super().__getitem__(key)
 
     @_abc.load_data
-    def search(self, hmms: HMMMarkerSet, *, evalue: float = 1e-10, jobs: int = 1, threads: int = 1) -> SearchHitsManager:
+    def search(self, hmms: HMMMarkerSet, *, evalue: float = 1e-10, jobs: int = 1, threads: int = 1) -> list[SearchHit]:
         """Search for HMM markers in each sample using multiple processes or threads.
 
         Args:
@@ -408,7 +408,7 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
                     ],
                 )
             search_res = [hit for res in search_res for hit in res]
-        return SearchHitsManager(search_res, self)
+        return search_res
 
 
 class SearchHit(NamedTuple):
@@ -421,39 +421,33 @@ class SearchHit(NamedTuple):
     """
 
     hmm: str
-    sample: str
+    sample: SampleSeqs
     sequence: str
 
 
 class SearchHitsManager:
     """A list-like object that saves the hmmsearch hits and facilitates sequence retrieval."""
 
-    __slots__ = ("_data", "_orthologs", "_samples", "_samplelist", "_mfa_dir")
+    __slots__ = ("_data", "_orthologs", "_samples", "_mfa_dir")
 
-    @overload
-    def __init__(self, hits: list[SearchHit]) -> None: ...
-
-    @overload
-    def __init__(self, hits: list[SearchHit], samplelist: SampleList) -> None: ...
-
-    def __init__(self, hits: list[SearchHit] | None = None, samplelist: SampleList | None = None) -> None:
+    def __init__(self, hits: list[SearchHit] | None = None) -> None:
         """Initialize the manager with optional hits and sample list.
 
         Args:
             hits (list[SearchHit] | None): Optional list of search hits.
-            samplelist (SampleList | None): Optional SampleList associated with the hits.
         """
         hits = hits or []
-        samplelist = samplelist or SampleList()
         self._data: list[SearchHit] = []
-        self._orthologs: dict[str, int] = {}  # Based on hits
-        self._samples: dict[str, int] = {}  # Based on hits
-        self._samplelist: SampleList[SampleSeqs] = SampleList()
+        self._orthologs: dict[str, list[int]] = {}  # Based on hits
+        self._samples: dict[SampleSeqs, list[int]] = {}  # Based on hits
         self._mfa_dir: tempfile.TemporaryDirectory = None
 
         for hit in hits:
             self.add(hit)
-        self.update_samples(samplelist)
+
+    def __del__(self) -> None:
+        """Clean up when the object is destroyed."""
+        self.unload()
 
     def __repr__(self) -> str:
         """Return a string representation of the manager.
@@ -473,7 +467,7 @@ class SearchHitsManager:
         Returns:
             bool: True if the managers are equal, False otherwise.
         """
-        return (self._orthologs == other._orthologs) and (self._samplelist == other._samplelist)
+        return (self._orthologs == other._orthologs) and (self._samples == other._samples)
 
     @overload
     def __getitem__(self, key: int) -> SearchHit: ...
@@ -494,9 +488,9 @@ class SearchHitsManager:
             SearchHit | SearchHitsManager: The corresponding hits.
         """
         if isinstance(key, slice):
-            return self.__class__(self._data[key], self.samplelist)
+            return self.__class__(self._data[key])
         elif isinstance(key, list):
-            return self.__class__([self._data[x] for x in key], self.samplelist)
+            return self.__class__([self._data[x] for x in key])
         else:
             return self._data[key]
 
@@ -546,24 +540,14 @@ class SearchHitsManager:
         self._orthologs.setdefault(hit.hmm, []).append(idx)
         self._samples.setdefault(hit.sample, []).append(idx)
 
-    def update_samples(self, item: SampleSeqs | SampleList) -> None:
-        """Update the samples in the manager.
+    def update(self, hits: Iterator[SearchHit]) -> None:
+        """Update new search hits to the manager.
 
         Args:
-            item (SampleSeqs | SampleList): The SampleSeqs or SampleList to add.
-
-        Raises:
-            TypeError: If the item is not a valid SampleSeqs or SampleList.
+            hit (Iterator[SearchHit]): The search hit to add.
         """
-        if not isinstance(item, (SampleSeqs, SampleList)):
-            raise TypeError(f"Only accepts {SampleList.__qualname__} or {SampleSeqs.__qualname__}. Got {type(item)}")
-        if isinstance(item, SampleSeqs):
-            items = [item]
-        else:
-            items = item
-        for sampleseq in items:
-            if sampleseq.name in self._samples:
-                self._samplelist.append(sampleseq)
+        for hit in hits:
+            self.add(hit)
 
     @property
     def samplelist(self) -> SampleList[SampleSeqs]:
@@ -572,7 +556,7 @@ class SearchHitsManager:
         Returns:
             SampleList[SampleSeqs]: The associated SampleList.
         """
-        return self._samplelist
+        return SampleList(tuple(self._samples.keys()))
 
     @property
     def orthologs(self) -> dict[str, tuple | Path]:
@@ -585,7 +569,7 @@ class SearchHitsManager:
             mfa_dir_path = Path(self._mfa_dir.name)
             return {hmm: mfa_dir_path / f"{hmm}.fa" for hmm in self._orthologs.keys()}
         else:
-            return {hmm: tuple(self._data[idx] for idx in indices) for hmm, indices in self._orthologs.items()}
+            raise RuntimeError("Please run the load method first.")
 
     @overload
     def filter(self, min_taxa: int) -> SearchHitsManager: ...
@@ -612,7 +596,7 @@ class SearchHitsManager:
         if min_taxa and drop_samples:
             return self.filter(drop_samples=drop_samples).filter(min_taxa=min_taxa)
         elif drop_samples:
-            selected_idx = [idx for idx, data in enumerate(self) if data.sample not in drop_samples]
+            selected_idx = [idx for idx, data in enumerate(self) if data.sample.name not in drop_samples]
         elif min_taxa:
             selected_idx = sorted([idx for indices in self._orthologs.values() for idx in indices if len(indices) >= min_taxa])
         if not selected_idx:
@@ -632,26 +616,26 @@ class SearchHitsManager:
             with tempfile.TemporaryDirectory() as faidx_dir:
                 faidx_dir = Path(faidx_dir)
                 msa_dir_path = Path(self._mfa_dir.name)
+                loaded_seqs = [None] * len(self)  # Create a fixed-size list and fill with seqs
                 if threads <= 1:
-                    loaded_seqs = []
                     for sample, indices in self._samples.items():
-                        loaded_seqs.extend(self._to_seqrecord(sample, indices, faidx_dir))
+                        self._to_seqrecord(sample, indices, loaded_seqs, faidx_dir)
                     for hmm, indices in self._orthologs.items():
                         self._write_to_file(loaded_seqs, indices, msa_dir_path / f"{hmm}.fa")
                 else:
                     with ThreadPool(threads) as pool:
-                        loaded_seqs = pool.starmap(
+                        pool.starmap(
                             self._to_seqrecord,
                             [
                                 (
                                     sample,
                                     indices,
+                                    loaded_seqs,
                                     faidx_dir,
                                 )
                                 for sample, indices in self._samples.items()
                             ],
                         )
-                        loaded_seqs = [seq for seqs in loaded_seqs for seq in seqs]
                         pool.starmap(
                             self._write_to_file,
                             [
@@ -665,6 +649,7 @@ class SearchHitsManager:
                         )
         except Exception:
             self.unload()
+            raise
 
     def unload(self) -> None:
         """Unload sequence data."""
@@ -672,37 +657,28 @@ class SearchHitsManager:
             self._mfa_dir.cleanup()
             self._mfa_dir = None
 
-    def _to_seqrecord(self, sample: str, indices: list[int], path: Path) -> list[SeqRecord]:
+    def _to_seqrecord(self, sample: SampleSeqs, indices: list[int], loaded_seqs: list, path: Path) -> None:
         """Convert hits to sequence records.
 
         Args:
             sample (str): Sample name.
             indices (list[int]): Indices of the hits.
+            loaded_seqs (list): A fixed-size list that used to store the SeqRecord objects.
             path (Path): Path for temporary storage.
-
-        Returns:
-            list[SeqRecord]: The converted sequence records.
-
-        Raises:
-            LookupError: If the sample does not exist in the SampleList.
         """
-        if sample not in self._samplelist:
-            raise LookupError(f"{sample} do not exist in samplelist. Please add it by update_samples method.")
-        file = self._samplelist[sample].file
-        seqs_handler = Fasta(file, Path(path) / f"{Path(file).name}.fai")
-        seqs: list[SeqRecord] = []
-        for idx in indices:
-            data = self._data[idx]
-            seqs.append(
-                SeqRecord(
+        try:
+            seqs_handler = Fasta(sample.file, Path(path) / f"{sample.name}.fai")
+            for idx in indices:
+                data = self._data[idx]
+                seqrec = SeqRecord(
                     seq=Seq(str(seqs_handler[data.sequence])),
-                    id=sample,
-                    name=sample,
+                    id=sample.name,
+                    name=sample.name,
                     description=data.sequence,
                 )
-            )
-
-        return seqs
+                loaded_seqs[idx] = seqrec
+        except Exception as e:
+            raise type(e)(f"{sample.file}: {e}").with_traceback(e.__traceback__)
 
     def _write_to_file(self, seqrecords: list[SeqRecord], indices: list[int], path: Path) -> None:
         """Write sequence records to a file.
@@ -1014,7 +990,7 @@ def run_hmmsearch(sample: SampleSeqs, hmms: HMMMarkerSet, *, evalue: float = 1e-
         hmm = hits.query.name
         for hit in hits:
             if hit.reported:
-                r.append(SearchHit(hmm.decode(), sample.name, hit.name.decode()))
+                r.append(SearchHit(hmm.decode(), sample, hit.name.decode()))
                 break  # The first hit in hits is the best hit
     logger.info("Hmmsearch on %s is done.", sample.name)
     return r

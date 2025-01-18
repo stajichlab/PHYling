@@ -314,6 +314,9 @@ class FileWrapperABC(ABC):
         """
         return self.name == other.name
 
+    def __hash__(self) -> int:
+        return self.checksum
+
     @property
     def file(self) -> Path:
         """Get the file path.
@@ -401,11 +404,11 @@ class SeqFileWrapperABC(FileWrapperABC):
         return super().__repr__()[:-1] + f"; seqtype={self.seqtype})"
 
     @check_seqtype
-    def __gt__(self, other: _FW) -> bool:
+    def __gt__(self, other: _SFW) -> bool:
         """Compare if the current object is larger (posterior) than another object.
 
         Args:
-            other (FileWrapperABC): Another instance of the same class.
+            other (SeqFileWrapperABC): Another instance of the same class.
 
         Returns:
             bool: True if the current object's name is larger, otherwise False.
@@ -416,11 +419,11 @@ class SeqFileWrapperABC(FileWrapperABC):
         return super().__gt__(other)
 
     @check_seqtype
-    def __ge__(self, other: _FW) -> bool:
+    def __ge__(self, other: _SFW) -> bool:
         """Compare if the current object is larger than or equal to another object.
 
         Args:
-            other (FileWrapperABC): Another instance of the same class.
+            other (SeqFileWrapperABC): Another instance of the same class.
 
         Returns:
             bool: True if the current object's name is larger or equal, otherwise False.
@@ -431,11 +434,11 @@ class SeqFileWrapperABC(FileWrapperABC):
         return super().__ge__(other)
 
     @check_seqtype
-    def __lt__(self, other: _FW) -> bool:
+    def __lt__(self, other: _SFW) -> bool:
         """Compare if the current object is smaller (prior) than another object.
 
         Args:
-            other (FileWrapperABC): Another instance of the same class.
+            other (SeqFileWrapperABC): Another instance of the same class.
 
         Returns:
             bool: True if the current object's name is smaller, otherwise False.
@@ -446,11 +449,11 @@ class SeqFileWrapperABC(FileWrapperABC):
         return super().__lt__(other)
 
     @check_seqtype
-    def __le__(self, other: _FW) -> bool:
+    def __le__(self, other: _SFW) -> bool:
         """Compare if the current object is smaller than or equal to another object.
 
         Args:
-            other (FileWrapperABC): Another instance of the same class.
+            other (SeqFileWrapperABC): Another instance of the same class.
 
         Returns:
             bool: True if the current object's name is smaller or equal, otherwise False.
@@ -461,11 +464,11 @@ class SeqFileWrapperABC(FileWrapperABC):
         return super().__le__(other)
 
     @check_seqtype
-    def __eq__(self, other: _FW) -> bool:
+    def __eq__(self, other: _SFW) -> bool:
         """Check if the current object is equal to another object.
 
         Args:
-            other (FileWrapperABC): Another instance of the same class.
+            other (SeqFileWrapperABC): Another instance of the same class.
 
         Returns:
             bool: True if the objects have the same name, otherwise False.
@@ -474,6 +477,9 @@ class SeqFileWrapperABC(FileWrapperABC):
             SeqtypeError: If `instance.seqtype` and `other.seqtype` are not identical.
         """
         return super().__eq__(other)
+
+    def __hash__(self):
+        return super().__hash__()
 
     @property
     def seqtype(self) -> str:
