@@ -295,6 +295,7 @@ class TestFilter:
         treeness = tmp_path / TreeOutputFiles.TREENESS
         msas_dir = tmp_path / TreeOutputFiles.MSAS_DIR
         assert treeness.is_file()
+        assert len(open(treeness).read().split("#")[1].strip().split("\n")) == 6
         assert msas_dir.is_dir()
         assert sum(1 for _ in msas_dir.iterdir()) == 5
         if inputs == [persistent_tmp_path / f for f in self.inputs_pep[1]]:
@@ -328,6 +329,7 @@ class TestFilter:
         treeness = prev_output / TreeOutputFiles.TREENESS
         msas_dir = prev_output / TreeOutputFiles.MSAS_DIR
         assert treeness.is_file()
+        assert len(open(treeness).read().split("#")[1].strip().split("\n")) == 7
         assert msas_dir.is_dir()
         assert sum(1 for _ in msas_dir.iterdir()) == 6
 
