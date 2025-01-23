@@ -604,12 +604,8 @@ class SearchHitsManager:
 
         return self[selected_idx]
 
-    def load(self, threads: int = 1) -> None:
-        """Load sequence data.
-
-        Args:
-            threads (int, optional): Number of threads to use. Defaults to 1.
-        """
+    def load(self) -> None:
+        """Retrieve the sequences for each alignment."""
         if not self._mfa_dir:
             self._mfa_dir = tempfile.TemporaryDirectory(prefix="phyling_align_mfa_")
         try:
@@ -617,42 +613,16 @@ class SearchHitsManager:
                 faidx_dir = Path(faidx_dir)
                 msa_dir_path = Path(self._mfa_dir.name)
                 loaded_seqs = [None] * len(self)  # Create a fixed-size list and fill with seqs
-                if threads <= 1:
-                    for sample, indices in self._samples.items():
-                        self._to_seqrecord(sample, indices, loaded_seqs, faidx_dir)
-                    for hmm, indices in self._orthologs.items():
-                        self._write_to_file(loaded_seqs, indices, msa_dir_path / f"{hmm}.fa")
-                else:
-                    with ThreadPool(threads) as pool:
-                        pool.starmap(
-                            self._to_seqrecord,
-                            [
-                                (
-                                    sample,
-                                    indices,
-                                    loaded_seqs,
-                                    faidx_dir,
-                                )
-                                for sample, indices in self._samples.items()
-                            ],
-                        )
-                        pool.starmap(
-                            self._write_to_file,
-                            [
-                                (
-                                    loaded_seqs,
-                                    indices,
-                                    msa_dir_path / f"{hmm}.fa",
-                                )
-                                for hmm, indices in self._orthologs.items()
-                            ],
-                        )
+                for sample, indices in self._samples.items():
+                    self._to_seqrecord(sample, indices, loaded_seqs, faidx_dir)
+                for hmm, indices in self._orthologs.items():
+                    self._write_to_file(loaded_seqs, indices, msa_dir_path / f"{hmm}.fa")
         except Exception:
             self.unload()
             raise
 
     def unload(self) -> None:
-        """Unload sequence data."""
+        """Release the memory allocated by loaded sequences."""
         if self._mfa_dir:
             self._mfa_dir.cleanup()
             self._mfa_dir = None

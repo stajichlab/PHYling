@@ -161,7 +161,7 @@ def align(
             "number of sample or if the correct HMM markers were being used."
         )
 
-    searchhits.load(threads=threads)
+    searchhits.load()
     orthologs = OrthologList(searchhits.orthologs.values(), searchhits.orthologs.keys())
 
     msa_list = orthologs.align(method=method, hmms=hmmmarkerset if method == "hmmalign" else None, jobs=threads)
