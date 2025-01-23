@@ -11,11 +11,21 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Environment variable PHYLING_DB that can be set to retrieve the database across multiple paths.
 
+### Removed
+
+- The threads option in SearchHitsManager load method - it run faster in single process/thread.
+
+### Changed
+
+- Make SampleList hashable and use it directly in SearchHits instead of just name.
+
 ### Fixed
 
 - The unload data when hmmsearch with multithreads.
 
 - The FileNotFoundError when rerun in a different working directory.
+
+- The missing newline of the treeness file output from filter module.
 
 ## [2.0.0] - 2025-01-10
 
