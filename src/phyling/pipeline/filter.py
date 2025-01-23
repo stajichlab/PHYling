@@ -115,13 +115,13 @@ def filter(
     # Generate treeness tsv
     treeness_file = output / TreeOutputFiles.TREENESS
     with open(treeness_file, "w") as f:
-        f.write(f"# The MSA fasta which the toverr within top {top_n_toverr} are selected:")
+        f.write(f"# The MSA fasta which the toverr within top {top_n_toverr} are selected:\n")
         for mfa2tree in completed_mfa2treelist[:top_n_toverr]:
-            f.write("\t".join([mfa2tree.name, str(mfa2tree.toverr)]))
+            f.write("\t".join([mfa2tree.name, str(mfa2tree.toverr)]) + "\n")
         if completed_mfa2treelist[top_n_toverr:]:
-            f.write("# The MSA fasta below are filtered out:")
+            f.write("# The MSA fasta below are filtered out:\n")
             for mfa2tree in completed_mfa2treelist[top_n_toverr:]:
-                f.write("\t".join([mfa2tree.name, str(mfa2tree.toverr)]))
+                f.write("\t".join([mfa2tree.name, str(mfa2tree.toverr)]) + "\n")
 
     # Symlink to seletced MSAs
     output = Path(output)
