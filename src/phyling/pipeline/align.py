@@ -141,12 +141,9 @@ def align(
     remaining_samples, searchhits = output_precheck.precheck()
     if remaining_samples:
         logger.info("Search start...")
-        if threads < 8:
-            jobs = 1
-        else:
-            jobs = threads // 4
-            threads = 4
-        hits = remaining_samples.search(hmmmarkerset, evalue=evalue, jobs=jobs, threads=threads)
+        threads_per_jobs = threads if threads < 8 else 4
+        jobs = threads // threads_per_jobs
+        hits = remaining_samples.search(hmmmarkerset, evalue=evalue, jobs=jobs, threads=threads_per_jobs)
         searchhits.update(hits)
         logger.info("Search done.")
 
@@ -165,6 +162,7 @@ def align(
     orthologs = OrthologList(searchhits.orthologs.values(), searchhits.orthologs.keys())
 
     msa_list = orthologs.align(method=method, hmms=hmmmarkerset if method == "hmmalign" else None, jobs=threads)
+    logger.info("Align done.")
 
     if not non_trim:
         if threads == 1:
