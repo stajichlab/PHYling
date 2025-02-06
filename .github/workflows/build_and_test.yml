@@ -106,7 +106,7 @@ jobs:
           pytest -vv --cov=$package_name --cov-report=xml --runslow
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.3.1
         with:
           flags: ${{ matrix.python }}
           env_vars: OS
