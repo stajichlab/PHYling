@@ -38,7 +38,6 @@ class TreeMethods(Enum):
 
 
 class TreeOutputFiles:
-    MSAS_DIR = "selected_MSAs"
     TREENESS = "treeness.tsv"
     CONCAT = f"concat_alignments.{FileExts.ALN}"
     PARTITION = "concat_alignments.partition"

@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from .. import logger
-from ..libphyling import TreeOutputFiles, _abc
-from ..libphyling._utils import remove_dirs, remove_files
+from ..libphyling import TreeOutputFiles, _abc, FileExts
+from ..libphyling._utils import remove_files
 from ..libphyling.align import SampleList, SampleSeqs, SearchHitsManager
 from ..libphyling.tree import MFA2Tree, MFA2TreeList
 
@@ -276,9 +276,7 @@ class FilterPrecheck(_abc.OutputPrecheckABC):
             remained_mfa2treelist.append(msa)
 
         # Remove files
-        rm_files = [x for x in self.output.iterdir() if x.is_file() if x.name == TreeOutputFiles.TREENESS]
-        rm_dirs = [x for x in self.output.iterdir() if x.is_dir if x.name == TreeOutputFiles.MSAS_DIR]
+        rm_files = [x for x in self.output.glob(TreeOutputFiles.TREENESS)] + [x for x in self.output.glob(f"*.{FileExts.ALN}")]
         remove_files(*rm_files)
-        remove_dirs(*rm_dirs)
 
         return remained_mfa2treelist, completed_mfa2treelist

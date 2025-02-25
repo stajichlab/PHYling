@@ -125,11 +125,9 @@ def filter(
 
     # Symlink to seletced MSAs
     output = Path(output)
-    msas_dir = output / TreeOutputFiles.MSAS_DIR
-    msas_dir.mkdir(exist_ok=True)
     files = [mfa2tree.file for mfa2tree in completed_mfa2treelist[:top_n_toverr]]
     for file in files:
-        (msas_dir / file.name).symlink_to(file.absolute())
+        (output / file.name).symlink_to(file.absolute())
 
     output_precheck.save_checkpoint(completed_mfa2treelist)
 
