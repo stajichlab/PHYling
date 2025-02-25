@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import gzip
-import subprocess
 import tempfile
 from functools import wraps
-from io import StringIO
 from itertools import product
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -15,18 +13,17 @@ from typing import Any, Callable, Literal, Sequence, TypeVar, overload
 from Bio import AlignIO, Phylo, SeqIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Phylo.BaseTree import Tree
-from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
 from Bio.Seq import Seq
 from Bio.SeqIO import FastaIO
 from Bio.SeqRecord import SeqRecord
 
 from .. import logger
-from ..exception import BinaryNotFoundError
+from ..external import Astral, Concordance, FastTree, Iqtree, ModelFinder, Raxml, UFBoot
 from ..external._libphykit import Saturation, compute_toverr
 from . import SeqTypes, TreeMethods, TreeOutputFiles, _abc
-from ._utils import CheckAttrs, CheckBinary, Timer, guess_seqtype, is_gzip_file
+from ._utils import CheckAttrs, Timer, guess_seqtype, is_gzip_file
 
-__all__ = ["MFA2Tree", "MFA2TreeList", "run_fasttree", "run_raxml", "run_iqtree"]
+__all__ = ["MFA2Tree", "MFA2TreeList"]
 _C = TypeVar("Callable", bound=Callable[..., Any])
 
 
@@ -62,7 +59,7 @@ def _check_attributes(*attrs: str):
     return decorator
 
 
-def _check_single_file(func: _C):
+def _check_single_file(func: _C) -> _C:
     """Decorator to ensure that the method is only called on a list with multiple MFA files.
 
     This decorator checks if the `MFA2TreeList` instance contains more than one MFA file. If there is only one file, it raises a
@@ -93,7 +90,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
     Optionally take a partition file to build tree with partition mode with RAxML-NG and IQ-TREE.
     """
 
-    __slots__ = ("_method", "_tree", "_toverr", "_saturation", "partition_file")
+    __slots__ = ("_method", "_tree", "_toverr", "_saturation")
 
     @overload
     def __init__(self, file: str | Path) -> None: ...
@@ -101,13 +98,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
     @overload
     def __init__(self, file: str | Path, name: str) -> None: ...
 
-    def __init__(
-        self,
-        file: str | Path,
-        name: str | None = None,
-        *,
-        partition_file: str | Path | None = None,
-    ) -> None:
+    def __init__(self, file: str | Path, name: str | None = None) -> None:
         """Initialize a MFA2Tree object.
 
         Initialize with a path of a multiple sequence alignment file (in fasta format) and a representative name (optional). The
@@ -133,12 +124,6 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         self._tree: Tree = None
         self._toverr: float = None
         self._saturation: float = None
-        if partition_file:
-            if isinstance(partition_file, (str, Path)):
-                partition_file = Path(partition_file)
-            else:
-                raise TypeError(f"Argument partition_file only accepts str or Path. Got {type(partition_file)}.")
-        self.partition_file: Path = partition_file
 
     @_abc.check_loaded
     def __len__(self) -> int:
@@ -263,33 +248,14 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
     @overload
     def build(
         self,
-        method: Literal["ft"],
+        method: Literal["ft", "raxml", "iqtree"],
+        output: str | Path,
+        model: str | Path = "AUTO",
         *,
-        capture_cmd: bool = False,
-    ) -> Tree: ...
-
-    @overload
-    def build(
-        self,
-        method: Literal["raxml"],
-        output: str | Path | None = None,
-        partition_file: str | Path | None = None,
-        *,
-        bs: int = 100,
+        bs: int = 1000,
+        scfl: int = 100,
         threads: int = 1,
-        capture_cmd: bool = False,
-    ) -> tuple[Tree, str]: ...
-
-    @overload
-    def build(
-        self,
-        method: Literal["iqtree"],
-        output: str | Path | None = None,
-        partition_file: str | Path | None = None,
-        *,
-        bs: int = 100,
-        threads: int = 1,
-        capture_cmd: bool = False,
+        capture_cmd: bool = True,
     ) -> tuple[Tree, str]: ...
 
     @_abc.load_data
@@ -297,9 +263,10 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         self,
         method: Literal["ft", "raxml", "iqtree"],
         output: str | Path | None = None,
-        partition_file: str | Path | None = None,
+        model: str | Path = "AUTO",
         *,
-        bs: int = 100,
+        bs: int = 1000,
+        scfl: int = 100,
         threads: int = 1,
         capture_cmd: bool = False,
     ) -> Tree:
@@ -312,7 +279,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 - "iqtree": Use IQ-TREE.
             output (str | Path | None, optional): Path to save the resulting tree file. If None, a temporary path is used.
                 Optional for RAxML-NG and IQ-TREE.
-            partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
+            model (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
                 object's partition_file if None.
             bs (int): Bootstrap value. Defaults to 100.
             threads (int): Number of threads to use. Applicable for RAxML-NG and IQ-TREE. Defaults to 1.
@@ -323,25 +290,60 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
             command string.
         """
         method = method.upper()
-        if not partition_file and self.partition_file:
-            partition_file = self.partition_file
-        if partition_file and self.partition_file:
-            logger.warning("MFA2Tree object has an already assigned partition_file. Use the one input to the build method.")
-        cmd = None
-        if method not in [m.name for m in TreeMethods]:
-            raise KeyError(f'Invalid method: {method}. Expected one of: {", ".join([m.name.lower() for m in TreeMethods])}')
-        if method == TreeMethods.FT.name:
-            self._tree, cmd = run_fasttree(self, capture_cmd=True)
-        elif method == TreeMethods.RAXML.name:
-            self._tree, cmd = run_raxml(self, output, partition_file, bs=bs, threads=threads, capture_cmd=True)
-        elif method == TreeMethods.IQTREE.name:
-            self._tree, cmd = run_iqtree(self, output, partition_file, bs=bs, threads=threads, capture_cmd=True)
-        else:
-            raise NotImplementedError(f"Method not implemented yet: {TreeMethods[method.upper()].name}.")
-        logger.debug("Tree building on %s is done.", self.name)
-        self._method = method
+        tempdir = None
+        capture_cmd_msg = ""
+        try:
+            if not output:
+                tempdir = tempfile.TemporaryDirectory()
+                output = tempdir.name
+
+            output = Path(output)
+            output.mkdir(exist_ok=True)
+
+            if model == "AUTO":
+                modelfinder = ModelFinder(
+                    self.file, output / "modelfinder", seqtype=self.seqtype, method=method.lower(), threads=threads
+                )
+                model = modelfinder()
+            elif Path(model).is_file():
+                # Partitioning analysis
+                if method == TreeMethods.FT.name:
+                    raise ValueError(f"{TreeMethods.FT.method} does not support partitioning analysis.")
+
+            if method not in [m.name for m in TreeMethods]:
+                raise KeyError(f"Invalid method: {method}. Expected one of: {', '.join([m.name.lower() for m in TreeMethods])}")
+            if method == TreeMethods.FT.name:
+                runner = FastTree(self.file, output / f"{self.file.name}.nw", seqtype=self.seqtype, model=model, threads=threads)
+            elif method == TreeMethods.RAXML.name:
+                runner = Raxml(self.file, output / self.file.name, seqtype=self.seqtype, model=model, threads=threads)
+            elif method == TreeMethods.IQTREE.name:
+                runner = Iqtree(self.file, output / self.file.name, seqtype=self.seqtype, model=model, threads=threads)
+            else:
+                raise NotImplementedError(f"Method not implemented yet: {TreeMethods[method].name}.")
+            tree_file = runner()
+            self._method = method
+            model = runner.model
+            capture_cmd_msg += f"Tree building cmd: {runner.cmd}\n"
+
+            if bs > 0:
+                runner = UFBoot(self.file, tree_file, output / "ufboot", model=model, bs=bs, threads=threads)
+                tree_file = runner()
+                capture_cmd_msg += f"UFBoot cmd: {runner.cmd}\n"
+
+            if scfl > 0:
+                runner = Concordance(self.file, tree_file, output / "concord", model=model, scfl=scfl, threads=threads)
+                tree_file = runner()
+                capture_cmd_msg += f"Concordance factor cmd: {runner.cmd}\n"
+
+            self._tree = Phylo.read(tree_file, "newick")
+            logger.debug("Tree building on %s is done.", self.name)
+
+        finally:
+            if tempdir:
+                tempdir.cleanup()
+
         if capture_cmd:
-            return self.tree, cmd
+            return self.tree, capture_cmd_msg
         else:
             return self.tree
 
@@ -467,7 +469,14 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
 
     @Timer.timer
     def build(
-        self, method: Literal["ft", "raxml", "iqtree"], *, bs: int = 100, threads: int = 1, capture_cmd: bool = False, **kwargs
+        self,
+        method: Literal["ft", "raxml", "iqtree"],
+        model: str | Path = "AUTO",
+        *,
+        bs: int = 0,
+        scfl: int = 0,
+        threads: int = 1,
+        capture_cmd: bool = False,
     ) -> None:
         """Build trees for each MFA2Tree object.
 
@@ -486,9 +495,10 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                 _build_helper(
                     mfa2tree,
                     method,
-                    kwargs.get("output"),
-                    kwargs.get("partition_file"),
+                    None,
+                    model,
                     bs,
+                    scfl,
                     threads,
                     capture_cmd,
                 )
@@ -501,10 +511,11 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                         (
                             mfa2tree,
                             method,
-                            kwargs.get("output"),
-                            kwargs.get("partition_file"),
+                            None,
+                            model,
                             bs,
-                            threads,
+                            scfl,
+                            1,
                             capture_cmd,
                         )
                         for mfa2tree in self
@@ -549,7 +560,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
 
     @Timer.timer
     @_check_single_file
-    def get_consensus_tree(self) -> Tree:
+    def get_consensus_tree(self, *, threads: int = 1) -> Tree:
         """Compute a consensus tree using ASTRAL.
 
         Returns:
@@ -559,43 +570,15 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             BinaryNotFoundError: If ASTRAL is not installed.
             RuntimeError: If ASTRAL fails.
         """
-        try:
-            astral = CheckBinary.find("astral")
-        except BinaryNotFoundError:
-            raise BinaryNotFoundError(
-                '%s not found. Please install it through "%s" or build the source following the instruction on %s'
-                % (
-                    "ASTRAL",
-                    "conda install bioconda::aster",
-                    "https://github.com/chaoszhang/ASTER",
-                )
-            )
-
-        logger.info("Run ASTRAL to resolve consensus among multiple trees.")
-        with tempfile.NamedTemporaryFile() as f:
-            Phylo.write([mfa2tree.tree for mfa2tree in self], f.name, "newick")
-            f.seek(0)
-            cmd = [str(astral), f.name]
-            try:
-                result = subprocess.run(cmd, capture_output=True, check=True, text=True)
-                logger.debug(
-                    "Consensus tree inferred by %s is done:\n%s",
-                    "ASTRAL",
-                    result.stdout,
-                )
-            except subprocess.CalledProcessError as e:
-                raise RuntimeError(f"ASTRAL failed:\n{e.stdout}")
-        return Phylo.read(StringIO(result.stdout), "newick")
-
-    @overload
-    def concat(self, output: Path, *, threads: int = 1) -> MFA2Tree: ...
-
-    @overload
-    def concat(self, output: Path, partition: bool, *, threads: int = 1) -> MFA2Tree: ...
+        with tempfile.NamedTemporaryFile() as f_in, tempfile.NamedTemporaryFile() as f_out:
+            Phylo.write([mfa2tree.tree for mfa2tree in self], f_in.name, "newick")
+            f_in.seek(0)
+            runner = Astral(f_in.name, f_out.name, threads=threads)
+            return Phylo.read(runner(), "newick")
 
     @Timer.timer
     @_check_single_file
-    def concat(self, output: str | Path, partition: bool = False, *, threads: int = 1) -> MFA2Tree:
+    def concat(self, output: str | Path, *, threads: int = 1) -> tuple[Path, Path]:
         """Concatenate selected MSAs into a single file and generate an MFA2Tree.
 
         Args:
@@ -646,309 +629,29 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
         logger.info("Concatenate selected MSAs...")
 
         start_idx = 0
-        if partition:
-            partition_info = []
+        partition_info = []
         for msa in msa_list:
-            # if self._get_missing_chars(mfa2tree):
-            #     warnings.warn(f"{mfa2tree.name} contains missing state.", MissingStateWarning)
-            #     continue
             concat_alignments += msa
-            if partition:
-                part_rec, end_idx = _generate_partition_record(msa, seqtype=self.seqtype, start=start_idx)
-                partition_info.append(part_rec)
-                start_idx = end_idx
-        if partition:
-            concat_alignments.annotations["partition"] = partition_info
+            part_rec, end_idx = _generate_partition_record(msa, seqtype=self.seqtype, start=start_idx)
+            partition_info.append(part_rec)
+            start_idx = end_idx
 
         for seq in concat_alignments:
             seq.description = ""
         logger.info("Done.")
 
         output.mkdir(exist_ok=True)
-        concat_file, partition_file = _output_concat_file(output, concat_alignments)
-        return MFA2Tree(concat_file, partition_file=partition_file)
+        concat_file = output / TreeOutputFiles.CONCAT
+        with open(concat_file, "w") as f:
+            SeqIO.write(concat_alignments, f, format="fasta")
+            logger.info("Concatenated fasta is output to %s", concat_file)
 
-
-@_abc.check_loaded
-def simple_distance_tree(mfa2tree: MFA2Tree, *, method: str) -> Tree:
-    """[Deprecated] Run the tree calculation using a simple distance method."""
-    calculator = DistanceCalculator("identity")
-    constructor = DistanceTreeConstructor(calculator, method)
-    return constructor.build_tree(mfa2tree.load())
-
-
-@overload
-def run_fasttree(mfa2tree: MFA2Tree) -> Tree: ...
-
-
-@overload
-def run_fasttree(mfa2tree: MFA2Tree, *, capture_cmd: bool = True) -> tuple[Tree, str]: ...
-
-
-@_abc.check_loaded
-def run_fasttree(mfa2tree: MFA2Tree, *, capture_cmd: bool = False) -> Tree:
-    """Runs FastTree to build a phylogenetic tree from the given MFA2Tree object.
-
-    Args:
-        mfa2tree (MFA2Tree): The MFA2Tree object containing multiple sequence alignment data.
-        capture_cmd (bool): If True, returns the FastTree command along with the resulting tree.
-
-    Returns:
-        If capture_cmd is False (default), returns a Tree object.
-        If capture_cmd is True, returns a tuple containing the Tree object and the command string.
-    """
-    try:
-        fasttree = CheckBinary.find(*TreeMethods.FT.bins)
-    except BinaryNotFoundError:
-        raise BinaryNotFoundError(
-            '{} not found. Please install it through "{}"'.format(TreeMethods.FT.bins, "conda install bioconda::fasttree")
-        )
-
-    cmd = [str(fasttree), "-gamma", str(mfa2tree.file)]
-    if mfa2tree.seqtype == SeqTypes.DNA:
-        cmd.insert(1, "-gtr")
-        cmd.insert(1, "-nt")
-    else:
-        cmd.insert(1, "-lg")
-
-    try:
-        logger.debug("Tree building cmd: %s", " ".join(cmd))
-        result = subprocess.run(cmd, capture_output=True, check=True, text=True)
-        logger.debug("Fasttree output:\n%s", result.stderr)  # This line output fasttree logs
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f'Tree building failed with cmd: {" ".join(cmd)}\n{e.stdout}')
-    tree = Phylo.read(StringIO(result.stdout), "newick")
-    if capture_cmd:
-        return tree, " ".join(cmd)
-    else:
-        return tree
-
-
-@overload
-def run_raxml(
-    mfa2tree: MFA2Tree,
-    output: str | Path | None = None,
-    partition_file: str | Path | None = None,
-    *,
-    bs: int = 50,
-    threads: int = 1,
-) -> Tree: ...
-
-
-@overload
-def run_raxml(
-    mfa2tree: MFA2Tree,
-    output: str | Path | None = None,
-    partition_file: str | Path | None = None,
-    *,
-    bs: int = 50,
-    threads: int = 1,
-    capture_cmd: bool = True,
-) -> tuple[Tree, str]: ...
-
-
-@_abc.check_loaded
-def run_raxml(
-    mfa2tree: MFA2Tree,
-    output: str | Path | None = None,
-    partition_file: str | Path | None = None,
-    *,
-    bs: int = 50,
-    threads: int = 1,
-    capture_cmd: bool = False,
-) -> Tree:
-    """Runs RAxML-NG to build a phylogenetic tree from the given MFA2Tree object.
-
-    Args:
-        mfa2tree (MFA2Tree): The MFA2Tree object containing alignment data.
-        output (str | Path | None, optional): Path to save the resulting tree file. If not provided, a temporary path is used.
-        partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Optional.
-        bs (int): Bootstrap value. Defaults to 50.
-        threads (int): Number of threads to use for RAxML-NG computation.
-        capture_cmd (bool): If True, returns the RAxML-NG command along with the resulting tree.
-
-    Returns:
-        If capture_cmd is False (default), returns a Tree object.
-        If capture_cmd is True, returns a tuple of the Tree object and the command string.
-    """
-    try:
-        raxml = CheckBinary.find(*TreeMethods.RAXML.bins)
-    except BinaryNotFoundError:
-        raise BinaryNotFoundError(
-            '{} not found. Please install it through "{}"'.format(TreeMethods.RAXML.method, "conda install bioconda::RAxML-NG")
-        )
-
-    if output:
-        if not isinstance(output, (str, Path)):
-            raise TypeError(f"Argument output only accepts str or Path. Got {type(output)}.")
-    if partition_file:
-        if not isinstance(partition_file, (str, Path)):
-            raise TypeError(f"Argument partition only accepts str or Path. Got {type(output)}.")
-        partition_file = Path(partition_file)
-        if not partition_file.exists():
-            raise FileNotFoundError(f"{partition_file}")
-        if not partition_file.is_file():
-            raise RuntimeError(f"{partition_file} is not a file.")
-
-    tempdir = None
-    try:
-        if not output:
-            tempdir = tempfile.TemporaryDirectory()
-            output = tempdir.name
-
-        if not isinstance(output, (str, Path)):
-            raise TypeError(f"Argument output only accepts str or Path. Got {type(output)}.")
-        output = Path(output) / TreeMethods.RAXML.method.lower()
-        output.mkdir(exist_ok=True)
-
-        cmd = [
-            str(raxml),
-            "--all",
-            "--msa",
-            str(mfa2tree.file),
-            "--prefix",
-            str(output / mfa2tree.name),
-            "--bs-trees",
-            str(bs),
-            "--threads",
-            f"auto{{{threads}}}",
-        ]
-        if partition_file:
-            cmd.extend(["--model", str(partition_file)])
-        elif mfa2tree.seqtype == SeqTypes.DNA:
-            cmd.extend(["--model", "GTR+G"])
-        else:
-            cmd.extend(["--model", "LG+G"])
-
-        try:
-            logger.debug("Tree building cmd: %s", " ".join(cmd))
-            result = subprocess.run(cmd, capture_output=True, check=True, text=True)
-            logger.debug("%s output:\n%s", TreeMethods.RAXML.method, result.stdout)  # This line output raxml logs
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f'Tree building failed with cmd: {" ".join(cmd)}\n{e.stdout}')
-        tree = Phylo.read(output / f"{mfa2tree.name}.raxml.support", "newick")
-        if capture_cmd:
-            return tree, " ".join(cmd)
-        else:
-            return tree
-
-    finally:
-        if tempdir:
-            tempdir.cleanup()
-
-
-@overload
-def run_iqtree(
-    mfa2tree: MFA2Tree,
-    output: str | Path | None = None,
-    partition_file: str | Path | None = None,
-    *,
-    bs: int = 100,
-    threads: int = 1,
-) -> Tree: ...
-
-
-@overload
-def run_iqtree(
-    mfa2tree: MFA2Tree,
-    output: str | Path | None = None,
-    partition_file: str | Path | None = None,
-    *,
-    bs: int = 100,
-    threads: int = 1,
-    capture_cmd: bool = True,
-) -> tuple[Tree, str]: ...
-
-
-@_abc.check_loaded
-def run_iqtree(
-    mfa2tree: MFA2Tree,
-    output: str | Path | None = None,
-    partition_file: str | Path | None = None,
-    *,
-    bs: int = 100,
-    threads: int = 1,
-    capture_cmd: bool = False,
-) -> Tree | tuple[Tree, str]:
-    """Runs IQ-TREE to construct a phylogenetic tree from the given MFA2Tree object.
-
-    Args:
-        mfa2tree (MFA2Tree): The MFA2Tree object containing alignment data.
-        output (str | Path | None, optional): Path to save the resulting tree file. If not provided, a temporary path is used.
-        partition_file (str | Path | None, optional):: Path to a partition file for model partitioning. Optional.
-        bs (int): Bootstrap value. Defaults to 100.
-        threads (int): Number of threads to use for IQ-TREE computation.
-        capture_cmd (bool): If True, returns the IQ-TREE command along with the resulting tree.
-
-    Returns:
-        If capture_cmd is False (default), returns a Tree object.
-        If capture_cmd is True, returns a tuple of the Tree object and the command string.
-    """
-    try:
-        iqtree = CheckBinary.find(*TreeMethods.IQTREE.bins)
-    except BinaryNotFoundError:
-        raise BinaryNotFoundError(
-            '{} not found. Please install it through "{}"'.format(TreeMethods.IQTREE.method, "conda install bioconda::iqtree")
-        )
-
-    if output:
-        if not isinstance(output, (str, Path)):
-            raise TypeError(f"Argument output only accepts str or Path. Got {type(output)}.")
-    if partition_file:
-        if not isinstance(partition_file, (str, Path)):
-            raise TypeError(f"Argument partition only accepts str or Path. Got {type(output)}.")
-        partition_file = Path(partition_file)
-        if not partition_file.exists():
-            raise FileNotFoundError(f"{partition_file}")
-        if not partition_file.is_file():
-            raise RuntimeError(f"{partition_file} is not a file.")
-
-    tempdir = None
-    try:
-        if not output:
-            tempdir = tempfile.TemporaryDirectory()
-            output = tempdir.name
-
-        output = Path(output) / TreeMethods.IQTREE.method.lower()
-        output.mkdir(exist_ok=True)
-
-        cmd = [
-            str(iqtree),
-            "-s",
-            str(mfa2tree.file),
-            "--prefix",
-            str(output / mfa2tree.name),
-            "-b",
-            str(bs),
-            "-T",
-            "AUTO",
-            "-ntmax",
-            str(threads),
-        ]
-        if mfa2tree.seqtype == SeqTypes.DNA:
-            cmd.extend(["-m", "GTR+G"])
-        else:
-            cmd.extend(["-m", "LG+G"])
-        if partition_file:
-            if not isinstance(partition_file, (str, Path)):
-                raise TypeError(f"Argument partition only accepts str or Path. Got {type(output)}.")
-            cmd.extend(["-p", str(partition_file)])
-
-        try:
-            logger.debug("Tree building cmd: %s", " ".join(cmd))
-            result = subprocess.run(cmd, capture_output=True, check=True, text=True)
-            logger.debug("%s output:\n%s", TreeMethods.IQTREE.method, result.stdout)  # This line output iqtree logs
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f'Tree building failed with cmd: {" ".join(cmd)}\n{e.stdout}')
-        tree = Phylo.read(output / f"{mfa2tree.name}.contree", "newick")
-        if capture_cmd:
-            return tree, " ".join(cmd)
-        else:
-            return tree
-
-    finally:
-        if tempdir:
-            tempdir.cleanup()
+        partition_file = output / TreeOutputFiles.PARTITION
+        with open(partition_file, "w") as f:
+            for part_rec in partition_info:
+                f.write(f"{part_rec}\n")
+        logger.info("Partition file is output to %s", partition_file)
+        return concat_file, partition_file
 
 
 def _compute_toverr_helper(instance: MFA2Tree) -> None:
@@ -972,11 +675,12 @@ def _compute_saturation_helper(instance: MFA2Tree) -> None:
 def _build_helper(
     instance: MFA2Tree,
     method: Literal["ft", "raxml", "iqtree"],
-    output: str | Path | None,
-    partition_file: str | Path | None,
-    bs: int,
-    threads: int,
-    capture_cmd: bool,
+    output: str | Path | None = None,
+    model: str | Path = "AUTO",
+    bs: int = 1000,
+    scfl: int = 100,
+    threads: int = 1,
+    capture_cmd: bool = False,
 ) -> Tree:
     """Helper function to run the `build` method on an MFA2Tree instance.
 
@@ -997,14 +701,7 @@ def _build_helper(
     Returns:
         Tree: The resulting phylogenetic tree.
     """
-    instance.build(
-        method,
-        output=output,
-        partition_file=partition_file,
-        bs=bs,
-        threads=threads,
-        capture_cmd=capture_cmd,
-    )
+    instance.build(method, output, model, bs=bs, scfl=scfl, threads=threads, capture_cmd=capture_cmd)
 
 
 def _fill_missing_taxon(samples: Sequence[str], msa: MultipleSeqAlignment) -> MultipleSeqAlignment:
@@ -1046,33 +743,6 @@ def _generate_partition_record(msa: MultipleSeqAlignment, *, seqtype, start: int
     model = "GTR+G" if seqtype == SeqTypes.DNA else "LG+G"
     end = msa.get_alignment_length()
     return (
-        f'{model}, {msa.annotations["seqname"]} = {start + 1}-{start + end}',
+        f"{model}, {msa.annotations['seqname']} = {start + 1}-{start + end}",
         start + end,
     )
-
-
-def _output_concat_file(output: Path, concat_alignments: MultipleSeqAlignment) -> tuple[Path, Path]:
-    """Write concatenated FASTA and partition files to the specified output directory.
-
-    Args:
-        output (Path): The directory where files will be written.
-        concat_alignments (MultipleSeqAlignment): The concatenated multiple sequence alignment.
-
-    Returns:
-        tuple[Path, Path | None]: Paths to the concatenated FASTA file and partition file, or None if partitioning is disabled.
-    """
-    concat_file = output / TreeOutputFiles.CONCAT
-    with open(concat_file, "w") as f:
-        SeqIO.write(concat_alignments, f, format="fasta")
-        logger.info("Concatenated fasta is output to %s", concat_file)
-
-    if "partition" in concat_alignments.annotations:
-        partition_file = output / TreeOutputFiles.PARTITION
-        with open(partition_file, "w") as f:
-            for part_rec in concat_alignments.annotations["partition"]:
-                f.write(f"{part_rec}\n")
-        logger.info("Partition file is output to %s", partition_file)
-    else:
-        partition_file = None
-        logger.debug("Partition mode disabled. No partition file output.")
-    return concat_file, partition_file

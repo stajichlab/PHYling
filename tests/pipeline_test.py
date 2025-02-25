@@ -10,7 +10,7 @@ from shutil import copytree
 import pytest
 from Bio import AlignIO
 
-from phyling.libphyling import ALIGN_METHODS, TreeMethods, TreeOutputFiles
+from phyling.libphyling import ALIGN_METHODS, TreeMethods, TreeOutputFiles, FileExts
 from phyling.pipeline import align, download, filter, tree
 
 
@@ -144,7 +144,7 @@ class TestAlign:
             threads=1,
         )
         samples = set()
-        for file in tmp_path.glob("*.mfa"):
+        for file in tmp_path.glob(f"*.{FileExts.ALN}"):
             for rec in AlignIO.read(file, "fasta"):
                 samples.add(rec.id)
         expected_samples = set(
@@ -175,7 +175,7 @@ class TestAlign:
             threads=1,
         )
         samples = set()
-        for file in tmp_path.glob("*.mfa"):
+        for file in tmp_path.glob(f"*.{FileExts.ALN}"):
             for rec in AlignIO.read(file, "fasta"):
                 samples.add(rec.id)
         expected_samples = set(
@@ -229,7 +229,7 @@ class TestAlign:
             threads=1,
         )
         samples = set()
-        for file in prev_output.glob("*.mfa"):
+        for file in prev_output.glob(f"*.{FileExts.ALN}"):
             for rec in AlignIO.read(file, "fasta"):
                 samples.add(rec.id)
         expected_samples = set(
@@ -369,8 +369,6 @@ class TestTree:
                     "O",
                     "--method",
                     "iqtree",
-                    "--bootstrap",
-                    "100",
                     "--concat",
                     "--partition",
                     "--threads",
@@ -382,7 +380,6 @@ class TestTree:
             "inputs": Path("I"),
             "output": Path("O"),
             "method": "iqtree",
-            "bootstrap": 100,
             "concat": True,
             "partition": True,
             "threads": 3,
@@ -396,7 +393,7 @@ class TestTree:
             inputs = persistent_tmp_path / inputs
         else:
             inputs = [persistent_tmp_path / f for f in inputs]
-        tree.tree(inputs, tmp_path, method=method, bs=10, concat=concat, threads=1)
+        tree.tree(inputs, tmp_path, method=method, concat=concat, threads=1)
         concat_file = tmp_path / TreeOutputFiles.CONCAT
         if concat:
             assert concat_file.is_file()
@@ -409,7 +406,7 @@ class TestTree:
     @pytest.mark.parametrize("inputs, method", list(product((inputs_pep[1], inputs_cds[1]), method[1:])))
     def test_tree_partition(self, inputs: list[str], tmp_path: Path, method: str, persistent_tmp_path: Path):
         inputs = [persistent_tmp_path / f for f in inputs]
-        tree.tree(inputs, tmp_path, method=method, bs=10, concat=True, partition=True, threads=1)
+        tree.tree(inputs, tmp_path, method=method, concat=True, partition=True, threads=1)
         concat_file = tmp_path / TreeOutputFiles.CONCAT
         partition_file = tmp_path / TreeOutputFiles.PARTITION
         treefile = tmp_path / TreeOutputFiles.TREE_NW
@@ -421,24 +418,24 @@ class TestTree:
     def test_partition_no_concat(self, tmp_path: Path, method: str, persistent_tmp_path: Path):
         inputs = [persistent_tmp_path / f for f in self.inputs_pep[1]]
         with pytest.raises(ValueError) as excinfo:
-            tree.tree(inputs, tmp_path, method=method, bs=10, concat=False, partition=True)
+            tree.tree(inputs, tmp_path, method=method, concat=False, partition=True)
         assert "Partition is not allowed in consensus mode" in str(excinfo.value)
 
     def test_partition_invalid_method(self, tmp_path: Path, persistent_tmp_path: Path):
         inputs = [persistent_tmp_path / f for f in self.inputs_pep[1]]
         with pytest.raises(ValueError) as excinfo:
-            tree.tree(inputs, tmp_path, method="ft", bs=10, concat=True, partition=True)
+            tree.tree(inputs, tmp_path, method="ft", concat=True, partition=True)
         assert f"Partition is not allowed with {TreeMethods.FT.method}" in str(excinfo.value)
 
     @pytest.mark.parametrize("inputs, method", list(product((inputs_pep[1][0], inputs_cds[1][0]), method)))
     def test_tree_single_input(self, inputs: str, tmp_path: Path, method: str, persistent_tmp_path: Path):
         inputs = persistent_tmp_path / inputs
         with pytest.raises(ValueError) as excinfo:
-            tree.tree(inputs, tmp_path, bs=10, method=method)
+            tree.tree(inputs, tmp_path, method=method)
         assert "Found only 1 MSA fasta" in str(excinfo.value)
 
     def test_tree_figure(self, tmp_path: Path, persistent_tmp_path: Path):
         inputs = [persistent_tmp_path / f for f in self.inputs_pep[1]]
-        tree.tree(inputs, tmp_path, bs=10, figure=True)
+        tree.tree(inputs, tmp_path, figure=True)
         img_file = tmp_path / TreeOutputFiles.TREE_IMG
         assert img_file.is_file()

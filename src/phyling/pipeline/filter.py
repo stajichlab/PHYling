@@ -12,10 +12,10 @@ import time
 from pathlib import Path
 
 from .. import AVAIL_CPUS, logger
-from ..libphyling import FileExts, TreeMethods
+from ..libphyling import FileExts, TreeMethods, SeqTypes
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.tree import MFA2TreeList, TreeOutputFiles
-from ._outputprecheck import TreePrecheck
+from ._outputprecheck import FilterPrecheck
 
 
 def menu(parser: argparse.ArgumentParser) -> None:
@@ -98,7 +98,7 @@ def filter(
     params = {"top_n_toverr": top_n_toverr}
 
     # Precheck and load checkpoint if it exist
-    output_precheck = TreePrecheck(output, mfa2treelist, **params)
+    output_precheck = FilterPrecheck(output, mfa2treelist, **params)
     remained_mfa2treelist, completed_mfa2treelist = output_precheck.precheck()
 
     if remained_mfa2treelist:
@@ -106,7 +106,7 @@ def filter(
             "Use %s to generate trees and filter by the rank of their toverr.",
             TreeMethods.FT.method,
         )
-        remained_mfa2treelist.build(method="ft", threads=threads)
+        remained_mfa2treelist.build("ft", "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "GTR", threads=threads)
         remained_mfa2treelist.compute_toverr(threads=threads)
         completed_mfa2treelist.extend(remained_mfa2treelist)
         logger.info("Filter done.")

@@ -155,8 +155,8 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
         return remained_samples, searchhits
 
 
-class TreePrecheck(_abc.OutputPrecheckABC):
-    """A class providing input/output precheck, checkpoint management, and final tree output.
+class FilterPrecheck(_abc.OutputPrecheckABC):
+    """A class providing input/output precheck, checkpoint management, and filtered MSAs output.
 
     Attributes:
         output (Path): Path to the output directory.
@@ -165,7 +165,7 @@ class TreePrecheck(_abc.OutputPrecheckABC):
         mfa2treelist (MFA2TreeList): List of MFA2Tree objects for processing.
     """
 
-    ckp: str = ".tree.ckp"
+    ckp: str = ".filter.ckp"
     params: dict = {"top_n_toverr": None}
 
     def __init__(self, output: Path, mfa2treelist: MFA2TreeList, **params) -> None:
