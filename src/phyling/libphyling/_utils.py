@@ -40,9 +40,6 @@ def get_file_checksum(file: str | Path) -> int:
     file = Path(file)
     if not file.exists():
         raise FileNotFoundError(f"{file} not found.")
-    file = Path(file)
-    if not file.exists():
-        raise FileNotFoundError(f"{file} not found.")
     crc = 0
     with open(file, "rb") as f:
         crc += crc32(f.read())
@@ -383,65 +380,38 @@ class CheckAttrs:
         return none_attrs
 
 
-class CheckBinary:
-    """A decorator to check for the availability of required binaries in the system's PATH.
+def check_binary(prog: str, bins: tuple, conda_url: str | None = None, source_url: str | None = None) -> str:
+    """Find the path of a binary from the given sequence of entry points.
 
-    This decorator ensures that all the binaries from the specified list is present in the system's PATH before executing the
-    decorated function.
+    This function searches for the binaries in the system's PATH and returns the path of the first binary found. If none are
+    found, it raises an error.
 
-    Attributes:
-        bins (tuple): A tuple of entry points (binary names) to check for availability.
+    Args:
+        *bins (str): Entry points (binary names) to search for.
+
+    Returns:
+        Path: The full path to the first available binary.
+
+    Raises:
+        BinaryNotFoundError: If none of the binaries are found in the system's PATH.
     """
+    for bin in bins:
+        bin_path = shutil.which(bin)
+        if bin_path:
+            return bin_path
 
-    __slots__ = ("bins",)
+    conda_msg = ""
+    source_msg = ""
+    if conda_url or source_url:
+        install_msg = " Please install it "
+    if conda_url:
+        conda_msg = f"through 'conda install {conda_url}'"
+        if source_url:
+            conda_msg += " or "
+    if source_url:
+        source_msg = f"from source following the instruction on {source_url}"
 
-    def __init__(self, *bins: str) -> None:
-        """Initialize the decorator with the binary names to check.
-
-        Args:
-            *bins (str): Entry points (binary names) to check for availability.
-        """
-        self.bins = bins
-
-    def __call__(self, func: _C) -> _C:
-        """Make the class instance callable as a decorator.
-
-        Args:
-            func (Callable): The method to wrap.
-
-        Returns:
-            Callable: The wrapped function.
-        """
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            """Check if the specified binaries exist before executing the function."""
-            CheckBinary.find(*self.bins)
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    @staticmethod
-    def find(*bins: str) -> Path:
-        """Find the path of a binary from the given sequence of entry points.
-
-        This method searches for the binaries in the system's PATH and returns the path of the first binary found. If none are
-        found, it raises an error.
-
-        Args:
-            *bins (str): Entry points (binary names) to search for.
-
-        Returns:
-            Path: The full path to the first available binary.
-
-        Raises:
-            BinaryNotFoundError: If none of the binaries are found in the system's PATH.
-        """
-        for bin in bins:
-            bin_path = shutil.which(bin)
-            if bin_path:
-                return Path(bin_path)
-        raise BinaryNotFoundError(f'None of the specified binaries are found: {", ".join(bins)}')
+    raise BinaryNotFoundError(f"{prog} not found.{install_msg}{conda_msg}{source_msg}")
 
 
 def substitute_ambiguous_seq(seq: Seq) -> Seq:
