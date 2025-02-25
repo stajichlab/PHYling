@@ -26,7 +26,7 @@ ALIGN_METHODS = ("hmmalign", "muscle")
 
 # Tree
 class TreeMethods(Enum):
-    FT = ("FastTree", ("VeryFastTree",), ("JC", "GTR"), ("JTT", "WAG", "LG"))
+    FT = ("VeryFastTree", ("VeryFastTree",), ("JC", "GTR"), ("JTT", "WAG", "LG"))
     RAXML = ("RAxML-NG", ("raxml-ng",), ("raxml",), ("raxml",))
     IQTREE = ("IQTree", ("iqtree", "iqtree2"), (), ())
 

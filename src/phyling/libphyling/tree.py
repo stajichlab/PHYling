@@ -274,7 +274,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
         Args:
             method (Literal["ft", "raxml", "iqtree"]): Tree-building method.
-                - "ft": Use FastTree.
+                - "ft": Use VeryFastTree.
                 - "raxml": Use RAxML-NG.
                 - "iqtree": Use IQ-TREE.
             output (str | Path | None, optional): Path to save the resulting tree file. If None, a temporary path is used.
@@ -482,7 +482,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
 
         Args:
             method (Literal["ft", "raxml", "iqtree"]): Tree-building method.
-                - "ft": Use FastTree.
+                - "ft": Use VeryFastTree.
                 - "raxml": Use RAxML-NG.
                 - "iqtree": Use IQ-TREE.
             bs (int): Bootstrap value. Defaults to 100.
@@ -687,7 +687,7 @@ def _build_helper(
     Args:
         instance (MFA2Tree): The MFA2Tree instance on which to run the `build` method.
         method (Literal["ft", "raxml", "iqtree"]): Tree-building method.
-                - "ft": Use FastTree.
+                - "ft": Use VeryFastTree.
                 - "raxml": Use RAxML-NG.
                 - "iqtree": Use IQ-TREE.
         output (str | Path | None, optional): Path to save the resulting tree file. If None, a temporary path is used.
