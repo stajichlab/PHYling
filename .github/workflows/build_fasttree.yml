@@ -4,32 +4,36 @@ on: workflow_call
 
 jobs:
   build_fasttree:
-    name: Build FastTree
+    name: Build VertFastTree
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cache FastTree
+      - name: Cache VeryFastTree
         id: cache
         uses: actions/cache@v4
         with:
-          path: ~/.local/bin/fasttree
-          key: ${{ runner.os }}-FastTree
+          path: ~/.local/bin/VeryFastTree
+          key: ${{ runner.os }}-VeryFastTree
 
-      - name: Download FastTree executable
+      - name: Download VeryFastTree and compile
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install wget
-          wget http://www.microbesonline.org/fasttree/FastTree
+          wget https://github.com/citiususc/veryfasttree/archive/refs/tags/v4.0.4.tar.gz
+          tar zxvf v4.0.4.tar.gz
+          cd veryfasttree-4.0.4
+          cmake .
+          make
 
       - name: Move executable
         if: steps.cache.outputs.cache-hit != 'true'
         working-directory: ${{ github.workspace }}
         run: |
           mkdir -p ~/.local/bin
-          cp FastTree ~/.local/bin/fasttree
-          chmod +x ~/.local/bin/fasttree
+          cp veryfasttree-4.0.4 VeryFastTree ~/.local/bin/VeryFastTree
+          chmod +x ~/.local/bin/VeryFastTree
 
-      - name: Export FastTree to PATH and verify
+      - name: Export VeryFastTree to PATH and verify
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          which fasttree
+          which VeryFastTree

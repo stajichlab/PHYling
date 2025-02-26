@@ -86,7 +86,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.local/bin/fasttree
-          key: ${{ runner.os }}-FastTree
+          key: ${{ runner.os }}-VeryFastTree
 
       - name: Cache RAxML
         uses: actions/cache/restore@v4
