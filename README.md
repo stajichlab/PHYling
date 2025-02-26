@@ -124,9 +124,6 @@ alignment is performed using the _hmmalign_ method. However, users have the opti
 Finally, each alignment result is output separately. You can decide whether you want to filter it with treeness/RCV score or use
 them all for tree building. Please check out the filter command through `phyling filter --help`
 
-decide whether you want to concatenate them or use consensus strategy
-in the tree module. See all the options with `phyling align --help`.
-
 ```
 Required arguments:
   -i file [files ...], --inputs file [files ...]
@@ -289,11 +286,10 @@ recording the toverr of all markers and the symlinks to the mfa of these selecte
 ### Build tree from multiple sequence alignment results
 
 Finally, we can run the tree module, use the multiple sequence alignment results to build a phylogenetic tree. By default, it uses
-the _consensus tree_ strategy (conclude the majority of trees which was built upon each single gene) But you can choose to use
-_concatenated alignment_ strategy by specifying `-c/--concat`. Currently, 3 methods (VeryFastTree, RAxML-NG and IQ-TREE) are available
-for tree building. You can choose your own preferred method by specifying `-M/--method`. (default is VeryFastTree) You can also adjust
-the bootstrap replicates by specifying `-b/--bootstrap`. (Recommend to use 100 for consensus mode and 1000 for concatenate mode)
-See all the options with `phyling tree --help`.
+the _consensus tree_ strategy (conclude the majority of trees which was built upon each single gene) but you can choose to use
+_concatenated alignment_ strategy by specifying `-c/--concat`. Currently, 3 methods (VeryFastTree, RAxML-NG and IQ-TREE) are
+available for tree building. You can choose your own preferred method by specifying `-M/--method`. (default is VeryFastTree) See
+all the options with `phyling tree --help`.
 
 ```
 Required arguments:
@@ -359,11 +355,10 @@ a single final tree.
 Meanwhile, users can construct tree with a more sophisticated **partition mode** when using [RAxML-NG] and [IQ-TREE]. In general,
 the partition mode expects different genes exhibit different evolutionary rates, which should be estimated with different models.
 
-The example below concatenates all the markers and run tree building with partitioning and 1000 bootstrap replicates through
-IQ-TREE.
+The example below concatenates all the markers and run tree building with partitioning through IQ-TREE.
 
 ```
-phyling tree -I align -M iqtree -b 1000 -c -p -t 16
+phyling tree -I align -M iqtree -c -p -t 16
 ```
 
 **Note: Partition mode is not supported in VeryFastTree.**
@@ -389,7 +384,7 @@ steps to achieve the best possible results:
 - [PhyKIT] for calculating treeness/RCV to filter uninformative orthologs.
 - [VeryFastTree], a faster version of FastTree, use approximately maximum-likelihood to build trees.
 - [RAxML-NG], a more sophisticated maximum-likelihood-based tree building tool. (Optional)
-- [IQ-TREE], a modern maximum-likelihood-based tool for tree building. (Optional)
+- [IQ-TREE], a modern maximum-likelihood-based tool for tree building.
 - [ASTER], a C++ re-implementation of [ASTRAL] to resolve consensus among trees.
 
 ## Install
@@ -398,7 +393,7 @@ Please download the source code from the [latest release](https://github.com/sta
 or `git clone` the main branch.
 
 Go into the PHYling folder. To avoid altering the base environment, it's advisable to install the software in a dedicated conda
-environment Please use the environment.yml to create environment and install all the required packages.
+environment. Please use the environment.yml to create environment and install all the required packages.
 
 ```
 cd PHYling-2.0.0
