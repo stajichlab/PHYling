@@ -1,3 +1,7 @@
+"""Binary wrapper"""
+
+from __future__ import annotations
+
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path

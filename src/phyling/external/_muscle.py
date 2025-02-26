@@ -1,3 +1,7 @@
+"""Muscle utilities"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 from ..libphyling._utils import check_binary

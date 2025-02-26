@@ -1,5 +1,7 @@
 """IQ-Tree utilities"""
 
+from __future__ import annotations
+
 import gzip
 import re
 from pathlib import Path
