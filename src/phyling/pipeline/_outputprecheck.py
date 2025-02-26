@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from .. import logger
-from ..libphyling import TreeOutputFiles, _abc
-from ..libphyling._utils import remove_dirs, remove_files
+from ..libphyling import TreeOutputFiles, _abc, FileExts
+from ..libphyling._utils import remove_files
 from ..libphyling.align import SampleList, SampleSeqs, SearchHitsManager
 from ..libphyling.tree import MFA2Tree, MFA2TreeList
 
@@ -155,8 +155,8 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
         return remained_samples, searchhits
 
 
-class TreePrecheck(_abc.OutputPrecheckABC):
-    """A class providing input/output precheck, checkpoint management, and final tree output.
+class FilterPrecheck(_abc.OutputPrecheckABC):
+    """A class providing input/output precheck, checkpoint management, and filtered MSAs output.
 
     Attributes:
         output (Path): Path to the output directory.
@@ -165,7 +165,7 @@ class TreePrecheck(_abc.OutputPrecheckABC):
         mfa2treelist (MFA2TreeList): List of MFA2Tree objects for processing.
     """
 
-    ckp: str = ".tree.ckp"
+    ckp: str = ".filter.ckp"
     params: dict = {"top_n_toverr": None}
 
     def __init__(self, output: Path, mfa2treelist: MFA2TreeList, **params) -> None:
@@ -276,9 +276,7 @@ class TreePrecheck(_abc.OutputPrecheckABC):
             remained_mfa2treelist.append(msa)
 
         # Remove files
-        rm_files = [x for x in self.output.iterdir() if x.is_file() if x.name == TreeOutputFiles.TREENESS]
-        rm_dirs = [x for x in self.output.iterdir() if x.is_dir if x.name == TreeOutputFiles.MSAS_DIR]
+        rm_files = [x for x in self.output.glob(TreeOutputFiles.TREENESS)] + [x for x in self.output.glob(f"*.{FileExts.ALN}")]
         remove_files(*rm_files)
-        remove_dirs(*rm_dirs)
 
         return remained_mfa2treelist, completed_mfa2treelist

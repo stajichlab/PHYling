@@ -7,11 +7,11 @@ import argparse
 import re
 import sys
 import textwrap
+import traceback
 
-from . import AUTHOR, VERSION
+from . import AUTHOR, VERSION, logger
 from . import __doc__ as _module_doc
 from . import __name__ as _module_name
-from . import logger
 from .pipeline.align import __doc__ as _align_doc
 from .pipeline.align import menu as _align_menu
 from .pipeline.download import __doc__ as _download_doc
@@ -166,8 +166,8 @@ def main(args: list[str] | None = None) -> int:
             for handler in logger.handlers:
                 handler.setLevel("DEBUG")
             logger.debug("Debug mode enabled.")
-            logger.debug(vars(args))
 
+        logger.debug(vars(args))
         args.func(**vars(args))
 
     except KeyboardInterrupt:
@@ -175,13 +175,15 @@ def main(args: list[str] | None = None) -> int:
         return 1
 
     except Exception as err:
-        logger.error(err, exc_info=True)
+        logger.error(err)
+        logger.debug("%s", traceback.format_exc())
         return 1
 
     except SystemExit as err:
         if err.code != 0:
-            logger.error(err, exc_info=True)
-            return 1
+            logger.error(err)
+            logger.debug("%s", traceback.format_exc())
+            return err.code
 
     return 0
 
