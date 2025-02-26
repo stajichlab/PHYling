@@ -30,7 +30,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           mkdir -p ~/.local/bin
-          cp veryfasttree-4.0.4 VeryFastTree ~/.local/bin/VeryFastTree
+          cp veryfasttree-4.0.4/VeryFastTree ~/.local/bin/VeryFastTree
           chmod +x ~/.local/bin/VeryFastTree
 
       - name: Export VeryFastTree to PATH and verify
