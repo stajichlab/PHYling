@@ -379,6 +379,20 @@ class CheckAttrs:
         none_attrs = [attr for attr in attrs if getattr(instance, attr) is None]
         return none_attrs
 
+    @staticmethod
+    def is_false(instance, *attrs: str) -> list[str]:
+        """Check if any attributes are False on the given instance.
+
+        Args:
+            instance: The object to validate.
+            *attrs (str): Attribute names to check.
+
+        Returns:
+            The attribute names that are False in the instance.
+        """
+        none_attrs = [attr for attr in attrs if getattr(instance, attr) is False]
+        return none_attrs
+
 
 def check_binary(prog: str, bins: tuple, conda_url: str | None = None, source_url: str | None = None) -> str:
     """Find the path of a binary from the given sequence of entry points.

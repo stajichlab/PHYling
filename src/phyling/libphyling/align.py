@@ -1031,7 +1031,7 @@ def run_muscle(ortholog: OrthologSeqs, *, threads: int = 1) -> MultipleSeqAlignm
             f_pep.seek(0)
             runner = Muscle(f_pep.name, f_aln.name)
             try:
-                runner()
+                runner.run()
             except Exception as e:
                 raise RuntimeError(f"Muscle failed on peptide fasta translated from {ortholog.file}:\n{e}")
         f_aln.seek(0)

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import subprocess
+import re
 from pathlib import Path
 from typing import Literal
 
-from .. import logger
 from ..libphyling import TreeMethods
 from ..libphyling._utils import check_binary
-from ._base import TreeToolWrapper
+from ._abc import TreeToolWrapper
+from ._models import DNA_MODELS, PEP_MODELS
 
 FASTTREE_BIN = check_binary(
     TreeMethods.FT.method, TreeMethods.FT.bins, "bioconda::veryfasttree", "https://github.com/citiususc/veryfasttree"
@@ -28,6 +28,9 @@ class FastTree(TreeToolWrapper):
         If capture_cmd is True, returns a tuple containing the Tree object and the command string.
     """
 
+    _prog: str = TreeMethods.FT.method
+    _cmd_log = "stderr"
+
     def __init__(
         self,
         file: str | Path,
@@ -38,16 +41,7 @@ class FastTree(TreeToolWrapper):
         threads: int = 1,
         add_args: tuple | list | None = None,
     ):
-        super().__init__(TreeMethods.FT.method, file, output, seqtype=seqtype, model=model, add_args=add_args, threads=threads)
-
-    def __call__(self, *, verbose: bool = False) -> Path:
-        try:
-            result = subprocess.run(self._cmd, capture_output=True, check=True, text=True)
-            if verbose:
-                logger.debug("%s", result.stderr)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"{self._prog} failed with cmd: {self.cmd}:\n{e.stderr}")
-        return self._target
+        super().__init__(file, output, seqtype=seqtype, model=model, add_args=add_args, threads=threads)
 
     def _construct_cmd(
         self,
@@ -67,21 +61,18 @@ class FastTree(TreeToolWrapper):
             str(threads),
             str(file),
         ]
-        model = model.split("+")
+        model, *params = model.split("+")
         if seqtype == "DNA":
             self._cmd.insert(1, "-nt")
-            if model[0].upper() not in TreeMethods.FT.dna_model:
-                raise ValueError(f"Model {model[0]} is not supported in {TreeMethods.FT.method} with {seqtype} alignments.")
-            if model[0].lower() in TreeMethods.FT.dna_model[1:]:
-                self._cmd.insert(3, f"--{model[0].lower()}")
+            if model.upper() not in DNA_MODELS[DNA_MODELS[:, 0] != "", 0]:
+                raise ValueError(f"Model {model} is not supported in {TreeMethods.FT.method} with {seqtype} alignments.")
+            if model.upper() == "GTR":
+                self._cmd.insert(3, f"-{model.lower()}")
         else:
-            if model[0].upper() not in TreeMethods.FT.pep_model:
-                raise ValueError(f"Model {model[0]} is not supported in {TreeMethods.FT.method} with {seqtype} alignments.")
-            if model[0].lower() in TreeMethods.FT.pep_model[1:]:
-                self._cmd.insert(2, f"--{model[0].lower()}")
+            if model.upper() not in PEP_MODELS[PEP_MODELS[:, 0] != "", 0]:
+                raise ValueError(f"Model {model} is not supported in {TreeMethods.FT.method} with {seqtype} alignments.")
+            if model.upper() in ("LG", "WAG"):
+                self._cmd.insert(2, f"-{model.lower()}")
 
-        for model_param in model[1:]:
-            if model_param == "G":
-                self._cmd.insert(-1, "-gamma")
-
-        self._target = output
+        if re.match("G", "+".join(params)):
+            self._cmd.insert(-1, "-gamma")

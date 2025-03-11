@@ -18,7 +18,18 @@ from Bio.SeqIO import FastaIO
 from Bio.SeqRecord import SeqRecord
 
 from .. import logger
-from ..external import Astral, Concordance, FastTree, Iqtree, ModelFinder, Raxml, UFBoot
+from ..external import (
+    Astral,
+    Concordance,
+    FastTree,
+    Iqtree,
+    ModelFinder,
+    PartitionRecord,
+    Partitions,
+    Raxml,
+    RaxmlHandler,
+    UFBoot,
+)
 from ..external._libphykit import Saturation, compute_toverr
 from . import SeqTypes, TreeMethods, TreeOutputFiles, _abc
 from ._utils import CheckAttrs, Timer, guess_seqtype, is_gzip_file
@@ -304,7 +315,8 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 modelfinder = ModelFinder(
                     self.file, output / "modelfinder", seqtype=self.seqtype, method=method.lower(), threads=threads
                 )
-                model = modelfinder()
+                modelfinder.run()
+                model = modelfinder.result
             elif Path(model).is_file():
                 # Partitioning analysis
                 if method == TreeMethods.FT.name:
@@ -320,19 +332,22 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 runner = Iqtree(self.file, output / self.file.name, seqtype=self.seqtype, model=model, threads=threads)
             else:
                 raise NotImplementedError(f"Method not implemented yet: {TreeMethods[method].name}.")
-            tree_file = runner()
+            runner.run()
+            tree_file = runner.result
             self._method = method
             model = runner.model
             capture_cmd_msg += f"Tree building cmd: {runner.cmd}\n"
 
             if bs > 0:
                 runner = UFBoot(self.file, tree_file, output / "ufboot", model=model, bs=bs, threads=threads)
-                tree_file = runner()
+                runner.run()
+                tree_file = runner.result
                 capture_cmd_msg += f"UFBoot cmd: {runner.cmd}\n"
 
             if scfl > 0:
                 runner = Concordance(self.file, tree_file, output / "concord", model=model, scfl=scfl, threads=threads)
-                tree_file = runner()
+                runner.run()
+                tree_file = runner.result
                 capture_cmd_msg += f"Concordance factor cmd: {runner.cmd}\n"
 
             self._tree = Phylo.read(tree_file, "newick")
@@ -574,7 +589,8 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             Phylo.write([mfa2tree.tree for mfa2tree in self], f_in.name, "newick")
             f_in.seek(0)
             runner = Astral(f_in.name, f_out.name, threads=threads)
-            return Phylo.read(runner(), "newick")
+            runner.run()
+            return Phylo.read(runner.result, "newick")
 
     @Timer.timer
     @_check_single_file
@@ -629,11 +645,19 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
         logger.info("Concatenate selected MSAs...")
 
         start_idx = 0
-        partition_info = []
+        partition_info = Partitions("raxml")
+        model = "GTR" if self.seqtype == SeqTypes.DNA else "LG"
         for msa in msa_list:
             concat_alignments += msa
-            part_rec, end_idx = _generate_partition_record(msa, seqtype=self.seqtype, start=start_idx)
-            partition_info.append(part_rec)
+            end_idx = start_idx + msa.get_alignment_length()
+            partition_info.add(
+                PartitionRecord(
+                    name=msa.annotations["seqname"],
+                    start=start_idx + 1,
+                    end=end_idx,
+                    model=model,
+                )
+            )
             start_idx = end_idx
 
         for seq in concat_alignments:
@@ -647,9 +671,8 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             logger.info("Concatenated fasta is output to %s", concat_file)
 
         partition_file = output / TreeOutputFiles.PARTITION
-        with open(partition_file, "w") as f:
-            for part_rec in partition_info:
-                f.write(f"{part_rec}\n")
+        with RaxmlHandler(partition_file, "w") as f:
+            f.write(partition_info)
         logger.info("Partition file is output to %s", partition_file)
         return concat_file, partition_file
 
@@ -725,24 +748,3 @@ def _fill_missing_taxon(samples: Sequence[str], msa: MultipleSeqAlignment) -> Mu
         )
         msa.sort()
     return msa
-
-
-def _generate_partition_record(msa: MultipleSeqAlignment, *, seqtype, start: int = 0) -> tuple[str, int]:
-    """Generate a partition record for RAxML-NG or IQ-TREE.
-
-    Args:
-        msa (MultipleSeqAlignment): The multiple sequence alignment.
-        seqtype: The type of sequence (DNA or protein).
-        start (int, optional): The starting position for the partition. Defaults to 0.
-
-    Returns:
-        tuple[str, int]: A tuple containing the partition record string and the end position.
-    """
-
-    # Assign model for raxml/iqtree compatible partition file
-    model = "GTR+G" if seqtype == SeqTypes.DNA else "LG+G"
-    end = msa.get_alignment_length()
-    return (
-        f"{model}, {msa.annotations['seqname']} = {start + 1}-{start + end}",
-        start + end,
-    )

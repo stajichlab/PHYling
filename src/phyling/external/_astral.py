@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
-from .. import logger
 from ..libphyling._utils import check_binary
-from ._base import BinaryWrapper
+from ._abc import BinaryWrapper
 
 ASTRAL_BIN = check_binary("ASTRAL", ("astral",), "bioconda::aster", "https://github.com/chaoszhang/ASTER")
 
@@ -23,18 +21,11 @@ class Astral(BinaryWrapper):
         RuntimeError: If ASTRAL fails.
     """
 
-    def __init__(self, file: str | Path, output: str | Path, *, add_args: list | tuple | None = None, threads: int = 1):
-        super().__init__("ASTRAL", file, output, add_args=add_args, threads=threads)
+    _prog: str = "ASTRAL"
+    _cmd_log = "stderr"
 
-    def __call__(self, *, verbose: bool = False) -> Path:
-        try:
-            result = subprocess.run(self._cmd, capture_output=True, check=True, text=True)
-            if verbose:
-                logger.debug("%s", result.stderr)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"{self._prog} failed with cmd: {self.cmd}:\n{e.stderr}")
-        return self._target
+    def __init__(self, file: str | Path, output: str | Path, *, add_args: list | tuple | None = None, threads: int = 1):
+        super().__init__(file, output, add_args=add_args, threads=threads)
 
     def _construct_cmd(self, file: Path, output: Path, *, threads: int):
         self._cmd = [ASTRAL_BIN, "--output", str(output), "--thread", str(threads), str(file)]
-        self._target = output

@@ -125,7 +125,8 @@ def tree(
                 method=method,
                 threads=threads,
             )
-            new_partition_file = modelfinder_runner()
+            modelfinder_runner.run()
+            new_partition_file = modelfinder_runner.result
             partition_file.unlink()
             partition_file.symlink_to(new_partition_file.parent.relative_to(partition_file.parent) / new_partition_file.name)
             tree, captured_cmd = concat_tree.build(

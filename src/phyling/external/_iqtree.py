@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="numpy")
 import gzip
 import re
 from pathlib import Path
@@ -9,30 +12,25 @@ from typing import Literal, overload
 
 from ..libphyling import SeqTypes, TreeMethods
 from ..libphyling._utils import check_binary
-from ._base import BinaryWrapper, TreeToolWrapper
+from ._abc import BinaryWrapper, TreeToolWrapper
+from ._models import (
+    ALL_MODELS,
+    DNA_MODELS,
+    INVARIANT_CODES,
+    PEP_MODELS,
+    STATIONARY_CODES,
+    NexusHandler,
+    RaxmlHandler,
+)
 
 IQTREE_BIN = check_binary(
     TreeMethods.IQTREE.method, TreeMethods.IQTREE.bins, "bioconda::iqtree", "https://github.com/iqtree/iqtree2"
 )
 
 
-def partition_nexus_to_raxml(file: str | Path, output: str | Path):
-    with open(file) as f:
-        sections = f.read().strip("\n").split(";\n")
-        info = {}
-        for charset in sections[1:-2]:
-            charset, pos = re.sub("charset", "", charset).strip().split(" = ")
-            info[charset] = [pos]
-        for model in re.sub(r".*\n", "", sections[-2], count=1).split(",\n"):
-            m, charset = model.strip().split(": ")
-            m = re.sub(r"\+G4", "+G", m)
-            info[charset].append(m)
-    with open(output, "w") as f:
-        for k, v in info.items():
-            f.write(f"{v[1]}, {k} = {v[0]}\n")
-
-
 class ModelFinder(BinaryWrapper):
+    _prog: str = "ModelFinder"
+
     @overload
     def __init__(
         self,
@@ -69,29 +67,38 @@ class ModelFinder(BinaryWrapper):
         threads: int = 1,
         add_args: tuple | list | None = None,
     ):
-        super().__init__(
-            "ModelFinder", file, output, partition_file, seqtype=seqtype, method=method, add_args=add_args, threads=threads
-        )
+        super().__init__(file, output, partition_file, seqtype=seqtype, method=method, add_args=add_args, threads=threads)
 
-    @overload
-    def __call__(self, *, verbose=False) -> Path: ...
-    @overload
-    def __call__(self, *, verbose=False) -> str: ...
-
-    def __call__(self, *, verbose=False) -> str | Path:
-        super().__call__(verbose=verbose)
-        if self._target.suffix == ".nex":  # partitioning analysis
-            partition_nexus_to_raxml(self._target, self._target.with_suffix(""))
-            return self._target.with_suffix("")
+    def _post_run(self) -> None:
+        if self._output.suffix == ".nex":  # partitioning analysis
+            if self._method == "raxml":
+                with NexusHandler(self._output) as fi, RaxmlHandler(self._output.with_suffix(""), mode="w") as fo:
+                    part_info = fi.read()["sets"]
+                    part_info = part_info.convert_to("raxml")
+                    fo.write(part_info)
+                self._result = self._output.with_suffix("")
+            else:
+                self._result = self._output
         else:
-            with gzip.open(self._target, "rt") as f:
+            with gzip.open(self._output, "rt") as f:
                 for line in f.read().strip("\n").split("\n"):
                     best_model_prefix = "best_model_BIC: "
                     if line.startswith(best_model_prefix):
                         best_model = line.lstrip(best_model_prefix)
-                        if self._method == "ft":
-                            best_model = re.sub(r"\+I(?=\+)", "", re.sub(r"\+F(?=\+)", "", best_model))
-            return best_model
+                        model, *params = best_model.split("+")
+                        method_idx = list(TreeMethods).index(TreeMethods[self._method.upper()])
+                        # Convert model in IQTree name to the name of each tool
+                        model = ALL_MODELS[ALL_MODELS[:, 2] == model, method_idx].tolist()
+                        for param in params:
+                            if self._method == "ft":
+                                if param.startswith(("F", "I")):
+                                    params
+                            else:
+                                if param.startswith("F"):
+                                    param = STATIONARY_CODES[STATIONARY_CODES[:, 2] == param, method_idx][0].item()
+                                elif param.startswith("F"):
+                                    param = INVARIANT_CODES[INVARIANT_CODES[:, 2] == param, method_idx][0].item()
+            self._result = "+".join(model + params)
 
     def _params_check(
         self,
@@ -106,15 +113,17 @@ class ModelFinder(BinaryWrapper):
             if method == "ft":
                 raise ValueError(f"Partitioning analysis is not allowed when using {TreeMethods.FT.method}.")
             partition_file = Path(partition_file)
+        method_idx = list(TreeMethods).index(TreeMethods[method.upper()])
         if seqtype == SeqTypes.DNA:
             seqtype = "DNA"
-            mset = ",".join(TreeMethods[method.upper()].dna_model)
+            # Find the support models for each tool and map to the name in IQTree format
+            mset = ",".join(DNA_MODELS[DNA_MODELS[:, method_idx] != "", 2])
         elif seqtype == SeqTypes.PEP:
             seqtype = "AA"
-            mset = ",".join(TreeMethods[method.upper()].pep_model)
+            mset = ",".join(PEP_MODELS[PEP_MODELS[:, method_idx] != "", 2])
         else:
             seqtype = None
-            mset = None
+            mset = ",".join(ALL_MODELS[ALL_MODELS[:, method_idx] != "", 2])
         self._method = method
         return super()._params_check(partition_file, seqtype=seqtype, mset=mset, **kwargs)
 
@@ -147,12 +156,14 @@ class ModelFinder(BinaryWrapper):
             self._cmd.extend(["--mset", mset])
         if partition_file:
             self._cmd.extend(["-p", str(partition_file)])
-            self._target = Path(f"{output}.best_scheme.nex")
+            self._output = Path(f"{output}.best_scheme.nex")
         else:
-            self._target = Path(f"{output}.model.gz")
+            self._output = Path(f"{output}.model.gz")
 
 
 class Iqtree(TreeToolWrapper):
+    _prog: str = TreeMethods.IQTREE.method
+
     def __init__(
         self,
         file: str | Path,
@@ -163,9 +174,16 @@ class Iqtree(TreeToolWrapper):
         threads: int = 1,
         add_args: tuple | list | None = None,
     ):
-        super().__init__(
-            TreeMethods.IQTREE.method, file, output, seqtype=seqtype, model=model, add_args=add_args, threads=threads
-        )
+        super().__init__(file, output, seqtype=seqtype, model=model, add_args=add_args, threads=threads)
+
+    def _post_run(self):
+        model_file = self._output.with_suffix(".best_model.nex")
+
+        if model_file.is_file():
+            self._model = model_file
+        else:
+            with open(self._output.with_suffix(".iqtree")) as f:
+                self._model = re.search(r"alisim simulated_MSA .* (\-m) \"(.*)\" ", f.read())[2]
 
     def _construct_cmd(self, file: Path, output: Path, *, seqtype: Literal["DNA", "AA"] | None, model: str, threads: int):
         self._cmd = [
@@ -186,19 +204,12 @@ class Iqtree(TreeToolWrapper):
         else:
             self._cmd.extend(["-m", str(model)])
 
-        self._target = Path(f"{output}.treefile")
-
-    def _update_model(self):
-        model_file = self._target.with_suffix(".best_model.nex")
-
-        if model_file.is_file():
-            self._model = model_file
-        else:
-            with open(self._target.with_suffix(".iqtree")) as f:
-                self._model = re.search(r"alisim simulated_MSA .* (\-m) \"(.*)\" ", f.read())[2]
+        self._output = Path(f"{output}.treefile")
 
 
 class UFBoot(TreeToolWrapper):
+    _prog: str = "UFBoot"
+
     def __init__(
         self,
         file: str | Path,
@@ -210,9 +221,7 @@ class UFBoot(TreeToolWrapper):
         threads: int = 1,
         add_args: tuple | list | None = None,
     ):
-        super().__init__(
-            "Ultrafast Bootstrap", file, output, tree, seqtype="AUTO", model=model, add_args=add_args, threads=threads, bs=bs
-        )
+        super().__init__(file, output, tree, seqtype="AUTO", model=model, add_args=add_args, threads=threads, bs=bs)
 
     def _params_check(self, tree: str | Path, *, seqtype, **kwargs):
         tree = Path(tree)
@@ -222,17 +231,7 @@ class UFBoot(TreeToolWrapper):
             raise RuntimeError(f"{tree} is not a file.")
         return super()._params_check(tree, seqtype=seqtype, **kwargs)
 
-    def _construct_cmd(
-        self,
-        file: Path,
-        output: Path,
-        tree: Path,
-        *,
-        seqtype: None,
-        model: str,
-        bs: int,
-        threads: int,
-    ):
+    def _construct_cmd(self, file: Path, output: Path, tree: Path, *, seqtype: None, model: str, bs: int, threads: int):
         self._cmd = [
             IQTREE_BIN,
             "-s",
@@ -253,10 +252,12 @@ class UFBoot(TreeToolWrapper):
         else:
             self._cmd.extend(["-m", str(model)])
 
-        self._target = Path(f"{output}.treefile")
+        self._output = Path(f"{output}.treefile")
 
 
 class Concordance(TreeToolWrapper):
+    _prog: str = "Concordance factor calculation"
+
     def __init__(
         self,
         file: str | Path,
@@ -268,29 +269,9 @@ class Concordance(TreeToolWrapper):
         threads: int = 1,
         add_args: tuple | list | None = None,
     ):
-        super().__init__(
-            "Concordance factor calculation",
-            file,
-            output,
-            tree,
-            seqtype="AUTO",
-            model=model,
-            add_args=add_args,
-            threads=threads,
-            scfl=scfl,
-        )
+        super().__init__(file, output, tree, seqtype="AUTO", model=model, add_args=add_args, threads=threads, scfl=scfl)
 
-    def _construct_cmd(
-        self,
-        file: Path,
-        output: Path,
-        tree: Path,
-        *,
-        seqtype: None,
-        model: str,
-        scfl: int,
-        threads: int,
-    ):
+    def _construct_cmd(self, file: Path, output: Path, tree: Path, *, seqtype: None, model: str, scfl: int, threads: int):
         self._cmd = [
             IQTREE_BIN,
             "-s",
@@ -300,7 +281,7 @@ class Concordance(TreeToolWrapper):
             "-te",
             str(tree.absolute()),
             "--scfl",
-            "100",
+            str(scfl),
             "-T",
             "AUTO",
             "--threads-max",
@@ -311,4 +292,4 @@ class Concordance(TreeToolWrapper):
         else:
             self._cmd.extend(["-m", str(model)])
 
-        self._target = Path(f"{output}.cf.tree")
+        self._output = Path(f"{output}.cf.tree")
