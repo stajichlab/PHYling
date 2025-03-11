@@ -121,9 +121,9 @@ class Partitions(ABC):
     _model_tbl: np.ndarray = ALL_MODELS
     _stationary_tbl: np.ndarray = STATIONARY_CODES
     _invariant_tbl: np.ndarray = INVARIANT_CODES
-    _methods: tuple[str] = ("ft", "raxml", "iqtree")
+    _methods: tuple[str] = tuple(x.name for x in TreeMethods)
 
-    __slots__ = tuple(x.name for x in TreeMethods)
+    __slots__ = ("_data", "_method_idx", "_avail_models")
 
     def __init__(self, source: Literal["ft", "raxml", "iqtree"]):
         """Initialize a Partitions object.
@@ -256,7 +256,7 @@ class Partitions(ABC):
 class CustomHandler(ABC):
     """A custom text file handler abstract class."""
 
-    __slots__ = "_file"
+    __slots__ = ("_file", "_format")
 
     def __init__(self, file: str | Path, mode: str = "r", *, format: Literal["raxml", "iqtree"]):
         """Initialize a CustomHandler object.
@@ -302,6 +302,11 @@ class CustomHandler(ABC):
 
 
 class NexusHandler(CustomHandler):
+    """A subclass of CustomHandler to help parse the nexus partition file."""
+
+    _header: str = "#nexus"
+    _delimiter: str = ";"
+
     def __init__(self, file: str | Path, mode: str = "r", *, format: Literal["raxml", "iqtree"] = "iqtree"):
         """Initialize a NexusHandler object.
 
@@ -313,10 +318,8 @@ class NexusHandler(CustomHandler):
                 - "iqtree": IQTree
         """
         super().__init__(file, mode, format=format)
-        self._header = "#nexus"
         if "r" in mode and self._file.readline().strip().lower() != self._header:
             raise RuntimeError("Not a nexus file.")
-        self._delimiter = ";"
 
     def read(self) -> dict[str, Partitions]:
         """Reads from the file.
@@ -421,6 +424,10 @@ class NexusHandler(CustomHandler):
 
 
 class RaxmlHandler(CustomHandler):
+    """A subclass of CustomHandler to help parse the raxml-style partition file."""
+
+    _delimiter: str = "\n"
+
     def __init__(self, file: str | Path, mode: str = "r", *, format: Literal["raxml", "iqtree"] = "raxml"):
         """Initialize a RaxmlHandler object.
 
@@ -432,7 +439,6 @@ class RaxmlHandler(CustomHandler):
                 - "iqtree": IQTree
         """
         super().__init__(file, mode, format=format)
-        self._delimiter = "\n"
 
     def read(self):
         """Reads from the file."""
