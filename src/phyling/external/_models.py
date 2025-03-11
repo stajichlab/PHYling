@@ -121,7 +121,7 @@ class Partitions(ABC):
     _model_tbl: np.ndarray = ALL_MODELS
     _stationary_tbl: np.ndarray = STATIONARY_CODES
     _invariant_tbl: np.ndarray = INVARIANT_CODES
-    _methods: tuple[str] = tuple(x.name for x in TreeMethods)
+    _methods: tuple[str] = tuple(x.name.lower() for x in TreeMethods)
 
     __slots__ = ("_data", "_method_idx", "_avail_models")
 
