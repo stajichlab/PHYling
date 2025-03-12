@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import gzip
-import subprocess
 import tempfile
 from multiprocessing import Manager, Pool
 from multiprocessing.pool import ThreadPool
@@ -24,9 +23,10 @@ from pyhmmer.easel import Alphabet, DigitalSequence, DigitalSequenceBlock, Seque
 from pyhmmer.plan7 import HMM, HMMFile
 
 from .. import logger
-from ..exception import BinaryNotFoundError, EmptyWarning, SeqtypeError
+from ..exception import EmptyWarning, SeqtypeError
+from ..external import Muscle
 from . import SeqTypes, _abc
-from ._utils import CheckBinary, guess_seqtype, is_gzip_file, load_msa
+from ._utils import guess_seqtype, is_gzip_file, load_msa
 
 __all__ = [
     "SampleSeqs",
@@ -768,12 +768,12 @@ class OrthologSeqs(SampleSeqs):
         hmm: HMM | None = None,
         threads: int = 1,
     ) -> MultipleSeqAlignment:
-        """Align sequences from each sample using hmmalign or MUSCLE.
+        """Align sequences from each sample using hmmalign or Muscle.
 
         Args:
             method (Literal["hmmalign", "muscle"]): The alignment method to use.
                 - "hmmalign": Uses HMM alignment with provided marker set.
-                - "muscle": Uses MUSCLE alignment.
+                - "muscle": Uses Muscle alignment.
             hmm (HMM): The HMM model for "hmmalign". Required for this method.
             threads (int, optional): Number of threads for "muscle". Defaults to 1.
 
@@ -871,7 +871,7 @@ class OrthologList(_abc.SeqDataListABC[OrthologSeqs]):
         Args:
             method (Literal["hmmalign", "muscle"]): The alignment method to use.
                 - "hmmalign": Uses HMM alignment with provided marker set.
-                - "muscle": Uses MUSCLE alignment.
+                - "muscle": Uses Muscle alignment.
             hmms (HMMMarkerSet, optional): The set of HMM markers for "hmmalign". Required for this method.
             jobs (int, optional): Number of parallel processes. Defaults to 1.
             threads (int, optional): Number of threads per process. Defaults to 1.
@@ -996,7 +996,7 @@ def run_hmmalign(ortholog: OrthologSeqs, hmm: HMM) -> MultipleSeqAlignment:
 
 @_abc.check_loaded
 def run_muscle(ortholog: OrthologSeqs, *, threads: int = 1) -> MultipleSeqAlignment:
-    """Run MUSCLE to perform multiple sequence alignment.
+    """Run Muscle to perform multiple sequence alignment.
 
     Args:
         ortholog (OrthologSeqs): The ortholog sequences to align.
@@ -1006,21 +1006,13 @@ def run_muscle(ortholog: OrthologSeqs, *, threads: int = 1) -> MultipleSeqAlignm
         MultipleSeqAlignment: The resulting multiple sequence alignment.
 
     Raises:
-        BinaryNotFoundError: If the MUSCLE binary is not found.
-        RuntimeError: If MUSCLE fails to complete successfully.
+        BinaryNotFoundError: If the Muscle binary is not found.
+        RuntimeError: If Muscle fails to complete successfully.
 
     Example:
         >>> ortholog = OrthologSeqs("ortholog.fasta")
         >>> alignment = run_muscle(ortholog, threads=4)
     """
-    try:
-        muscle = CheckBinary.find("muscle")
-    except BinaryNotFoundError:
-        raise BinaryNotFoundError(
-            "Muscle not found. "
-            'Please install it through "conda install bioconda::muscle" '
-            "or build the source following the instruction on https://github.com/rcedgar/muscle"
-        )
     with tempfile.NamedTemporaryFile() as f_aln:
         with tempfile.NamedTemporaryFile() as f_pep:
             SeqIO.write(
@@ -1037,22 +1029,11 @@ def run_muscle(ortholog: OrthologSeqs, *, threads: int = 1) -> MultipleSeqAlignm
                 "fasta",
             )
             f_pep.seek(0)
+            runner = Muscle(f_pep.name, f_aln.name)
             try:
-                _ = subprocess.run(
-                    [
-                        str(muscle),
-                        "-align",
-                        f"{f_pep.name}",
-                        "-output",
-                        f"{f_aln.name}",
-                        "-threads",
-                        str(threads),
-                    ],
-                    capture_output=True,
-                    check=True,
-                )
-            except subprocess.CalledProcessError as e:
-                raise RuntimeError(f"Muscle failed on peptide fasta translated from {ortholog.file}:\n{e.stdout}")
+                runner.run()
+            except Exception as e:
+                raise RuntimeError(f"Muscle failed on peptide fasta translated from {ortholog.file}:\n{e}")
         f_aln.seek(0)
         alignment = load_msa(Path(f_aln.name))
     alignment.annotations = {"seqtype": SeqTypes.PEP}

@@ -26,7 +26,7 @@ ALIGN_METHODS = ("hmmalign", "muscle")
 
 # Tree
 class TreeMethods(Enum):
-    FT = ("FastTree", ("fasttree", "Fasttree"))
+    FT = ("VeryFastTree", ("VeryFastTree",))
     RAXML = ("RAxML-NG", ("raxml-ng",))
     IQTREE = ("IQTree", ("iqtree", "iqtree2"))
 
@@ -36,7 +36,6 @@ class TreeMethods(Enum):
 
 
 class TreeOutputFiles:
-    MSAS_DIR = "selected_MSAs"
     TREENESS = "treeness.tsv"
     CONCAT = f"concat_alignments.{FileExts.ALN}"
     PARTITION = "concat_alignments.partition"

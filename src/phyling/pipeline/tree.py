@@ -4,7 +4,7 @@ By default the consensus tree method will be employed which use a 50% cutoff to 
 use the -c/--concat option to concatenate the MSA and build a single tree instead. Note that enable the -p/--partition option will
 also output a partition file that compatible to RAxML-NG and IQ-TREE.
 
-For the tree building step, the Fasttree will be used as default algorithm. Users can switch to the RAxML-NG or IQ-TREE by
+For the tree building step, the VeryFastTree will be used as default algorithm. Users can switch to the RAxML-NG or IQ-TREE by
 specifying the -m/--method raxml/iqtree.
 
 Once the tree is built, an ASCII figure representing the tree will be displayed, and a treefile in Newick format will be generated
@@ -22,9 +22,10 @@ import matplotlib.pyplot as plt
 from Bio import Phylo
 
 from .. import AVAIL_CPUS, logger
-from ..libphyling import FileExts, TreeMethods, TreeOutputFiles
+from ..external import ModelFinder
+from ..libphyling import FileExts, SeqTypes, TreeMethods, TreeOutputFiles
 from ..libphyling._utils import Timer, check_threads
-from ..libphyling.tree import MFA2TreeList
+from ..libphyling.tree import MFA2Tree, MFA2TreeList
 
 
 def menu(parser: argparse.ArgumentParser) -> None:
@@ -67,13 +68,6 @@ def menu(parser: argparse.ArgumentParser) -> None:
         + "\n".join(f"{m.name.lower()}: {m.method}" for m in TreeMethods),
     )
     opt_args.add_argument(
-        "-b",
-        "--bootstrap",
-        type=int,
-        default=100,
-        help="Specify number of bootstrap replicates",
-    )
-    opt_args.add_argument(
         "-c",
         "--concat",
         action="store_true",
@@ -105,29 +99,48 @@ def tree(
     output: str | Path,
     *,
     method: Literal["ft", "raxml", "iqtree"] = "ft",
-    bs: int = 100,
+    bs: int = 1000,
+    scfl: int = 100,
     concat: bool = False,
     partition: bool = False,
     figure: bool = False,
     threads: int = 1,
     **kwargs,
 ) -> None:
-    """A pipeline that build phylogenetic tree through either FastTree, RAxML-NG or IQ-TREE."""
+    """A pipeline that build phylogenetic tree through either VeryFastTree, RAxML-NG or IQ-TREE."""
 
     inputs = _input_check(inputs)
     mfa2treelist = MFA2TreeList(inputs)
     partition = _validate_partition(partition, method, concat)
 
     if concat:
-        concat_tree = mfa2treelist.concat(output=output, partition=partition, threads=threads)
-        tree, tree_building_cmd = concat_tree.build(method, output=output, threads=threads, bs=bs, capture_cmd=True)
-    else:
-        if method in (TreeMethods.RAXML.name, TreeMethods.IQTREE.name) and bs > 100:
-            logger.warning(
-                "Set the bootstrap > %s for consensus mode may take a significant of time. Please consider using a lower value.",
-                "100",
+        concat_file, partition_file = mfa2treelist.concat(output=output, threads=threads)
+        concat_tree = MFA2Tree(concat_file)
+        if partition:
+            modelfinder_runner = ModelFinder(
+                concat_tree.file,
+                output / method / "modelfinder",
+                partition_file,
+                seqtype=concat_tree.seqtype,
+                method=method,
+                threads=threads,
             )
-        mfa2treelist.build(method, output=output, bs=bs, threads=threads)
+            modelfinder_runner.run()
+            new_partition_file = modelfinder_runner.result
+            partition_file.unlink()
+            partition_file.symlink_to(new_partition_file.parent.relative_to(partition_file.parent) / new_partition_file.name)
+            tree, captured_cmd = concat_tree.build(
+                method, output / method, partition_file, bs=bs, scfl=scfl, threads=threads, capture_cmd=True
+            )
+        else:
+            tree, captured_cmd = concat_tree.build(
+                method, output / method, "AUTO", bs=bs, scfl=scfl, threads=threads, capture_cmd=True
+            )
+
+    else:
+        if bs > 0 or scfl > 0:
+            logger.warning("Bootstrap and concordance factor calculation are disabled when using consensus mode.")
+        mfa2treelist.build(method, "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "GTR", bs=0, scfl=0, threads=threads)
         tree = mfa2treelist.get_consensus_tree()
 
     """Output the tree in newick format and figure."""
@@ -140,10 +153,13 @@ def tree(
         strategy = "concatenate" if concat else "consensus"
         f.write(f"# Final tree is built using {TreeMethods[method.upper()].method} with {strategy} strategy.")
         if concat and partition:
-            f.write(" Partition mode is enabled.")
-            if tree_building_cmd:
-                f.write(f"\n# Tree building cmd: {tree_building_cmd}")
-        f.write("\n\n")
+            f.write(" Partition mode is enabled.\n")
+            if captured_cmd:
+                for line in captured_cmd.strip().split("\n"):
+                    f.write(f"# {line}\n")
+        else:
+            f.write("\n")
+        f.write("\n")
         Phylo.write(tree, f, "newick")
 
     if figure:

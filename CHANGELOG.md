@@ -11,13 +11,25 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Environment variable PHYLING_DB that can be set to retrieve the database across multiple paths.
 
+- Site concordance factor along with bootstrap value to better interpret branch support.
+
 ### Removed
 
 - The threads option in SearchHitsManager load method - it run faster in single process/thread.
 
+- Custom bootstrap value assignment in main menu. Now bootstrap was done by UFBoot with 1000 replicates, standardized across all tools.
+
 ### Changed
 
 - Make SampleList hashable and use it directly in SearchHits instead of just name.
+
+- Remove the selected_MSAs folder and directly link the selected MSAs to the main output folder produced by the filter module.
+
+- Use VeryFastTree to replace FastTree.
+
+- In consensus mode, use GTR and LG models for DNA and peptide data. In concatenation mode, use ModelFinder to find the best model(s)
+
+- Use UFBoot for bootstrapping after tree building by either tool.
 
 ### Fixed
 
@@ -26,6 +38,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The FileNotFoundError when rerun in a different working directory.
 
 - The missing newline of the treeness file output from filter module.
+
+- Simplify the log when verbose is disabled.
 
 ## [2.0.0] - 2025-01-10
 
