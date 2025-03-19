@@ -81,7 +81,7 @@ class HMMMarkerSet(_abc.DataListABC[HMM]):
             else:
                 data = (data,)
 
-        self._data: list[self._bound_class] = []
+        self._data: list[HMM] = []
         self._names: set[bytes] = set()
         if data:
             for d in data:

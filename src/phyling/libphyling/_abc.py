@@ -544,7 +544,7 @@ class DataListABC(ABC, Generic[_FW]):
             TypeError: If a data item cannot be converted to the bound class.
             KeyError: If the item already exists.
         """
-        self._data: list[self._bound_class] = []
+        self._data: list[_FW] = []
         self._names: set[str] = set()
         if data:
             if names:
