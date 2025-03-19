@@ -11,7 +11,7 @@ import phyling.__main__ as main
 
 
 def test_cfg_dirs_with_env():
-    assert phyling.CFG_DIRS[0] == Path("tests/database").absolute()
+    assert phyling.CFG_DIRS[0].resolve().absolute() == Path("tests/database").resolve().absolute()
 
 
 def test_cfg_dirs_wo_env(monkeypatch):
