@@ -41,6 +41,8 @@ class Saturation(Phykit_saturation):
 def compute_toverr(alignment: Path, tree: Tree) -> float:
     """Calculate the treeness/RCV of the tree by PhyKIT implementation."""
     # calculate treeness
+    if tree.total_branch_length() <= 0:
+        return 0
     treeness = PhykitTree().calculate_treeness(tree=tree)
 
     # calculate rcv
