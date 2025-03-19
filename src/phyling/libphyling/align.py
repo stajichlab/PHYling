@@ -87,7 +87,9 @@ class HMMMarkerSet(_abc.DataListABC[HMM]):
             for d in data:
                 if isinstance(d, (str, Path)):
                     with HMMFile(d) as hmm_profile:
+                        profile_name = Path(d).stem
                         d: HMM = hmm_profile.read()
+                        d.name = profile_name.encode()
                 if not isinstance(d, self._bound_class):
                     raise TypeError(f"{type(d).__qualname__} cannot be converted to {self._bound_class.__qualname__}.")
                 self.append(d)
