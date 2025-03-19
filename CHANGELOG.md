@@ -7,11 +7,19 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Set HMM.name to the filename of the hmm profile to adapt the change on the v12 dataset.
+
+### Fixed
+
+- The treeness/RCV computation error when the tree's total branch length is zero.
+
 ## [2.1.0] - 2025-03-12
 
 ### Added
 
-- Environment variable PHYLING\_DB that can be set to retrieve the database across multiple paths.
+- Environment variable PHYLING_DB that can be set to retrieve the database across multiple paths.
 
 - Site concordance factor along with bootstrap value to better interpret branch support.
 
@@ -25,7 +33,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Make SampleList hashable and use it directly in SearchHits instead of just name.
 
-- Remove the selected\_MSAs folder and directly link the selected MSAs to the main output folder produced by the filter module.
+- Remove the selected_MSAs folder and directly link the selected MSAs to the main output folder produced by the filter module.
 
 - Use VeryFastTree to replace FastTree.
 
@@ -119,11 +127,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Implement back-translation to convert the peptide MSA results to DNA counterpart when receiving coding sequence fasta as inputs.
 
 [Unreleased]: https://github.com/stajichlab/PHYling/compare/v2.1.0...HEAD
-
 [2.1.0]: https://github.com/stajichlab/PHYling/compare/v2.0.0...v2.1.0
-
 [2.0.0]: https://github.com/stajichlab/PHYling/compare/v2.0.0-beta...v2.0.0
-
 [2.0.0-beta]: https://github.com/stajichlab/PHYling/compare/v2.0.0-alpha...v2.0.0-beta
-
 [2.0.0-alpha]: https://github.com/stajichlab/PHYling/releases/tag/v2.0.0-alpha
