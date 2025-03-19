@@ -194,7 +194,7 @@ enable the multithreading option.
 #### Use coding sequences instead of peptide sequences
 
 In some circumstances, the highly shared peptide sequences make it difficult to resolve the relationship among closely related
-species. To address the issue, one can use DNA coding sequences (CDS), which contain more evolutionary traces, instead of peptide
+species. To address the issue, one can use DNA coding sequences (CDS), which can contain more recent evolutionary changes, instead of peptide
 sequences for phylogeny analysis.
 
 Run the align module with cds fasta files under folder `cds`.
