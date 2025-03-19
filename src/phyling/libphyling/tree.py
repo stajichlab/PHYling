@@ -263,8 +263,8 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         output: str | Path,
         model: str | Path = "AUTO",
         *,
-        bs: int = 1000,
-        scfl: int = 100,
+        bs: int = 0,
+        scfl: int = 0,
         threads: int = 1,
         capture_cmd: bool = True,
     ) -> tuple[Tree, str]: ...
@@ -276,8 +276,8 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         output: str | Path | None = None,
         model: str | Path = "AUTO",
         *,
-        bs: int = 1000,
-        scfl: int = 100,
+        bs: int = 0,
+        scfl: int = 0,
         threads: int = 1,
         capture_cmd: bool = False,
     ) -> Tree:
@@ -292,7 +292,8 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 Optional for RAxML-NG and IQ-TREE.
             model (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
                 object's partition_file if None.
-            bs (int): Bootstrap value. Defaults to 100.
+            bs (int): UFBoot value. Defaults to 0 (disabled).
+            scfl (int): Site concordance factor threshold for IQ-TREE. Must be at least 1000 if set. Defaults to 0 (disabled).
             threads (int): Number of threads to use. Applicable for RAxML-NG and IQ-TREE. Defaults to 1.
             capture_cmd (bool): If True, returns the command string used. Defaults to False.
 
@@ -500,7 +501,8 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                 - "ft": Use VeryFastTree.
                 - "raxml": Use RAxML-NG.
                 - "iqtree": Use IQ-TREE.
-            bs (int): Bootstrap value. Defaults to 100.
+            bs (int): UFBoot value. Defaults to 0 (disabled).
+            scfl (int): Site concordance factor threshold for IQ-TREE. Must be at least 1000 if set. Defaults to 0 (disabled).
             threads (int, optional): Number of parallel threads. Defaults to 1.
             capture_cmd (bool, optional): Capture command-line output. Defaults to False.
         """
@@ -700,8 +702,8 @@ def _build_helper(
     method: Literal["ft", "raxml", "iqtree"],
     output: str | Path | None = None,
     model: str | Path = "AUTO",
-    bs: int = 1000,
-    scfl: int = 100,
+    bs: int = 0,
+    scfl: int = 0,
     threads: int = 1,
     capture_cmd: bool = False,
 ) -> Tree:
@@ -717,7 +719,8 @@ def _build_helper(
                 Optional for RAxML-NG and IQ-TREE.
         partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
             object's partition_file if None.
-        bs (int): Bootstrap value. Defaults to 100.
+        bs (int): UFBoot value. Defaults to 0 (disabled).
+        scfl (int): Site concordance factor threshold for IQ-TREE. Must be at least 1000 if set. Defaults to 0 (disabled).
         threads (int): Number of threads to use. Applicable for RAxML-NG and IQ-TREE. Defaults to 1.
         capture_cmd (bool): If True, returns the command string used. Defaults to False.
 
