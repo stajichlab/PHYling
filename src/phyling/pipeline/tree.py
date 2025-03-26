@@ -4,7 +4,7 @@ By default the consensus tree method will be employed which use a 50% cutoff to 
 use the -c/--concat option to concatenate the MSA and build a single tree instead. Note that enable the -p/--partition option will
 also output a partition file that compatible to RAxML-NG and IQ-TREE.
 
-For the tree building step, the VeryFastTree will be used as default algorithm. Users can switch to the RAxML-NG or IQ-TREE by
+For the tree building step, the FastTree will be used as default algorithm. Users can switch to the RAxML-NG or IQ-TREE by
 specifying the -m/--method raxml/iqtree.
 
 Once the tree is built, an ASCII figure representing the tree will be displayed, and a treefile in Newick format will be generated
@@ -107,7 +107,7 @@ def tree(
     threads: int = 1,
     **kwargs,
 ) -> None:
-    """A pipeline that build phylogenetic tree through either VeryFastTree, RAxML-NG or IQ-TREE."""
+    """A pipeline that build phylogenetic tree through either FastTree, RAxML-NG or IQ-TREE."""
 
     inputs = _input_check(inputs)
     mfa2treelist = MFA2TreeList(inputs)

@@ -12,7 +12,7 @@ from ._abc import TreeToolWrapper
 from ._models import DNA_MODELS, PEP_MODELS
 
 FASTTREE_BIN = check_binary(
-    TreeMethods.FT.method, TreeMethods.FT.bins, "bioconda::veryfasttree", "https://github.com/citiususc/veryfasttree"
+    TreeMethods.FT.method, TreeMethods.FT.bins, "bioconda::fasttree", "https://github.com/morgannprice/fasttree"
 )
 
 
@@ -57,8 +57,6 @@ class FastTree(TreeToolWrapper):
             "-nosupport",
             "-out",
             str(output),
-            "-threads",
-            str(threads),
             str(file),
         ]
         model, *params = model.split("+")

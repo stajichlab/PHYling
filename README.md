@@ -34,7 +34,7 @@ sets][Busco].
 - Simplify some steps and reduce the intermediate files as much as possible.
 - [Muscle] is now available for alternative alignment method.
 - Use [PhyKIT] to remove uninformative orthologs.
-- [VeryFastTree], [RAxML-NG] and [IQ-TREE] are now available for tree construction.
+- [FastTree], [RAxML-NG] and [IQ-TREE] are now available for tree construction.
 - [ASTER], a C++ version of [ASTRAL] is now integrated to resolve consensus among trees built upon individual genes.
 
 ## Usage
@@ -280,15 +280,15 @@ For example, we pick only the top 20 markers by specifying `-n/--top_n_toverr`:
 phyling filter -I align -o filtered_align -n 20 -t 16
 ```
 
-VeryFastTree will be used to build a tree for all markers and the toverr will be computed on these trees. A file `treeness.tsv`
+FastTree will be used to build a tree for all markers and the toverr will be computed on these trees. A file `treeness.tsv`
 recording the toverr of all markers and the symlinks to the mfa of these selected markers will be output.
 
 ### Build tree from multiple sequence alignment results
 
 Finally, we can run the tree module, use the multiple sequence alignment results to build a phylogenetic tree. By default, it uses
 the _consensus tree_ strategy (conclude the majority of trees which was built upon each single gene) but you can choose to use
-_concatenated alignment_ strategy by specifying `-c/--concat`. Currently, 3 methods (VeryFastTree, RAxML-NG and IQ-TREE) are
-available for tree building. You can choose your own preferred method by specifying `-M/--method`. (default is VeryFastTree) See
+_concatenated alignment_ strategy by specifying `-c/--concat`. Currently, 3 methods (FastTree, RAxML-NG and IQ-TREE) are
+available for tree building. You can choose your own preferred method by specifying `-M/--method`. (default is FastTree) See
 all the options with `phyling tree --help`.
 
 ```
@@ -304,7 +304,7 @@ Options:
   -M {ft,raxml,iqtree}, --method {ft,raxml,iqtree}
                         Algorithm used for tree building. (default: ft)
                         Available options:
-                        ft: VeryFastTree
+                        ft: FastTree
                         raxml: RAxML-NG
                         iqtree: IQ-TREE
   -c, --concat          Concatenated alignment results
@@ -328,7 +328,7 @@ You can also use only a part of the alignment results to build the tree.
 phyling tree -i filtered_align/100957at4751.aa.mfa filtered_align/174653at4751.aa.mfa filtered_align/255412at4751.aa.mfa
 ```
 
-Use IQ-TREE instead of the default VeryFastTree method for tree building and run with 16 threads.
+Use IQ-TREE instead of the default FastTree method for tree building and run with 16 threads.
 
 ```
 phyling tree -I filtered_align -m iqtree -t 16
@@ -361,7 +361,7 @@ The example below concatenates all the markers and run tree building with partit
 phyling tree -I align -M iqtree -c -p -t 16
 ```
 
-**Note: Partition mode is not supported in VeryFastTree.**
+**Note: Partition mode is not supported in FastTree.**
 
 #### Model selection
 
@@ -370,7 +370,7 @@ use the GTR model for DNA and the LG model for peptide data in consensus mode. I
 steps to achieve the best possible results:
 
 1. Find the best suited model(s) through the ModelFinder module from [IQ-TREE].
-2. Use the best model(s) to build tree with either [VeryFastTree], [RAxML-NG] or [IQ-TREE].
+2. Use the best model(s) to build tree with either [FastTree], [RAxML-NG] or [IQ-TREE].
 3. Calculate the branch support by both Ultrafast bootstrap and site concordance factor by [IQ-TREE], using the parameters
    retrieve from the previous step.
 
@@ -382,7 +382,7 @@ steps to achieve the best possible results:
 - [muscle] for alternative method for multiple sequence alignment. (Optional)
 - [ClipKIT] for removing sites that are poor of phylogenetic signal.
 - [PhyKIT] for calculating treeness/RCV to filter uninformative orthologs.
-- [VeryFastTree], a faster version of FastTree, use approximately maximum-likelihood to build trees.
+- [FastTree], a faster version of FastTree, use approximately maximum-likelihood to build trees.
 - [RAxML-NG], a more sophisticated maximum-likelihood-based tree building tool. (Optional)
 - [IQ-TREE], a modern maximum-likelihood-based tool for tree building.
 - [ASTER], a C++ re-implementation of [ASTRAL] to resolve consensus among trees.
@@ -445,7 +445,7 @@ conda env update -f dev_additional_packages.yml
 [ClipKIT]: https://jlsteenwyk.com/ClipKIT/
 [PhyKIT]: https://jlsteenwyk.com/PhyKIT/
 [Treeness/RCV]: https://jlsteenwyk.com/PhyKIT/usage/index.html#treeness-over-rcv
-[VeryFastTree]: https://github.com/citiususc/veryfasttree
+[FastTree]: https://github.com/morgannprice/fasttree
 [RAxML-NG]: https://github.com/amkozlov/raxml-ng
 [IQ-TREE]: http://www.iqtree.org/
 [ASTER]: https://github.com/chaoszhang/ASTER

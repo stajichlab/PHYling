@@ -7,6 +7,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Use JC instead of GTR for faster phylogenetic inference during filtering step.
+
+- Swap back to FastTree since VeryFastTree stuck occasionally. [#35](https://github.com/stajichlab/PHYling/issues/35)
+
 ## [2.1.1] - 2025-03-19
 
 ### Changed
