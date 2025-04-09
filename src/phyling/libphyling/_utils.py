@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import re
 import shutil
+import threading
 import time
 from functools import wraps
+from multiprocessing.managers import ValueProxy
+from multiprocessing.sharedctypes import Synchronized
+from multiprocessing.synchronize import Condition
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 from zlib import crc32
@@ -115,6 +119,20 @@ def remove_dirs(*dirs: Path) -> None:
     if dirs:
         for dir in dirs:
             shutil.rmtree(dir)
+
+
+def progress_daemon(total: int, counter: Synchronized[int] | ValueProxy, condition: Condition, *, step: int = 10):
+    def reporter():
+        while True:
+            with condition:
+                condition.wait()
+                done = counter.value
+                if total != 0 and (done % step == 0 or done == total):
+                    logger.info("Progress: %d / %d", done, total)
+                if done >= total:
+                    break
+
+    return threading.Thread(target=reporter, daemon=True)
 
 
 def check_threads(func: _C) -> _C:

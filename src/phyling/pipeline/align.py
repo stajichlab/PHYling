@@ -161,6 +161,7 @@ def align(
     searchhits.load()
     orthologs = OrthologList(searchhits.orthologs.values(), searchhits.orthologs.keys())
 
+    logger.info("Align start...")
     msa_list = orthologs.align(method=method, hmms=hmmmarkerset if method == "hmmalign" else None, jobs=threads)
     logger.info("Align done.")
 

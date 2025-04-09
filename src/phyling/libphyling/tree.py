@@ -6,7 +6,10 @@ import gzip
 import tempfile
 from functools import wraps
 from itertools import product
+from multiprocessing import Manager
 from multiprocessing.pool import ThreadPool
+from multiprocessing.sharedctypes import Synchronized
+from multiprocessing.synchronize import Condition
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence, TypeVar, overload
 
@@ -32,7 +35,7 @@ from ..external import (
 )
 from ..external._libphykit import Saturation, compute_toverr
 from . import SeqTypes, TreeMethods, TreeOutputFiles, _abc
-from ._utils import CheckAttrs, Timer, guess_seqtype, is_gzip_file
+from ._utils import CheckAttrs, Timer, guess_seqtype, is_gzip_file, progress_daemon
 
 __all__ = ["MFA2Tree", "MFA2TreeList"]
 _C = TypeVar("Callable", bound=Callable[..., Any])
@@ -508,36 +511,23 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             scfl (int): Site concordance factor threshold for IQ-TREE. Must be at least 1000 if set. Defaults to 0 (disabled).
             threads (int, optional): Number of parallel threads. Defaults to 1.
         """
-        if len(self) == 1 or threads == 1:
-            logger.debug("Sequential mode with maximum %s threads.", threads)
-            for mfa2tree in self:
-                _build_helper(
-                    mfa2tree,
-                    method,
-                    None,
-                    model,
-                    bs,
-                    scfl,
-                    threads,
-                )
-        else:
-            logger.debug("Multiprocesses mode: %s jobs are run concurrently.", threads)
-            with ThreadPool(threads) as pool:
-                pool.starmap(
-                    _build_helper,
-                    (
-                        (
-                            mfa2tree,
-                            method,
-                            None,
-                            model,
-                            bs,
-                            scfl,
-                            1,
-                        )
-                        for mfa2tree in self
-                    ),
-                )
+        with Manager() as manager:
+            counter = manager.Value("i", 0)
+            condition = manager.Condition()
+
+            progress = progress_daemon(len(self), counter, condition, step=int(round(len(self) / 10, -1)))
+            progress.start()
+
+            params_per_task = [(mfa2tree, method, None, model, noml, bs, scfl, threads, counter, condition) for mfa2tree in self]
+
+            if len(self) == 1 or threads == 1:
+                logger.debug("Sequential mode with %s threads.", threads)
+                for params in params_per_task:
+                    _build_helper(*params)
+            else:
+                logger.debug("Multiprocesses mode with %s jobs and 1 thread for each.", threads)
+                with ThreadPool(threads) as pool:
+                    pool.starmap(_build_helper, params_per_task)
 
     @Timer.timer
     def compute_toverr(self, *, threads: int = 1) -> None:
@@ -706,6 +696,8 @@ def _build_helper(
     bs: int = 0,
     scfl: int = 0,
     threads: int = 1,
+    counter: Synchronized | None = None,
+    condition: Condition | None = None,
 ) -> Tree:
     """Helper function to run the `build` method on an MFA2Tree instance.
 
@@ -729,6 +721,11 @@ def _build_helper(
         Tree: The resulting phylogenetic tree.
     """
     instance.build(method, output, model, noml=noml, bs=bs, scfl=scfl, threads=threads)
+
+    if counter and condition:
+        with condition:
+            counter.value += 1
+            condition.notify()
 
 
 def _fill_missing_taxon(samples: Sequence[str], msa: MultipleSeqAlignment) -> MultipleSeqAlignment:
