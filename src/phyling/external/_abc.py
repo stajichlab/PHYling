@@ -48,21 +48,15 @@ class BinaryWrapper(ABC):
     _cmd_log: Literal["stdout", "stderr"] = "stdout"
     __slots__ = ("_output", "_cmd", "_result", "done")
 
-    def __init__(
-        self, file: str | Path, output: str | Path | None = None, *args, add_args: list | tuple | None = None, **kwargs
-    ) -> None:
+    def __init__(self, file: str | Path, output: str | Path | None = None, *args, **kwargs) -> None:
         file = Path(file)
         if not file.exists():
             raise FileNotFoundError(f"{file}")
         if output:
             self._output = output
-        add_args = add_args if add_args else []
-        if not isinstance(add_args, (list, tuple)):
-            raise TypeError(f"Argument add_args only accepts list or tuple. Got {type(add_args)}.")
         args, kwargs = self._params_check(*args, **kwargs)
         self._construct_cmd(file, output, *args, **kwargs)
         self._cmd: list[str]
-        self._cmd.extend(add_args)
         self.done = False
 
     def run(self, *, verbose: bool = False) -> None:
@@ -112,11 +106,10 @@ class TreeToolWrapper(BinaryWrapper):
         *args,
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         model: str = "AUTO",
-        add_args: list | tuple | None = None,
         threads: int = 1,
         **kwargs,
     ) -> None:
-        super().__init__(file, output, *args, seqtype=seqtype, model=model, add_args=add_args, threads=threads, **kwargs)
+        super().__init__(file, output, *args, seqtype=seqtype, model=model, threads=threads, **kwargs)
         self._model: str = model
 
     def run(self, *, verbose=False) -> None:
