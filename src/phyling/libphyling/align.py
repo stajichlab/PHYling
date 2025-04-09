@@ -960,11 +960,18 @@ def run_hmmsearch(sample: SampleSeqs, hmms: HMMMarkerSet, *, evalue: float = 1e-
     r = []
     for hits in hmmsearch(hmms, sample, cpus=threads, **cutoffs_args):
         hmm = hits.query.name
-        for hit in hits:
+        reported = []
+        idx = 0
+        while idx < min(2, len(hits)):
+            hit = hits[idx]
             if hit.reported:
-                r.append(SearchHit(hmm.decode(), sample, hit.name.decode()))
-                break  # The first hit in hits is the best hit
-    logger.info("Hmmsearch on %s is done.", sample.name)
+                reported.append(SearchHit(hmm.decode(), sample, hit.name.decode()))
+            idx += 1
+        if len(reported) > 1:
+            continue
+        r.extend(reported)
+
+    logger.debug("Hmmsearch on %s is done.", sample.name)
     return r
 
 
