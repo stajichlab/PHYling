@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 from .. import AVAIL_CPUS, logger
-from ..libphyling import FileExts, TreeMethods, SeqTypes
+from ..libphyling import FileExts, SeqTypes, TreeMethods
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.tree import MFA2TreeList, TreeOutputFiles
 from ._outputprecheck import FilterPrecheck
@@ -56,6 +56,11 @@ def menu(parser: argparse.ArgumentParser) -> None:
         help="Output directory of the treeness.tsv and selected MSAs (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))",
     )
     opt_args.add_argument(
+        "--ml",
+        action="store_true",
+        help="Use maximum-likelihood estimation during tree building",
+    )
+    opt_args.add_argument(
         "-t",
         "--threads",
         type=int,
@@ -74,6 +79,7 @@ def filter(
     output: str | Path,
     top_n_toverr: int,
     *,
+    ml: bool = False,
     threads: int = 1,
     **kwargs,
 ) -> None:
@@ -89,6 +95,7 @@ def filter(
             detail_msg = f"should between 2 to {len(inputs) - 1}"
         raise ValueError(f"Argument top_n_toverr out of range. ({detail_msg})")
 
+    logger.info("Filter start...")
     logger.info("Found %s MSA fasta.", len(inputs))
     # samples, seqtype = _libtree.determine_samples_and_seqtype(input_dir)
 
@@ -106,7 +113,7 @@ def filter(
             "Use %s to generate trees and filter by the rank of their toverr.",
             TreeMethods.FT.method,
         )
-        remained_mfa2treelist.build("ft", "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "JC", threads=threads)
+        remained_mfa2treelist.build("ft", "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "JC", noml=not (ml), threads=threads)
         remained_mfa2treelist.compute_toverr(threads=threads)
         completed_mfa2treelist.extend(remained_mfa2treelist)
         logger.info("Filter done.")
