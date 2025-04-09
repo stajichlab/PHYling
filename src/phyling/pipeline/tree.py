@@ -129,13 +129,9 @@ def tree(
             new_partition_file = modelfinder_runner.result
             partition_file.unlink()
             partition_file.symlink_to(new_partition_file.parent.relative_to(partition_file.parent) / new_partition_file.name)
-            tree, captured_cmd = concat_tree.build(
-                method, output / method, partition_file, bs=bs, scfl=scfl, threads=threads, capture_cmd=True
-            )
+            tree = concat_tree.build(method, output / method, partition_file, bs=bs, scfl=scfl, threads=threads)
         else:
-            tree, captured_cmd = concat_tree.build(
-                method, output / method, "AUTO", bs=bs, scfl=scfl, threads=threads, capture_cmd=True
-            )
+            tree = concat_tree.build(method, output / method, "AUTO", bs=bs, scfl=scfl, threads=threads)
 
     else:
         if bs > 0 or scfl > 0:
@@ -154,9 +150,9 @@ def tree(
         f.write(f"# Final tree is built using {TreeMethods[method.upper()].method} with {strategy} strategy.")
         if concat and partition:
             f.write(" Partition mode is enabled.\n")
-            if captured_cmd:
-                for line in captured_cmd.strip().split("\n"):
-                    f.write(f"# {line}\n")
+            for cmd in concat_tree.cmds:
+                if cmd:
+                    f.write(f"# {cmd}\n")
         else:
             f.write("\n")
         f.write("\n")

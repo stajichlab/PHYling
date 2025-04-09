@@ -101,7 +101,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
     Optionally take a partition file to build tree with partition mode with RAxML-NG and IQ-TREE.
     """
 
-    __slots__ = ("_method", "_tree", "_toverr", "_saturation")
+    __slots__ = ("_method", "_tree", "_cmds", "_toverr", "_saturation")
 
     @overload
     def __init__(self, file: str | Path) -> None: ...
@@ -133,6 +133,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         super().__init__(file, name)
         self._method: str = None
         self._tree: Tree = None
+        self._cmds: list[str] = [""] * 3
         self._toverr: float = None
         self._saturation: float = None
 
@@ -226,11 +227,21 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
     @property
     @_check_attributes("_tree")
+    def cmds(self) -> list[str]:
+        """Return the commands that were used in the build method.
+
+        Raises:
+            AttributeError: If tree haven't built.
+        """
+        return self._cmds
+
+    @property
+    @_check_attributes("_tree")
     def method(self) -> str:
         """Return the method used for tree building.
 
         Raises:
-            AttributeError: If tree haven't calculated.
+            AttributeError: If tree haven't built.
         """
         return self._method
 
@@ -256,19 +267,6 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         """
         return self._saturation
 
-    @overload
-    def build(
-        self,
-        method: Literal["ft", "raxml", "iqtree"],
-        output: str | Path,
-        model: str | Path = "AUTO",
-        *,
-        bs: int = 0,
-        scfl: int = 0,
-        threads: int = 1,
-        capture_cmd: bool = True,
-    ) -> tuple[Tree, str]: ...
-
     @_abc.load_data
     def build(
         self,
@@ -276,10 +274,10 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         output: str | Path | None = None,
         model: str | Path = "AUTO",
         *,
+        noml: bool = False,
         bs: int = 0,
         scfl: int = 0,
         threads: int = 1,
-        capture_cmd: bool = False,
     ) -> Tree:
         """Build a phylogenetic tree using the specified method.
 
@@ -290,20 +288,22 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 - "iqtree": Use IQ-TREE.
             output (str | Path | None, optional): Path to save the resulting tree file. If None, a temporary path is used.
                 Optional for RAxML-NG and IQ-TREE.
-            model (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
-                object's partition_file if None.
+            model (str | Path | None, optional): String of model or path to a partition file for model partitioning. Defaults to
+                "AUTO" that use ModelFinder to identify the best model.
+            noml (bool): Disable Maximum-likelihood estimation to speed up tree building. Only available for FastTree. Defaults to
+                False.
             bs (int): UFBoot value. Defaults to 0 (disabled).
             scfl (int): Site concordance factor threshold for IQ-TREE. Must be at least 1000 if set. Defaults to 0 (disabled).
             threads (int): Number of threads to use. Applicable for RAxML-NG and IQ-TREE. Defaults to 1.
-            capture_cmd (bool): If True, returns the command string used. Defaults to False.
 
         Returns:
-            If capture_cmd is False, returns a Tree object. If capture_cmd is True, returns a tuple of the Tree object and the
-            command string.
+            Tree: A Biopython Tree object.
         """
         method = method.upper()
+        if method not in [m.name for m in TreeMethods]:
+            raise KeyError(f"Invalid method: {method}. Expected one of: {', '.join([m.name.lower() for m in TreeMethods])}")
+
         tempdir = None
-        capture_cmd_msg = ""
         try:
             if not output:
                 tempdir = tempfile.TemporaryDirectory()
@@ -323,10 +323,10 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 if method == TreeMethods.FT.name:
                     raise ValueError(f"{TreeMethods.FT.method} does not support partitioning analysis.")
 
-            if method not in [m.name for m in TreeMethods]:
-                raise KeyError(f"Invalid method: {method}. Expected one of: {', '.join([m.name.lower() for m in TreeMethods])}")
             if method == TreeMethods.FT.name:
-                runner = FastTree(self.file, output / f"{self.file.name}.nw", seqtype=self.seqtype, model=model, threads=threads)
+                runner = FastTree(
+                    self.file, output / f"{self.file.name}.nw", seqtype=self.seqtype, model=model, noml=noml, threads=threads
+                )
             elif method == TreeMethods.RAXML.name:
                 runner = Raxml(self.file, output / self.file.name, seqtype=self.seqtype, model=model, threads=threads)
             elif method == TreeMethods.IQTREE.name:
@@ -337,19 +337,23 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
             tree_file = runner.result
             self._method = method
             model = runner.model
-            capture_cmd_msg += f"Tree building cmd: {runner.cmd}\n"
+            self._cmds[0] = f"Tree building cmd: {runner.cmd}"
 
             if bs > 0:
                 runner = UFBoot(self.file, tree_file, output / "ufboot", model=model, bs=bs, threads=threads)
                 runner.run()
                 tree_file = runner.result
-                capture_cmd_msg += f"UFBoot cmd: {runner.cmd}\n"
+                self._cmds[1] = f"UFBoot cmd: {runner.cmd}"
+            else:
+                self._cmds[1] = ""
 
             if scfl > 0:
                 runner = Concordance(self.file, tree_file, output / "concord", model=model, scfl=scfl, threads=threads)
                 runner.run()
                 tree_file = runner.result
-                capture_cmd_msg += f"Concordance factor cmd: {runner.cmd}\n"
+                self._cmds[2] = f"Concordance factor cmd: {runner.cmd}"
+            else:
+                self._cmds[2] = ""
 
             self._tree = Phylo.read(tree_file, "newick")
             logger.debug("Tree building on %s is done.", self.name)
@@ -358,10 +362,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
             if tempdir:
                 tempdir.cleanup()
 
-        if capture_cmd:
-            return self.tree, capture_cmd_msg
-        else:
-            return self.tree
+        return self.tree
 
     @_check_attributes("_tree")
     def compute_toverr(self) -> None:
@@ -489,10 +490,10 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
         method: Literal["ft", "raxml", "iqtree"],
         model: str | Path = "AUTO",
         *,
+        noml: bool = False,
         bs: int = 0,
         scfl: int = 0,
         threads: int = 1,
-        capture_cmd: bool = False,
     ) -> None:
         """Build trees for each MFA2Tree object.
 
@@ -501,10 +502,11 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                 - "ft": Use FastTree.
                 - "raxml": Use RAxML-NG.
                 - "iqtree": Use IQ-TREE.
+            noml (bool): Disable Maximum-likelihood estimation to speed up tree building. Only available for FastTree. Defaults to
+                False.
             bs (int): UFBoot value. Defaults to 0 (disabled).
             scfl (int): Site concordance factor threshold for IQ-TREE. Must be at least 1000 if set. Defaults to 0 (disabled).
             threads (int, optional): Number of parallel threads. Defaults to 1.
-            capture_cmd (bool, optional): Capture command-line output. Defaults to False.
         """
         if len(self) == 1 or threads == 1:
             logger.debug("Sequential mode with maximum %s threads.", threads)
@@ -517,7 +519,6 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                     bs,
                     scfl,
                     threads,
-                    capture_cmd,
                 )
         else:
             logger.debug("Multiprocesses mode: %s jobs are run concurrently.", threads)
@@ -533,7 +534,6 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                             bs,
                             scfl,
                             1,
-                            capture_cmd,
                         )
                         for mfa2tree in self
                     ),
@@ -702,10 +702,10 @@ def _build_helper(
     method: Literal["ft", "raxml", "iqtree"],
     output: str | Path | None = None,
     model: str | Path = "AUTO",
+    noml: bool = False,
     bs: int = 0,
     scfl: int = 0,
     threads: int = 1,
-    capture_cmd: bool = False,
 ) -> Tree:
     """Helper function to run the `build` method on an MFA2Tree instance.
 
@@ -719,15 +719,16 @@ def _build_helper(
                 Optional for RAxML-NG and IQ-TREE.
         partition_file (str | Path | None, optional): Path to a partition file for model partitioning. Defaults to the
             object's partition_file if None.
+        noml (bool): Disable Maximum-likelihood estimation to speed up tree building. Only available for FastTree. Defaults to
+            False.
         bs (int): UFBoot value. Defaults to 0 (disabled).
         scfl (int): Site concordance factor threshold for IQ-TREE. Must be at least 1000 if set. Defaults to 0 (disabled).
         threads (int): Number of threads to use. Applicable for RAxML-NG and IQ-TREE. Defaults to 1.
-        capture_cmd (bool): If True, returns the command string used. Defaults to False.
 
     Returns:
         Tree: The resulting phylogenetic tree.
     """
-    instance.build(method, output, model, bs=bs, scfl=scfl, threads=threads, capture_cmd=capture_cmd)
+    instance.build(method, output, model, noml=noml, bs=bs, scfl=scfl, threads=threads)
 
 
 def _fill_missing_taxon(samples: Sequence[str], msa: MultipleSeqAlignment) -> MultipleSeqAlignment:
