@@ -11,7 +11,6 @@ import threading
 import time
 from functools import wraps
 from multiprocessing.managers import ValueProxy
-from multiprocessing.sharedctypes import Synchronized
 from multiprocessing.synchronize import Condition
 from pathlib import Path
 from typing import Any, Callable, TypeVar
@@ -121,16 +120,19 @@ def remove_dirs(*dirs: Path) -> None:
             shutil.rmtree(dir)
 
 
-def progress_daemon(total: int, counter: Synchronized[int] | ValueProxy, condition: Condition, *, step: int = 10):
+def progress_daemon(total: int, counter: ValueProxy, condition: Condition, *, step: int = 10):
+    step = step if step > 0 else 1
+
     def reporter():
-        while True:
-            with condition:
-                condition.wait()
-                done = counter.value
-                if total != 0 and (done % step == 0 or done == total):
-                    logger.info("Progress: %d / %d", done, total)
-                if done >= total:
-                    break
+        if total != 0:
+            while True:
+                with condition:
+                    condition.wait()
+                    done = counter.value
+                    if done % step == 0 or done == total:
+                        logger.info("Progress: %d / %d", done, total)
+                    if done >= total:
+                        break
 
     return threading.Thread(target=reporter, daemon=True)
 

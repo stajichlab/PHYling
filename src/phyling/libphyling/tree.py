@@ -515,7 +515,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             counter = manager.Value("i", 0)
             condition = manager.Condition()
 
-            progress = progress_daemon(len(self), counter, condition, step=int(round(len(self) / 10, -1)))
+            progress = progress_daemon(len(self), counter, condition, step=min(max(10, len(self) // 200 * 50), 500))
             progress.start()
 
             params_per_task = [(mfa2tree, method, None, model, noml, bs, scfl, threads, counter, condition) for mfa2tree in self]

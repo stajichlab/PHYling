@@ -392,7 +392,7 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
             counter = manager.Value("i", 0)
             condition = manager.Condition()
 
-            progress = progress_daemon(len(self), counter, condition, step=1)
+            progress = progress_daemon(len(self), counter, condition, step=min(max(1, len(self) // 200 * 10), 50))
             progress.start()
 
             if jobs <= 1:
@@ -898,7 +898,7 @@ class OrthologList(_abc.SeqDataListABC[OrthologSeqs]):
             condition = manager.Condition()
             samples = manager.list(self)
 
-            progress = progress_daemon(len(self), counter, condition, step=int(round(len(self) / 10, -1)))
+            progress = progress_daemon(len(self), counter, condition, step=min(max(10, len(self) // 200 * 50), 500))
             progress.start()
 
             params_per_task = [
