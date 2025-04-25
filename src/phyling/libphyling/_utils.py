@@ -86,11 +86,11 @@ def guess_seqtype(seq: str, ignore_failed=False) -> str | None:
     chars.update(seq)
     if "-" in chars:
         chars.remove("-")
-    if len(chars) <= 4 and chars.issubset(set(NCBICodonTableDNA.nucleotide_alphabet)):
+    if chars.issubset(set(NCBICodonTableDNA.nucleotide_alphabet + "N")):
         return SeqTypes.DNA
-    elif len(chars) <= 4 and chars.issubset(set(NCBICodonTableRNA.nucleotide_alphabet)):
+    elif chars.issubset(set(NCBICodonTableRNA.nucleotide_alphabet + "N")):
         return SeqTypes.RNA
-    elif chars.issubset(set(NCBICodonTable.protein_alphabet)):
+    elif chars.issubset(set(NCBICodonTable.protein_alphabet + "BXZ")):
         return SeqTypes.PEP
     else:
         if ignore_failed:
