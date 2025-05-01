@@ -607,7 +607,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
                 output = Path(output)
             else:
                 raise TypeError("Argument output only accepts str or Path.")
-            mfa2treelist = sorted(self, key=lambda msa: msa._data.get_alignment_length(), reverse=True)
+            mfa2treelist = sorted(self, key=lambda msa: len(msa), reverse=True)
 
             # Get sample names and create an empty MSA holder
             concat_alignments = MultipleSeqAlignment([])
