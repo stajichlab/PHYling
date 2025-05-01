@@ -145,7 +145,7 @@ def tree(
     output.mkdir(exist_ok=True)
     output_tree = output / TreeOutputFiles.TREE_NW
     logger.info("Output tree to %s", output_tree)
-    with open(output_tree, "w") as f:
+    with open(output / "log.txt", "w") as f:
         strategy = "concatenate" if concat else "consensus"
         f.write(f"# Final tree is built using {TreeMethods[method.upper()].method} with {strategy} strategy.")
         if concat and partition:
@@ -156,6 +156,7 @@ def tree(
         else:
             f.write("\n")
         f.write("\n")
+    with open(output_tree, "w") as f:
         Phylo.write(tree, f, "newick")
 
     if figure:
