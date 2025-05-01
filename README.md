@@ -25,7 +25,8 @@ sets][Busco].
 
 ### Flow chart
 
-<img src= "misc/phyling_flowchart.svg" alt="PHYling flowchart" width="800">
+<img src= "misc/phyling_flowchart-light.svg#gh-light-mode-only" alt="PHYling flowchart" width="800">
+<img src= "misc/phyling_flowchart-dark.svg#gh-dark-mode-only" alt="PHYling flowchart" width="800">
 
 ### New features compared to the original version
 
