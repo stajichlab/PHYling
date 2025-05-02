@@ -7,6 +7,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.2.0] - 2025-05-02
+
 ### Changed
 
 - Use JC instead of GTR for faster phylogenetic inference during filtering step.
@@ -25,7 +27,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Fix guess_seqtype failure when having ambiguous codes in input sequences.
+- Fix guess\_seqtype failure when having ambiguous codes in input sequences.
 
 ## [2.1.1] - 2025-03-19
 
@@ -148,7 +150,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Implement back-translation to convert the peptide MSA results to DNA counterpart when receiving coding sequence fasta as inputs.
 
-[Unreleased]: https://github.com/stajichlab/PHYling/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/stajichlab/PHYling/compare/v2.2.0...HEAD
+
+[2.2.0]: https://github.com/stajichlab/PHYling/compare/v2.1.1...v2.2.0
 
 [2.1.1]: https://github.com/stajichlab/PHYling/compare/v2.1.0...v2.1.1
 
