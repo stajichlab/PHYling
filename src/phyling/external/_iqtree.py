@@ -41,7 +41,6 @@ class ModelFinder(BinaryWrapper):
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
         threads: int = 1,
-        add_args: tuple | list | None = None,
     ): ...
 
     @overload
@@ -53,7 +52,6 @@ class ModelFinder(BinaryWrapper):
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
         threads: int = 1,
-        add_args: tuple | list | None = None,
     ): ...
 
     def __init__(
@@ -65,9 +63,8 @@ class ModelFinder(BinaryWrapper):
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
         threads: int = 1,
-        add_args: tuple | list | None = None,
     ):
-        super().__init__(file, output, partition_file, seqtype=seqtype, method=method, add_args=add_args, threads=threads)
+        super().__init__(file, output, partition_file, seqtype=seqtype, method=method, threads=threads)
 
     def _post_run(self) -> None:
         if self._output.suffix == ".nex":  # partitioning analysis
@@ -172,9 +169,8 @@ class Iqtree(TreeToolWrapper):
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         model: str = "AUTO",
         threads: int = 1,
-        add_args: tuple | list | None = None,
     ):
-        super().__init__(file, output, seqtype=seqtype, model=model, add_args=add_args, threads=threads)
+        super().__init__(file, output, seqtype=seqtype, model=model, threads=threads)
 
     def _post_run(self):
         model_file = self._output.with_suffix(".best_model.nex")
@@ -219,9 +215,8 @@ class UFBoot(TreeToolWrapper):
         model: str = "AUTO",
         bs: int = 1000,
         threads: int = 1,
-        add_args: tuple | list | None = None,
     ):
-        super().__init__(file, output, tree, seqtype="AUTO", model=model, add_args=add_args, threads=threads, bs=bs)
+        super().__init__(file, output, tree, seqtype="AUTO", model=model, threads=threads, bs=bs)
 
     def _params_check(self, tree: str | Path, *, seqtype, **kwargs):
         tree = Path(tree)
@@ -267,9 +262,8 @@ class Concordance(TreeToolWrapper):
         model: str = "AUTO",
         scfl: int = 100,
         threads: int = 1,
-        add_args: tuple | list | None = None,
     ):
-        super().__init__(file, output, tree, seqtype="AUTO", model=model, add_args=add_args, threads=threads, scfl=scfl)
+        super().__init__(file, output, tree, seqtype="AUTO", model=model, threads=threads, scfl=scfl)
 
     def _construct_cmd(self, file: Path, output: Path, tree: Path, *, seqtype: None, model: str, scfl: int, threads: int):
         self._cmd = [

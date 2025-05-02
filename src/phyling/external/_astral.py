@@ -24,8 +24,8 @@ class Astral(BinaryWrapper):
     _prog: str = "ASTRAL"
     _cmd_log = "stderr"
 
-    def __init__(self, file: str | Path, output: str | Path, *, add_args: list | tuple | None = None, threads: int = 1):
-        super().__init__(file, output, add_args=add_args, threads=threads)
+    def __init__(self, file: str | Path, output: str | Path, *, threads: int = 1):
+        super().__init__(file, output, threads=threads)
 
     def _construct_cmd(self, file: Path, output: Path, *, threads: int):
         self._cmd = [ASTRAL_BIN, "--output", str(output), "--thread", str(threads), str(file)]

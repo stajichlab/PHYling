@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import re
 import shutil
+import threading
 import time
 from functools import wraps
+from multiprocessing.managers import ValueProxy
+from multiprocessing.synchronize import Condition
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 from zlib import crc32
@@ -83,11 +86,11 @@ def guess_seqtype(seq: str, ignore_failed=False) -> str | None:
     chars.update(seq)
     if "-" in chars:
         chars.remove("-")
-    if len(chars) <= 4 and chars.issubset(set(NCBICodonTableDNA.nucleotide_alphabet)):
+    if chars.issubset(set(NCBICodonTableDNA.nucleotide_alphabet + "N")):
         return SeqTypes.DNA
-    elif len(chars) <= 4 and chars.issubset(set(NCBICodonTableRNA.nucleotide_alphabet)):
+    elif chars.issubset(set(NCBICodonTableRNA.nucleotide_alphabet + "N")):
         return SeqTypes.RNA
-    elif chars.issubset(set(NCBICodonTable.protein_alphabet)):
+    elif chars.issubset(set(NCBICodonTable.protein_alphabet + "BXZ")):
         return SeqTypes.PEP
     else:
         if ignore_failed:
@@ -115,6 +118,23 @@ def remove_dirs(*dirs: Path) -> None:
     if dirs:
         for dir in dirs:
             shutil.rmtree(dir)
+
+
+def progress_daemon(total: int, counter: ValueProxy, condition: Condition, *, step: int = 10):
+    step = step if step > 0 else 1
+
+    def reporter():
+        if total != 0:
+            while True:
+                with condition:
+                    condition.wait()
+                    done = counter.value
+                    if done % step == 0 or done == total:
+                        logger.info("Progress: %d / %d", done, total)
+                    if done >= total:
+                        break
+
+    return threading.Thread(target=reporter, daemon=True)
 
 
 def check_threads(func: _C) -> _C:

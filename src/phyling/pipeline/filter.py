@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 from .. import AVAIL_CPUS, logger
-from ..libphyling import FileExts, TreeMethods, SeqTypes
+from ..libphyling import FileExts, SeqTypes, TreeMethods
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.tree import MFA2TreeList, TreeOutputFiles
 from ._outputprecheck import FilterPrecheck
@@ -56,6 +56,11 @@ def menu(parser: argparse.ArgumentParser) -> None:
         help="Output directory of the treeness.tsv and selected MSAs (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))",
     )
     opt_args.add_argument(
+        "--ml",
+        action="store_true",
+        help="Use maximum-likelihood estimation during tree building",
+    )
+    opt_args.add_argument(
         "-t",
         "--threads",
         type=int,
@@ -74,6 +79,7 @@ def filter(
     output: str | Path,
     top_n_toverr: int,
     *,
+    ml: bool = False,
     threads: int = 1,
     **kwargs,
 ) -> None:
@@ -89,8 +95,8 @@ def filter(
             detail_msg = f"should between 2 to {len(inputs) - 1}"
         raise ValueError(f"Argument top_n_toverr out of range. ({detail_msg})")
 
+    logger.info("Filter start...")
     logger.info("Found %s MSA fasta.", len(inputs))
-    # samples, seqtype = _libtree.determine_samples_and_seqtype(input_dir)
 
     mfa2treelist = MFA2TreeList(data=inputs)
 
@@ -106,18 +112,32 @@ def filter(
             "Use %s to generate trees and filter by the rank of their toverr.",
             TreeMethods.FT.method,
         )
-        remained_mfa2treelist.build("ft", "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "JC", threads=threads)
+        remained_mfa2treelist.build("ft", "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "JC", noml=not (ml), threads=threads)
         remained_mfa2treelist.compute_toverr(threads=threads)
         completed_mfa2treelist.extend(remained_mfa2treelist)
         logger.info("Filter done.")
     completed_mfa2treelist.sort()
+    all_samples = set()
+    for mfa2tree in completed_mfa2treelist:
+        all_samples.update([tip.name for tip in mfa2tree.tree.get_terminals()])
 
     # Generate treeness tsv
     treeness_file = output / TreeOutputFiles.TREENESS
     with open(treeness_file, "w") as f:
         f.write(f"# The MSA fasta which the toverr within top {top_n_toverr} are selected:\n")
+        picked_samples = set()
         for mfa2tree in completed_mfa2treelist[:top_n_toverr]:
             f.write("\t".join([mfa2tree.name, str(mfa2tree.toverr)]) + "\n")
+            picked_samples.update([tip.name for tip in mfa2tree.tree.get_terminals()])
+        missing_samples = all_samples - picked_samples
+        if missing_samples:
+            logger.warning(
+                "The following samples are totally missed in the selected markers: %s", ", ".join(sorted(missing_samples))
+            )
+            logger.warning(
+                "They will not show up in the final tree. "
+                + "If the presence of all samples is important please consider adjusting the argument --top_n_toverr/-n."
+            )
         if completed_mfa2treelist[top_n_toverr:]:
             f.write("# The MSA fasta below are filtered out:\n")
             for mfa2tree in completed_mfa2treelist[top_n_toverr:]:

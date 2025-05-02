@@ -41,7 +41,6 @@ class Raxml(TreeToolWrapper):
         seqtype: Literal["dna", "pep", "AUTO"],
         model: str = "AUTO",
         threads: int = 1,
-        add_args: tuple | list | None = None,
     ):
         """Instantiate RAxML-NG runner.
 
@@ -51,13 +50,12 @@ class Raxml(TreeToolWrapper):
             seqtype (str | Path | None, optional): The sequence type of the file.
             model (int): Model to use for phylogeny inference.
             threads (int): Number of threads to use.
-            add_args (bool): Additional arguments to pass in.
 
         Returns:
             If capture_cmd is False (default), returns a Tree object.
             If capture_cmd is True, returns a tuple of the Tree object and the command string.
         """
-        super().__init__(file, output, seqtype=seqtype, model=model, add_args=add_args, threads=threads)
+        super().__init__(file, output, seqtype=seqtype, model=model, threads=threads)
 
     def _post_run(self):
         model_file = self._output.with_suffix(".bestModel")
