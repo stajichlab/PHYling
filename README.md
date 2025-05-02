@@ -244,10 +244,10 @@ In this case, `Pilobolus umbonatus`, `Rhizopus homothallicus` and `Rhizopus rhiz
 process since they have already been searched in the previous run. The `Actinomucor elegans` is the only sample need to be
 hmmsearched. On the other hand, the `Zygorhynchus heterogamous` will be removed from the current run.
 
-Note that if the input files have changes, they will also being detected by align module and trigger the rerun. If the hmmsearch
-evalue/bitscore cutoff is changed, all the samples will need to rerun the hmmsearch step. Also, the changes on HMM markersets or
-input samples with different seqtype will terminate the align module. (since this case should be considered an entirely different
-analysis)
+Note that if the content or the path of the input files have changes, they will also being detected by align module and trigger
+the rerun. If the hmmsearch evalue/bitscore cutoff is changed, all the samples will need to rerun the hmmsearch step. Also, the
+changes on HMM markersets or input samples with different seqtype will terminate the align module. (since this case should be
+considered an entirely different analysis)
 
 ### Filter the alignment results
 
@@ -269,6 +269,7 @@ Required arguments:
 Options:
   -o directory, --output directory
                         Output directory of the treeness.tsv and selected MSAs (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))
+  --ml                  Use maximum-likelihood estimation during tree building
   -t THREADS, --threads THREADS
                         Threads for filtering (default: 6)
   -v, --verbose         Verbose mode for debug
@@ -281,8 +282,13 @@ For example, we pick only the top 20 markers by specifying `-n/--top_n_toverr`:
 phyling filter -I align -o filtered_align -n 20 -t 16
 ```
 
-FastTree will be used to build a tree for all markers and the toverr will be computed on these trees. A file `treeness.tsv`
+FastTree will be used to build a tree for all markers and the toverr will be computed on these trees. To accelerate the process,
+the maximum-likelihood estimation is turned off by default and users can enable it by specifying `--ml`. A file `treeness.tsv`
 recording the toverr of all markers and the symlinks to the mfa of these selected markers will be output.
+
+Note that some of the samples may be entirely excluded after filtering by markers (e.g., if they lack orthologs in the top n
+selected markers). When missing samples are detected, the filter module will issue a warning. If the presence of all samples is
+important, consider adjusting the `-n/--top_n_toverr` argument accordingly.
 
 ### Build tree from multiple sequence alignment results
 
@@ -380,6 +386,7 @@ steps to achieve the best possible results:
 - Python >= 3.9
 - [Biopython](https://biopython.org/)
 - [pyhmmer], a HMMER3 implementation on python3.
+- [pyfaidx](https://github.com/mdshw5/pyfaidx) for quickly retrieving fasta sequences.
 - [muscle] for alternative method for multiple sequence alignment. (Optional)
 - [ClipKIT] for removing sites that are poor of phylogenetic signal.
 - [PhyKIT] for calculating treeness/RCV to filter uninformative orthologs.
@@ -397,7 +404,7 @@ Go into the PHYling folder. To avoid altering the base environment, it's advisab
 environment. Please use the environment.yml to create environment and install all the required packages.
 
 ```
-cd PHYling-2.0.0
+cd PHYling-2.X.X
 conda env create -f environment.yml
 ```
 

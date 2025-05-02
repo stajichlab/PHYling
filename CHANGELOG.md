@@ -13,6 +13,20 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Swap back to FastTree since VeryFastTree stuck occasionally. [#35](https://github.com/stajichlab/PHYling/issues/35)
 
+- Enable --noml option for FastTree during filtering step by default. Users can use --ml in filter module to enable it.
+
+- The hmmsearch step now report only single hit instead of the top hit of each markers. Therefore the final results will be
+  single-copy orthologs.
+
+- Use the fractional process indicator in search, filter and tree modules to better monitor the run.
+
+- Move the tree construction comments from the top of the newick file to log.txt to avoid newick file loading failure in some of
+  the software.
+
+### Fixed
+
+- Fix guess_seqtype failure when having ambiguous codes in input sequences.
+
 ## [2.1.1] - 2025-03-19
 
 ### Changed
