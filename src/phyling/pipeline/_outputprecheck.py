@@ -144,6 +144,11 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
             searchhits = prev_searchhits
         remove_files(*rm_files)
 
+        # Update file path/name
+        cur_checksums_d = self.samplelist.checksums
+        for checksum, sample in prev_samplelist.checksums.items():
+            sample.file, sample.name = cur_checksums_d[checksum].file, cur_checksums_d[checksum].name
+
         # Determine the samples need rerun
         remained_samples = SampleList()
         for sample in self.samplelist:
@@ -271,6 +276,7 @@ class FilterPrecheck(_abc.OutputPrecheckABC):
             if msa.name in prev_mfa2treelist:
                 prev_msa = prev_mfa2treelist[msa.name]
                 if msa.checksum == prev_msa.checksum and prev_msa.toverr:
+                    prev_msa.file, prev_msa.name = msa.file, msa.name
                     completed_mfa2treelist.append(prev_msa)
                     continue
             remained_mfa2treelist.append(msa)
