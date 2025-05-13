@@ -129,6 +129,7 @@ def align(
 
     logger.info("Loading markerset from %s ...", markerset)
     hmmmarkerset = HMMMarkerSet(markerset, markerset.parent / "scores_cutoff")
+    hmmmarkerset.sort(key=lambda x: x.name)
 
     # Params for precheck
     params = {
