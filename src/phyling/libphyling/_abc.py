@@ -237,13 +237,8 @@ class FileWrapperABC(ABC):
             FileNotFoundError: If the specified file does not exist.
             RuntimeError: If the specified path is not a file.
         """
-        self._file = Path(file).absolute()
-        if not self._file.exists():
-            raise FileNotFoundError(f"{self._file}")
-        if not self._file.is_file():
-            raise RuntimeError(f"{self._file} is not a file.")
-        self._checksum = get_file_checksum(self.file)
-        self._name = name if name else self._file.name
+        self.file = file
+        self.name = name
         self._data = None
 
     def __repr__(self) -> str:
@@ -326,6 +321,17 @@ class FileWrapperABC(ABC):
         """
         return self._file
 
+    @file.setter
+    def file(self, file) -> None:
+        """Set the file path."""
+        file = Path(file).absolute()
+        if not file.exists():
+            raise FileNotFoundError(f"{self._file}")
+        if not file.is_file():
+            raise RuntimeError(f"{self._file} is not a file.")
+        self._file = file
+        self._checksum = get_file_checksum(self._file)
+
     @property
     def name(self) -> str:
         """Get the representative name of the file.
@@ -334,6 +340,11 @@ class FileWrapperABC(ABC):
             str: The name of the file.
         """
         return self._name
+
+    @name.setter
+    def name(self, name) -> None:
+        """Set the representative name of the file."""
+        self._name = name if name else self.file.name
 
     @property
     def checksum(self) -> int:
@@ -509,7 +520,7 @@ class DataListABC(ABC, Generic[_FW]):
         checksums (dict): A dictionary of names and their checksums.
     """
 
-    __slots__ = ("_data", "_names")
+    __slots__ = ("_data",)
     _bound_class: type[_FW]
 
     @overload
@@ -545,7 +556,6 @@ class DataListABC(ABC, Generic[_FW]):
             KeyError: If the item already exists.
         """
         self._data: list[_FW] = []
-        self._names: set[str] = set()
         if data:
             if names:
                 if len(data) != len(names):
@@ -619,7 +629,7 @@ class DataListABC(ABC, Generic[_FW]):
             name = item.name
         else:
             raise TypeError(f"Can only check by str or {FileWrapperABC.__qualname__} and its subclass.")
-        return name in self._names
+        return name in self.names
 
     @overload
     def __getitem__(self, key: str) -> _FW: ...
@@ -678,13 +688,13 @@ class DataListABC(ABC, Generic[_FW]):
         return tuple(d.name for d in self)
 
     @property
-    def checksums(self) -> dict[str, int]:
-        """Returns a dictionary mapping sample names to their CRC checksums.
+    def checksums(self) -> dict[int, FileWrapperABC]:
+        """Returns a dictionary mapping sample CRC checksums to their names.
 
         Returns:
-            dict[str, int]: A dictionary of names and their checksums.
+            dict[str, int]: A dictionary of checksums and their names.
         """
-        return {d.name: d.checksum for d in self}
+        return {d.checksum: d for d in self}
 
     def load(self) -> None:
         """Loads data for all items in the list."""
@@ -708,7 +718,6 @@ class DataListABC(ABC, Generic[_FW]):
         """
         self._before_append_validate(item)
         self._data.append(item)
-        self._names.add(item.name)
 
     def extend(self: _DL, other: _DL) -> None:
         """Extends the list by appending items from another DataListABC object.
@@ -729,7 +738,6 @@ class DataListABC(ABC, Generic[_FW]):
             FileWrapperABC: The removed item.
         """
         item: _FW = self._data.pop(i)
-        self._names.remove(item.name)
         return item
 
     def sort(self, /, *args, **kwargs) -> None:

@@ -132,7 +132,7 @@ def align(
 
     # Params for precheck
     params = {
-        "markerset": tuple(hmmmarkerset.checksums.values()),
+        "markerset": tuple(hmmmarkerset.checksums.keys()),
         "markerset_cutoff": "markerset cutoff" if hmmmarkerset.have_cutoffs else evalue,
         "method": method,
     }
