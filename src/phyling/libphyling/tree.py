@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import tempfile
+import traceback
 from functools import wraps
 from itertools import product
 from multiprocessing import Manager
@@ -525,15 +526,18 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             progress.start()
 
             params_per_task = [(mfa2tree, method, None, model, noml, bs, scfl, threads, counter, condition) for mfa2tree in self]
-
-            if len(self) == 1 or threads == 1:
-                logger.debug("Sequential mode with %s threads.", threads)
-                for params in params_per_task:
-                    _build_helper(*params)
-            else:
-                logger.debug("Multiprocesses mode with %s jobs and 1 thread for each.", threads)
-                with ThreadPool(threads) as pool:
-                    pool.starmap(_build_helper, params_per_task)
+            try:
+                if len(self) == 1 or threads == 1:
+                    logger.debug("Sequential mode with %s threads.", threads)
+                    for params in params_per_task:
+                        _build_helper(*params)
+                else:
+                    logger.debug("Multiprocesses mode with %s jobs and 1 thread for each.", threads)
+                    with ThreadPool(threads) as pool:
+                        pool.starmap(_build_helper, params_per_task)
+            except Exception:
+                logger.error("%s", traceback.format_exc())
+                raise
 
     @Timer.timer
     def compute_toverr(self, *, threads: int = 1) -> None:

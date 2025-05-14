@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import gzip
 import tempfile
+import traceback
 from multiprocessing import Manager, Pool
 from multiprocessing.pool import ThreadPool
 from multiprocessing.sharedctypes import Synchronized
@@ -400,15 +401,22 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
             progress = progress_daemon(len(self), counter, condition, step=min(max(1, len(self) // 200 * 10), 50))
             progress.start()
 
-            if jobs <= 1:
-                logger.debug("Sequential mode with %s threads.", threads)
-                search_res = [_search_helper(sample, hmms, evalue, threads, counter, condition) for sample in self]
-            else:
-                logger.debug("Multiprocesses mode with %s jobs and %s threads for each.", jobs, threads)
-                with ThreadPool(jobs) as pool:
-                    search_res = pool.starmap(
-                        _search_helper, [(sample, hmms, evalue, threads, counter, condition) for sample in self]
-                    )
+            try:
+                if jobs <= 1:
+                    logger.debug("Sequential mode with %s threads.", threads)
+                    search_res = [_search_helper(sample, hmms, evalue, threads, counter, condition) for sample in self]
+                else:
+                    logger.debug("Multiprocesses mode with %s jobs and %s threads for each.", jobs, threads)
+                    with ThreadPool(jobs) as pool:
+                        search_res = pool.starmap(
+                            _search_helper, [(sample, hmms, evalue, threads, counter, condition) for sample in self]
+                        )
+            except ValueError:
+                logger.error("Input sequence reading error. Did you assign the wrong seqtype?\n%s", traceback.format_exc())
+                raise
+            except Exception:
+                logger.error("%s", traceback.format_exc())
+                raise
         search_res = [hit for res in search_res for hit in res]
         return search_res
 
@@ -915,14 +923,17 @@ class OrthologList(_abc.SeqDataListABC[OrthologSeqs]):
             params_per_task = [
                 (sample, method, hmms[sample.name.encode()] if hmms else None, threads, counter, condition) for sample in samples
             ]
-
-            if jobs <= 1:
-                logger.debug("Sequential mode with %s threads.", threads)
-                msa = [_align_helper(*params) for params in params_per_task]
-            else:
-                logger.debug("Multiprocesses mode with %s jobs and %s threads for each.", jobs, threads)
-                with Pool(jobs) as pool:
-                    msa = pool.starmap(_align_helper, params_per_task)
+            try:
+                if jobs <= 1:
+                    logger.debug("Sequential mode with %s threads.", threads)
+                    msa = [_align_helper(*params) for params in params_per_task]
+                else:
+                    logger.debug("Multiprocesses mode with %s jobs and %s threads for each.", jobs, threads)
+                    with Pool(jobs) as pool:
+                        msa = pool.starmap(_align_helper, params_per_task)
+            except Exception:
+                logger.error("%s", traceback.format_exc())
+                raise
         return msa
 
 
