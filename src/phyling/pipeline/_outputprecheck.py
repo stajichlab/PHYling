@@ -144,18 +144,16 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
             searchhits = prev_searchhits
         remove_files(*rm_files)
 
-        # Update file path/name
-        cur_checksums_d = self.samplelist.checksums
-        for checksum, sample in prev_samplelist.checksums.items():
-            sample.file, sample.name = cur_checksums_d[checksum].file, cur_checksums_d[checksum].name
-
         # Determine the samples need rerun
         remained_samples = SampleList()
-        for sample in self.samplelist:
-            if sample in searchhits.samplelist:
-                if sample.checksum == searchhits.samplelist[sample.name].checksum:
-                    continue
-            remained_samples.append(sample)
+        prev_checksums_d = searchhits.samplelist.checksums
+        for checksum, sample in self.samplelist.checksums.items():
+            if checksum in prev_checksums_d:
+                prev_sample = prev_checksums_d[checksum]
+                # Update name and file path using current samples
+                prev_sample.file, prev_sample.name = sample.file, sample.name
+            else:
+                remained_samples.append(sample)
 
         return remained_samples, searchhits
 
