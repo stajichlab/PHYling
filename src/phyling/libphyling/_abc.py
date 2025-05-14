@@ -696,10 +696,10 @@ class DataListABC(ABC, Generic[_FW]):
 
     @property
     def checksums(self) -> dict[int, _FW]:
-        """Returns a dictionary mapping sample CRC checksums to their names.
+        """Returns a dictionary mapping sample CRC checksums to itself.
 
         Returns:
-            dict[int, int]: A dictionary of checksums and their names.
+            dict[int, FileWrapperABC]: A dictionary of checksums and the object itself.
         """
         return {d.checksum: d for d in self}
 
