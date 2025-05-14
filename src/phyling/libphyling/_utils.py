@@ -124,15 +124,18 @@ def progress_daemon(total: int, counter: ValueProxy, condition: Condition, *, st
     step = step if step > 0 else 1
 
     def reporter():
-        if total != 0:
-            while True:
-                with condition:
-                    condition.wait()
-                    done = counter.value
-                    if done % step == 0 or done == total:
-                        logger.info("Progress: %d / %d", done, total)
-                    if done >= total:
-                        break
+        try:
+            if total != 0:
+                while True:
+                    with condition:
+                        condition.wait()
+                        done = counter.value
+                        if done % step == 0 or done == total:
+                            logger.info("Progress: %d / %d", done, total)
+                        if done >= total:
+                            break
+        except Exception as e:
+            logger.error("Exception in progress reporter: %s", e)
 
     return threading.Thread(target=reporter, daemon=True)
 
