@@ -7,6 +7,23 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Add the argument "seqtype" to SeqFileWrapperABC and its subclasses, which allow users to manually assign the seqtype of the
+  inputs if the autodetection failed.
+
+### Changed
+
+- Swap the key-value in DataListABC checksums which allow to look up using input checksums instead of input names.
+
+### Fixed
+
+- The order of the checksums in HMMMarkerSet generated from different platforms (x86 Linux and M series macos) are different.
+
+- Error when estimating the threads during the align module with only 1 job.
+
+- Error message traceback issue when monitoring the progress with progress daemon.
+
 ## [2.2.0] - 2025-05-02
 
 ### Changed

@@ -137,15 +137,16 @@ Required arguments:
 Options:
   -o directory, --output directory
                         Output directory of the alignment results (default: phyling-align-[YYYYMMDD-HHMMSS] (UTC timestamp))
+  --seqtype {dna,pep,AUTO}
+                        Input data sequence type (default: AUTO)
   -E float, --evalue float
-                        Hmmsearch reporting threshold (default: 1e-10, only being used when bitscore cutoff file is not
-                        available)
+                        Hmmsearch reporting threshold (default: 1e-10, only being used when bitscore cutoff file is not available)
   -M {hmmalign,muscle}, --method {hmmalign,muscle}
                         Program used for multiple sequence alignment (default: hmmalign)
   --non_trim            Report non-trimmed alignment results
   -t THREADS, --threads THREADS
                         Threads for hmmsearch and the number of parallelized jobs in MSA step. Better be multiple of 4 if using
-                        more than 8 threads (default: 4)
+                        more than 8 threads (default: 8)
   -v, --verbose         Verbose mode for debug
   -h, --help            show this help message and exit
 ```
@@ -178,7 +179,7 @@ phyling align -i pep/Pilobolus_umbonatus_NRRL_6349.aa.fasta.gz \
 Accelerate by using 16 cpus.
 
 ```
-phyling align -I pep -o align -m HMM/fungi_odb10/hmms -t 16
+phyling align -I pep -o align -m fungi_odb10 -t 16
 ```
 
 #### Multithreading strategy
@@ -201,12 +202,20 @@ sequences for phylogeny analysis.
 Run the align module with cds fasta files under folder `cds`.
 
 ```
-phyling align -I cds -o align_cds -m HMM/fungi_odb10/hmms -t 16
+phyling align -I cds -o align_cds -m fungi_odb10 -t 16
 ```
 
 The CDS inputs will be translated into peptide sequences in the first steps. The translated peptide sequences will be used for
 hmmsearch and the alignment steps. The peptide alignment results will then being back-translated according to the original CDS
 inputs. And the back-translated DNA version alignments will be output.
+
+By default, Phyling automatically detects the sequence type based on the input data. However, this autodetection can occasionally
+fail, particularly with DNA sequences that contain [IUPAC ambiguity codes](https://www.bioinformatics.org/sms/iupac.html). If the
+autodetection is incorrect or fails, users can override it by specifying the sequence type manually using the `--seqtype` option.
+
+```
+phyling align -I cds -o align_cds -m fungi_odb10 -t 16 --seqtype dna
+```
 
 #### Checkpoint for quick rerun
 
@@ -244,10 +253,10 @@ In this case, `Pilobolus umbonatus`, `Rhizopus homothallicus` and `Rhizopus rhiz
 process since they have already been searched in the previous run. The `Actinomucor elegans` is the only sample need to be
 hmmsearched. On the other hand, the `Zygorhynchus heterogamous` will be removed from the current run.
 
-Note that if the content or the path of the input files have changes, they will also being detected by align module and trigger
-the rerun. If the hmmsearch evalue/bitscore cutoff is changed, all the samples will need to rerun the hmmsearch step. Also, the
-changes on HMM markersets or input samples with different seqtype will terminate the align module. (since this case should be
-considered an entirely different analysis)
+Note that if the content of input files have changes, they will also being detected by align module and trigger the rerun. If the
+hmmsearch evalue/bitscore cutoff is changed, all the samples will need to rerun the hmmsearch step. Also, the changes on HMM
+markersets or input samples with different seqtype will terminate the align module. (since this case should be considered an
+entirely different analysis)
 
 ### Filter the alignment results
 
@@ -269,6 +278,8 @@ Required arguments:
 Options:
   -o directory, --output directory
                         Output directory of the treeness.tsv and selected MSAs (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))
+  --seqtype {pep,dna,AUTO}
+                        Input data sequence type (default: AUTO)
   --ml                  Use maximum-likelihood estimation during tree building
   -t THREADS, --threads THREADS
                         Threads for filtering (default: 6)
@@ -290,6 +301,13 @@ Note that some of the samples may be entirely excluded after filtering by marker
 selected markers). When missing samples are detected, the filter module will issue a warning. If the presence of all samples is
 important, consider adjusting the `-n/--top_n_toverr` argument accordingly.
 
+Again, the filter module automatically detects the sequence type of the input data. Try manually assign it by `--seqtype` if it
+fails. (The case below are peptide fasta)
+
+```
+phyling filter -I align -o filtered_align -n 20 -t 16 --seqtype pep
+```
+
 ### Build tree from multiple sequence alignment results
 
 Finally, we can run the tree module, use the multiple sequence alignment results to build a phylogenetic tree. By default, it uses
@@ -308,12 +326,14 @@ Required arguments:
 Options:
   -o directory, --output directory
                         Output directory of the newick treefile (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))
+  --seqtype {pep,dna,AUTO}
+                        Input data sequence type (default: AUTO)
   -M {ft,raxml,iqtree}, --method {ft,raxml,iqtree}
                         Algorithm used for tree building. (default: ft)
                         Available options:
                         ft: FastTree
                         raxml: RAxML-NG
-                        iqtree: IQ-TREE
+                        iqtree: IQTree
   -c, --concat          Concatenated alignment results
   -p, --partition       Partitioned analysis by sequence. Only works when --concat enabled.
   -f, --figure          Generate a matplotlib tree figure
@@ -339,6 +359,12 @@ Use IQ-TREE instead of the default FastTree method for tree building and run wit
 
 ```
 phyling tree -I filtered_align -m iqtree -t 16
+```
+
+Manually assign sequence type.
+
+```
+phyling tree -I filtered_align -m iqtree -t 16 --seqtype pep
 ```
 
 Use matplotlib to generate a tree figure.
