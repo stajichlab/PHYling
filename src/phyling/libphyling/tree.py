@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import tempfile
+import traceback
 from functools import wraps
 from itertools import product
 from multiprocessing import Manager
@@ -107,12 +108,12 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
     __slots__ = ("_method", "_tree", "_cmds", "_toverr", "_saturation")
 
     @overload
-    def __init__(self, file: str | Path) -> None: ...
+    def __init__(self, file: str | Path, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
     @overload
-    def __init__(self, file: str | Path, name: str) -> None: ...
+    def __init__(self, file: str | Path, name: str, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
-    def __init__(self, file: str | Path, name: str | None = None) -> None:
+    def __init__(self, file: str | Path, name: str | None = None, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None:
         """Initialize a MFA2Tree object.
 
         Initialize with a path of a multiple sequence alignment file (in fasta format) and a representative name (optional). The
@@ -122,6 +123,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         Args:
             file (str | Path): The path to the MSA file (plain or bgzipped).
             name (str, optional): A representative name for the sequences. Defaults to None.
+            seqtype (Literal["dna", "pep", "AUTO"]): The sequence type of the file. Defaults to AUTO.
 
         Examples:
             Load a peptide fasta:
@@ -133,7 +135,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
             Load a bgzf compressed cds fasta:
             >>> MFA2Tree("data/101133at4751.cds.mfa", "msa_101133at4751")
         """
-        super().__init__(file, name)
+        super().__init__(file, name, seqtype=seqtype)
         self._method: str = None
         self._tree: Tree = None
         self._cmds: list[str] = [""] * 3
@@ -398,28 +400,33 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
     _bound_class = MFA2Tree
 
     @overload
-    def __init__(self, data: Sequence[str | Path | MFA2Tree]) -> None: ...
+    def __init__(self, data: Sequence[str | Path | MFA2Tree], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
     @overload
-    def __init__(self, data: Sequence[str | Path | MFA2Tree], names: Sequence[str]) -> None: ...
+    def __init__(
+        self, data: Sequence[str | Path | MFA2Tree], names: Sequence[str], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO"
+    ) -> None: ...
 
     def __init__(
         self,
         data: Sequence[str | Path | MFA2Tree] | None = None,
         names: Sequence[str] | None = None,
+        *,
+        seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
     ) -> None:
         """Initialize the MFA2TreeList wrapper object.
 
         Args:
             data (Sequence[str | Path | MFA2Tree] | None, optional): A sequence of data items.
             names (Sequence[str] | None, optional): A sequence of names corresponding to the data items.
+            seqtype (Literal["dna", "pep", "AUTO"]): The sequence type of the file. Defaults to AUTO.
 
         Raises:
             RuntimeError: If names are provided but data is not.
             TypeError: If a data item cannot be converted to a MFA2Tree.
             KeyError: If the item already exists.
         """
-        super().__init__(data, names)
+        super().__init__(data, names, seqtype=seqtype)
 
     @overload
     def __getitem__(self, key: str) -> MFA2Tree: ...
@@ -519,15 +526,18 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             progress.start()
 
             params_per_task = [(mfa2tree, method, None, model, noml, bs, scfl, threads, counter, condition) for mfa2tree in self]
-
-            if len(self) == 1 or threads == 1:
-                logger.debug("Sequential mode with %s threads.", threads)
-                for params in params_per_task:
-                    _build_helper(*params)
-            else:
-                logger.debug("Multiprocesses mode with %s jobs and 1 thread for each.", threads)
-                with ThreadPool(threads) as pool:
-                    pool.starmap(_build_helper, params_per_task)
+            try:
+                if len(self) == 1 or threads == 1:
+                    logger.debug("Sequential mode with %s threads.", threads)
+                    for params in params_per_task:
+                        _build_helper(*params)
+                else:
+                    logger.debug("Multiprocesses mode with %s jobs and 1 thread for each.", threads)
+                    with ThreadPool(threads) as pool:
+                        pool.starmap(_build_helper, params_per_task)
+            except Exception:
+                logger.error("%s", traceback.format_exc())
+                raise
 
     @Timer.timer
     def compute_toverr(self, *, threads: int = 1) -> None:

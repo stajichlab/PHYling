@@ -125,7 +125,7 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
         if prev_samplelist.seqtype != self.samplelist.seqtype:
             raise SystemExit("Seqtype is changed. Aborted.")
         diff_params = {param[0] for param in set(self.params.items()) ^ set(prev_params.items())}
-        diff_inputs = set(prev_samplelist.checksums.items()) ^ set(self.samplelist.checksums.items())
+        diff_inputs = set(prev_samplelist.checksums.keys()) ^ set(self.samplelist.checksums.keys())
         if not (diff_params or diff_inputs) and sum(1 for _ in self.output.iterdir()) > 1:
             raise SystemExit("Files not changed and parameters are identical to the previous run. Aborted.")
         if "markerset" in diff_params:
@@ -146,11 +146,14 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
 
         # Determine the samples need rerun
         remained_samples = SampleList()
-        for sample in self.samplelist:
-            if sample in searchhits.samplelist:
-                if sample.checksum == searchhits.samplelist[sample.name].checksum:
-                    continue
-            remained_samples.append(sample)
+        prev_checksums_d = searchhits.samplelist.checksums
+        for checksum, sample in self.samplelist.checksums.items():
+            if checksum in prev_checksums_d:
+                prev_sample = prev_checksums_d[checksum]
+                # Update name and file path using current samples
+                prev_sample.file, prev_sample.name = sample.file, sample.name
+            else:
+                remained_samples.append(sample)
 
         return remained_samples, searchhits
 
@@ -271,6 +274,7 @@ class FilterPrecheck(_abc.OutputPrecheckABC):
             if msa.name in prev_mfa2treelist:
                 prev_msa = prev_mfa2treelist[msa.name]
                 if msa.checksum == prev_msa.checksum and prev_msa.toverr:
+                    prev_msa.file, prev_msa.name = msa.file, msa.name
                     completed_mfa2treelist.append(prev_msa)
                     continue
             remained_mfa2treelist.append(msa)

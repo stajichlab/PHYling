@@ -67,6 +67,12 @@ def menu(parser: argparse.ArgumentParser) -> None:
         help="Output directory of the alignment results (default: phyling-align-[YYYYMMDD-HHMMSS] (UTC timestamp))",
     )
     opt_args.add_argument(
+        "--seqtype",
+        choices=["dna", "pep", "AUTO"],
+        default="AUTO",
+        help="Input data sequence type",
+    )
+    opt_args.add_argument(
         "-E",
         "--evalue",
         metavar="float",
@@ -106,6 +112,7 @@ def align(
     output: str | Path,
     *,
     markerset: str | Path,
+    seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
     evalue: float = 1e-10,
     method: Literal["hmmalign", "muscle"] = "hmmalign",
     non_trim: bool = False,
@@ -125,14 +132,15 @@ def align(
         )
         for sample in inputs
     ]
-    samples = SampleList(inputs, names)
+    samples = SampleList(inputs, names, seqtype=seqtype)
 
     logger.info("Loading markerset from %s ...", markerset)
     hmmmarkerset = HMMMarkerSet(markerset, markerset.parent / "scores_cutoff")
+    hmmmarkerset.sort(key=lambda x: x.name)
 
     # Params for precheck
     params = {
-        "markerset": tuple(hmmmarkerset.checksums.values()),
+        "markerset": tuple(hmmmarkerset.checksums.keys()),
         "markerset_cutoff": "markerset cutoff" if hmmmarkerset.have_cutoffs else evalue,
         "method": method,
     }
@@ -141,7 +149,7 @@ def align(
     remaining_samples, searchhits = output_precheck.precheck()
     if remaining_samples:
         logger.info("Search start...")
-        threads_per_jobs = threads if threads < 8 else 4
+        threads_per_jobs = threads if (threads < 8 or len(remaining_samples) == 1) else 4
         jobs = threads // threads_per_jobs
         hits = remaining_samples.search(hmmmarkerset, evalue=evalue, jobs=jobs, threads=threads_per_jobs)
         searchhits.update(hits)
