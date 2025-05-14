@@ -59,6 +59,12 @@ def menu(parser: argparse.ArgumentParser) -> None:
         help="Output directory of the newick treefile (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))",
     )
     opt_args.add_argument(
+        "--seqtype",
+        choices=["pep", "dna", "AUTO"],
+        default="AUTO",
+        help="Input data sequence type",
+    )
+    opt_args.add_argument(
         "-M",
         "--method",
         choices=[m.name.lower() for m in TreeMethods],
@@ -99,6 +105,7 @@ def tree(
     output: str | Path,
     *,
     method: Literal["ft", "raxml", "iqtree"] = "ft",
+    seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
     bs: int = 1000,
     scfl: int = 100,
     concat: bool = False,
@@ -110,12 +117,12 @@ def tree(
     """A pipeline that build phylogenetic tree through either FastTree, RAxML-NG or IQ-TREE."""
 
     inputs = _input_check(inputs)
-    mfa2treelist = MFA2TreeList(inputs)
+    mfa2treelist = MFA2TreeList(inputs, seqtype=seqtype)
     partition = _validate_partition(partition, method, concat)
 
     if concat:
         concat_file, partition_file = mfa2treelist.concat(output=output, threads=threads)
-        concat_tree = MFA2Tree(concat_file)
+        concat_tree = MFA2Tree(concat_file, seqtype=seqtype)
         if partition:
             modelfinder_runner = ModelFinder(
                 concat_tree.file,

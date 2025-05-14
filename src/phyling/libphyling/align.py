@@ -183,12 +183,12 @@ class SampleSeqs(_abc.SeqFileWrapperABC):
     """
 
     @overload
-    def __init__(self, file: str | Path) -> None: ...
+    def __init__(self, file: str | Path, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
     @overload
-    def __init__(self, file: str | Path, name: str) -> None: ...
+    def __init__(self, file: str | Path, name: str, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
-    def __init__(self, file: str | Path, name: str = None) -> None:
+    def __init__(self, file: str | Path, name: str = None, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None:
         """Initialize a SampleSeqs object.
 
         Initialize with a path of a fasta file and a representative name (optional). The basename of the file will be used as the
@@ -197,6 +197,7 @@ class SampleSeqs(_abc.SeqFileWrapperABC):
         Args:
             file (str | Path): The path to the fasta file (plain or bgzipped).
             name (str, optional): A representative name for the sequences. Defaults to None.
+            seqtype (Literal["dna", "pep", "AUTO"]): The sequence type of the file. Defaults to AUTO.
 
         Examples:
             Load a peptide fasta:
@@ -208,7 +209,7 @@ class SampleSeqs(_abc.SeqFileWrapperABC):
             Load a bgzf compressed cds fasta:
             >>> SampleSeqs("data/Actinomucor_elegans_CBS_100.09.cds.fa.gz", "Actinomucor_elegans")
         """
-        super().__init__(file, name)
+        super().__init__(file, name, seqtype=seqtype)
 
     @_abc.check_loaded
     def __len__(self) -> int:
@@ -318,21 +319,26 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
     """A wrapper that stores all the SampleSeqs for an analysis."""
 
     @overload
-    def __init__(self, data: Sequence[str | Path | SampleSeqs]) -> None: ...
+    def __init__(self, data: Sequence[str | Path | SampleSeqs], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
     @overload
-    def __init__(self, data: Sequence[str | Path | SampleSeqs], names: Sequence[str]) -> None: ...
+    def __init__(
+        self, data: Sequence[str | Path | SampleSeqs], names: Sequence[str], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO"
+    ) -> None: ...
 
     def __init__(
         self,
         data: Sequence[str | Path | SampleSeqs] | None = None,
         names: Sequence[str] | None = None,
+        *,
+        seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
     ) -> None:
         """Initializes the object and stores data into a list.
 
         Args:
             data (Sequence[str | Path | SampleSeqs] | None, optional): A sequence of data items.
             names (Sequence[str] | None, optional): A sequence of names corresponding to the data items.
+            seqtype (Literal["dna", "pep", "AUTO"]): The sequence type of the file. Defaults to AUTO.
 
         Raises:
             RuntimeError: If names are provided but data is not.
@@ -341,7 +347,7 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
         """
         if not hasattr(self, "_bound_class"):
             self._bound_class = SampleSeqs
-        super().__init__(data, names)
+        super().__init__(data, names, seqtype=seqtype)
 
     @overload
     def __getitem__(self, key: int) -> SampleSeqs: ...
@@ -667,12 +673,12 @@ class OrthologSeqs(SampleSeqs):
     __slots__ = ("_data_cds",)
 
     @overload
-    def __init__(self, file: str | Path) -> None: ...
+    def __init__(self, file: str | Path, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
     @overload
-    def __init__(self, file: str | Path, name: str) -> None: ...
+    def __init__(self, file: str | Path, name: str, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
-    def __init__(self, file: str | Path, name: str | None = None) -> None:
+    def __init__(self, file: str | Path, name: str | None = None, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None:
         """Initialize a OrthologSeqs object.
 
         Initialize with a path of a fasta file and a representative name (optional). The basename of the file will be used as the
@@ -681,6 +687,7 @@ class OrthologSeqs(SampleSeqs):
         Args:
             file (str | Path): The path to the fasta file (plain or bgzipped).
             name (str, optional): A representative name for the sequences. Defaults to None.
+            seqtype (Literal["dna", "pep", "AUTO"]): The sequence type of the file. Defaults to AUTO.
 
         Examples:
             Load a peptide fasta:
@@ -692,7 +699,7 @@ class OrthologSeqs(SampleSeqs):
             Load a bgzf compressed cds fasta:
             >>> OrthologSeqs("data/101133at4751.fa.bgzf", "hmm_101133at4751")
         """
-        super().__init__(file, name)
+        super().__init__(file, name, seqtype=seqtype)
 
     def load(self) -> None:
         """Load the sequences for hmmalign.
@@ -803,21 +810,26 @@ class OrthologList(_abc.SeqDataListABC[OrthologSeqs]):
     """A wrapper that stores all the OrthologSeqs for an analysis."""
 
     @overload
-    def __init__(self, data: Sequence[str | Path | OrthologSeqs]) -> None: ...
+    def __init__(self, data: Sequence[str | Path | OrthologSeqs], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
     @overload
-    def __init__(self, data: Sequence[str | Path | OrthologSeqs], names: Sequence[str]) -> None: ...
+    def __init__(
+        self, data: Sequence[str | Path | OrthologSeqs], names: Sequence[str], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO"
+    ) -> None: ...
 
     def __init__(
         self,
         data: Sequence[str | Path | OrthologSeqs] | None = None,
         names: Sequence[str] | None = None,
+        *,
+        seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
     ) -> None:
         """Initializes the object and stores data into a list.
 
         Args:
             data (Sequence[str | Path | OrthologSeqs] | None, optional): A sequence of data items.
             names (Sequence[str] | None, optional): A sequence of names corresponding to the data items.
+            seqtype (Literal["dna", "pep", "AUTO"]): The sequence type of the file. Defaults to AUTO.
 
         Raises:
             RuntimeError: If names are provided but data is not.
@@ -826,7 +838,7 @@ class OrthologList(_abc.SeqDataListABC[OrthologSeqs]):
         """
         if not hasattr(self, "_bound_class"):
             self._bound_class = OrthologSeqs
-        super().__init__(data, names)
+        super().__init__(data, names, seqtype=seqtype)
 
     @overload
     def __getitem__(self, key: int) -> OrthologSeqs: ...
