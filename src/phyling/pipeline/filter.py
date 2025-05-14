@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import time
 from pathlib import Path
+from typing import Literal
 
 from .. import AVAIL_CPUS, logger
 from ..libphyling import FileExts, SeqTypes, TreeMethods
@@ -56,6 +57,12 @@ def menu(parser: argparse.ArgumentParser) -> None:
         help="Output directory of the treeness.tsv and selected MSAs (default: phyling-tree-[YYYYMMDD-HHMMSS] (UTC timestamp))",
     )
     opt_args.add_argument(
+        "--seqtype",
+        choices=["pep", "dna", "AUTO"],
+        default="AUTO",
+        help="Input data sequence type",
+    )
+    opt_args.add_argument(
         "--ml",
         action="store_true",
         help="Use maximum-likelihood estimation during tree building",
@@ -79,6 +86,7 @@ def filter(
     output: str | Path,
     top_n_toverr: int,
     *,
+    seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
     ml: bool = False,
     threads: int = 1,
     **kwargs,
@@ -98,7 +106,7 @@ def filter(
     logger.info("Filter start...")
     logger.info("Found %s MSA fasta.", len(inputs))
 
-    mfa2treelist = MFA2TreeList(data=inputs)
+    mfa2treelist = MFA2TreeList(data=inputs, seqtype=seqtype)
 
     # Params for precheck
     params = {"top_n_toverr": top_n_toverr}

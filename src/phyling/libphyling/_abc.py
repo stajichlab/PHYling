@@ -7,10 +7,11 @@ import textwrap
 from abc import ABC, abstractmethod
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Generic, Iterator, Sequence, TypeVar, overload
+from typing import Any, Callable, Generic, Iterator, Literal, Sequence, TypeVar, overload
 
 from .. import logger
 from ..exception import SeqtypeError
+from . import SeqTypes
 from ._utils import CheckAttrs, get_file_checksum, remove_dirs
 
 __all__ = ["FileWrapperABC", "SeqFileWrapperABC", "DataListABC", "SeqDataListABC", "OutputPrecheckABC"]
@@ -387,24 +388,32 @@ class SeqFileWrapperABC(FileWrapperABC):
     __slots__ = ("_seqtype",)
 
     @overload
-    def __init__(self, file: str | Path) -> None: ...
+    def __init__(self, file: str | Path, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
     @overload
-    def __init__(self, file: str | Path, name: str) -> None: ...
+    def __init__(self, file: str | Path, name: str, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
-    def __init__(self, file: str | Path, name: str | None = None) -> None:
+    def __init__(self, file: str | Path, name: str | None = None, *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None:
         """Initialize the object with a file path and an representative name.
 
         Args:
             file (str | Path): The path to the file. It will be converted to a `pathlib.Path` object.
             name (str | None, optional): The representative name of the file. Defaults to the file name.
+            seqtype (Literal["dna", "pep", "AUTO"]): The sequence type of the file. Defaults to AUTO.
 
         Raises:
             FileNotFoundError: If the specified file does not exist.
             RuntimeError: If the specified path is not a file.
         """
         super().__init__(file, name)
-        self._seqtype = self._guess_seqtype()
+        if seqtype == "AUTO":
+            self._seqtype = self._guess_seqtype()
+        elif seqtype == SeqTypes.DNA:
+            self._seqtype = SeqTypes.DNA
+        elif seqtype == SeqTypes.PEP:
+            self._seqtype = SeqTypes.PEP
+        else:
+            raise SeqtypeError(f"Invalid seqtype: {seqtype}.")
 
     def __repr__(self) -> str:
         """Return a string representation of the object.
@@ -540,9 +549,7 @@ class DataListABC(ABC, Generic[_FW]):
     """
 
     def __init__(
-        self,
-        data: Sequence[str | Path | _FW] | None = None,
-        names: Sequence[str] | None = None,
+        self, data: Sequence[str | Path | _FW] | None = None, names: Sequence[str] | None = None, *args, **kwargs
     ) -> None:
         """Initializes the object and stores data into a list.
 
@@ -564,7 +571,7 @@ class DataListABC(ABC, Generic[_FW]):
                 names = (None,) * len(data)
             for d, name in zip(data, names):
                 if isinstance(d, (str, Path)):
-                    d = self._bound_class(d, name)
+                    d = self._bound_class(d, name, *args, **kwargs)
                 if not isinstance(d, self._bound_class):
                     raise TypeError(f"{type(d).__qualname__} cannot be converted to {self._bound_class.__qualname__}.")
                 self.append(d)
@@ -688,11 +695,11 @@ class DataListABC(ABC, Generic[_FW]):
         return tuple(d.name for d in self)
 
     @property
-    def checksums(self) -> dict[int, FileWrapperABC]:
+    def checksums(self) -> dict[int, _FW]:
         """Returns a dictionary mapping sample CRC checksums to their names.
 
         Returns:
-            dict[str, int]: A dictionary of checksums and their names.
+            dict[int, int]: A dictionary of checksums and their names.
         """
         return {d.checksum: d for d in self}
 
@@ -785,21 +792,26 @@ class SeqDataListABC(DataListABC[_SFW]):
     def __init__(self) -> None: ...
 
     @overload
-    def __init__(self, data: Sequence[str | Path | _SFW]) -> None: ...
+    def __init__(self, data: Sequence[str | Path | _SFW], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
 
     @overload
-    def __init__(self, data: Sequence[str | Path | _SFW], names: Sequence[str]) -> None: ...
+    def __init__(
+        self, data: Sequence[str | Path | _SFW], names: Sequence[str], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO"
+    ) -> None: ...
 
     def __init__(
         self,
         data: Sequence[str | Path | _SFW] | None = None,
         names: Sequence[str] | None = None,
+        *,
+        seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
     ) -> None:
         """Initializes the object and stores data into a list.
 
         Args:
             data (Sequence[str | Path | SeqFileWrapperABC] | None, optional): A sequence of data items.
             names (Sequence[str] | None, optional): A sequence of names corresponding to the data items.
+            seqtype (Literal["dna", "pep", "AUTO"]): The sequence type of the file. Defaults to AUTO.
 
         Raises:
             RuntimeError: If names are provided but data is not.
@@ -808,7 +820,7 @@ class SeqDataListABC(DataListABC[_SFW]):
             SeqtypeError: If items represent different sequence types.
         """
         self._seqtype: str = "NaN"
-        super().__init__(data, names)
+        super().__init__(data, names, seqtype=seqtype)
         self._data: list[_SFW]
 
     def __repr__(self) -> str:
