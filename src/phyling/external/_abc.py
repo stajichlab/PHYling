@@ -106,10 +106,9 @@ class TreeToolWrapper(BinaryWrapper):
         *args,
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         model: str = "AUTO",
-        threads: int = 1,
         **kwargs,
     ) -> None:
-        super().__init__(file, output, *args, seqtype=seqtype, model=model, threads=threads, **kwargs)
+        super().__init__(file, output, *args, seqtype=seqtype, model=model, **kwargs)
         self._model: str = model
 
     def run(self, *, verbose=False) -> None:
@@ -142,6 +141,5 @@ class TreeToolWrapper(BinaryWrapper):
         *args,
         seqtype: Literal["DNA", "AA"] | None,
         model: str,
-        threads: int,
         **kwargs,
     ) -> None: ...

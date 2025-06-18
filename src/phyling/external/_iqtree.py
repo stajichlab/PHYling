@@ -40,7 +40,9 @@ class ModelFinder(BinaryWrapper):
         *,
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
+        seed: int = -1,
         threads: int = 1,
+        threads_max: int = 1,
     ): ...
 
     @overload
@@ -51,7 +53,9 @@ class ModelFinder(BinaryWrapper):
         *,
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
+        seed: int = -1,
         threads: int = 1,
+        threads_max: int = 1,
     ): ...
 
     def __init__(
@@ -62,9 +66,13 @@ class ModelFinder(BinaryWrapper):
         *,
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
+        seed: int = -1,
         threads: int = 1,
+        threads_max: int = 1,
     ):
-        super().__init__(file, output, partition_file, seqtype=seqtype, method=method, threads=threads)
+        super().__init__(
+            file, output, partition_file, seqtype=seqtype, method=method, seed=seed, threads=threads, threads_max=threads_max
+        )
 
     def _post_run(self) -> None:
         if self._output.suffix == ".nex":  # partitioning analysis
@@ -132,7 +140,9 @@ class ModelFinder(BinaryWrapper):
         *,
         seqtype: Literal["dna", "pep"] | None,
         mset: str | None,
+        seed: int,
         threads: int,
+        threads_max: int,
     ):
         self._cmd = [
             IQTREE_BIN,
@@ -141,14 +151,16 @@ class ModelFinder(BinaryWrapper):
             "--prefix",
             str(output.absolute()),
             "-T",
-            "AUTO",
+            str(threads) if threads >= 1 else "AUTO",
             "--threads-max",
-            str(threads),
+            str(threads_max),
             "-m",
             "TESTONLY",
         ]
         if seqtype:
             self._cmd.extend(["--seqtype", seqtype])
+        if seed >= 0:
+            self._cmd.extend(["--seed", str(seed)])
         if mset:
             self._cmd.extend(["--mset", mset])
         if partition_file:
@@ -168,9 +180,11 @@ class Iqtree(TreeToolWrapper):
         *,
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         model: str = "AUTO",
+        seed: int = -1,
         threads: int = 1,
+        threads_max: int = 1,
     ):
-        super().__init__(file, output, seqtype=seqtype, model=model, threads=threads)
+        super().__init__(file, output, seqtype=seqtype, model=model, seed=seed, threads=threads, threads_max=threads_max)
 
     def _post_run(self):
         model_file = self._output.with_suffix(".best_model.nex")
@@ -181,7 +195,17 @@ class Iqtree(TreeToolWrapper):
             with open(self._output.with_suffix(".iqtree")) as f:
                 self._model = re.search(r"alisim simulated_MSA .* (\-m) \"(.*)\" ", f.read())[2]
 
-    def _construct_cmd(self, file: Path, output: Path, *, seqtype: Literal["DNA", "AA"] | None, model: str, threads: int):
+    def _construct_cmd(
+        self,
+        file: Path,
+        output: Path,
+        *,
+        seqtype: Literal["DNA", "AA"] | None,
+        model: str,
+        seed: int,
+        threads: int,
+        threads_max: int,
+    ):
         self._cmd = [
             IQTREE_BIN,
             "-s",
@@ -189,12 +213,14 @@ class Iqtree(TreeToolWrapper):
             "--prefix",
             str(output.absolute()),
             "-T",
-            "AUTO",
+            str(threads) if threads >= 1 else "AUTO",
             "--threads-max",
-            str(threads),
+            str(threads_max),
         ]
         if seqtype:
             self._cmd.extend(["--seqtype", seqtype])
+        if seed >= 0:
+            self._cmd.extend(["--seed", str(seed)])
         if Path(model).is_file():
             self._cmd.extend(["-p", str(model)])
         else:
@@ -214,9 +240,13 @@ class UFBoot(TreeToolWrapper):
         *,
         model: str = "AUTO",
         bs: int = 1000,
+        seed: int = -1,
         threads: int = 1,
+        threads_max: int = 1,
     ):
-        super().__init__(file, output, tree, seqtype="AUTO", model=model, threads=threads, bs=bs)
+        super().__init__(
+            file, output, tree, seqtype="AUTO", model=model, bs=bs, seed=seed, threads=threads, threads_max=threads_max
+        )
 
     def _params_check(self, tree: str | Path, *, seqtype, **kwargs):
         tree = Path(tree)
@@ -226,7 +256,19 @@ class UFBoot(TreeToolWrapper):
             raise RuntimeError(f"{tree} is not a file.")
         return super()._params_check(tree, seqtype=seqtype, **kwargs)
 
-    def _construct_cmd(self, file: Path, output: Path, tree: Path, *, seqtype: None, model: str, bs: int, threads: int):
+    def _construct_cmd(
+        self,
+        file: Path,
+        output: Path,
+        tree: Path,
+        *,
+        seqtype: None,
+        model: str,
+        seed: int,
+        bs: int,
+        threads: int,
+        threads_max: int,
+    ):
         self._cmd = [
             IQTREE_BIN,
             "-s",
@@ -237,11 +279,14 @@ class UFBoot(TreeToolWrapper):
             str(tree.absolute()),
             "-B",
             str(bs),
+            "-bnni",
             "-T",
-            "AUTO",
+            str(threads) if threads >= 1 else "AUTO",
             "--threads-max",
-            str(threads),
+            str(threads_max),
         ]
+        if seed >= 0:
+            self._cmd.extend(["--seed", str(seed)])
         if Path(model).is_file():
             self._cmd.extend(["-p", str(model)])
         else:
@@ -251,7 +296,7 @@ class UFBoot(TreeToolWrapper):
 
 
 class Concordance(TreeToolWrapper):
-    _prog: str = "Concordance factor calculation"
+    _prog: str = "Branch concordance calculation"
 
     def __init__(
         self,
@@ -261,11 +306,27 @@ class Concordance(TreeToolWrapper):
         *,
         model: str = "AUTO",
         scfl: int = 100,
+        seed: int = -1,
         threads: int = 1,
+        threads_max: int = 1,
     ):
-        super().__init__(file, output, tree, seqtype="AUTO", model=model, threads=threads, scfl=scfl)
+        super().__init__(
+            file, output, tree, seqtype="AUTO", model=model, scfl=scfl, seed=seed, threads=threads, threads_max=threads_max
+        )
 
-    def _construct_cmd(self, file: Path, output: Path, tree: Path, *, seqtype: None, model: str, scfl: int, threads: int):
+    def _construct_cmd(
+        self,
+        file: Path,
+        output: Path,
+        tree: Path,
+        *,
+        seqtype: None,
+        model: str,
+        scfl: int,
+        seed: int,
+        threads: int,
+        threads_max: int,
+    ):
         self._cmd = [
             IQTREE_BIN,
             "-s",
@@ -277,10 +338,12 @@ class Concordance(TreeToolWrapper):
             "--scfl",
             str(scfl),
             "-T",
-            "AUTO",
+            str(threads) if threads >= 1 else "AUTO",
             "--threads-max",
-            str(threads),
+            str(threads_max),
         ]
+        if seed >= 0:
+            self._cmd.extend(["--seed", str(seed)])
         if Path(model).is_file():
             self._cmd.extend(["-p", str(model)])
         else:

@@ -12,7 +12,7 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing.sharedctypes import Synchronized
 from multiprocessing.synchronize import Condition
 from pathlib import Path
-from typing import Any, Callable, Literal, Sequence, TypeVar, overload
+from typing import Any, Callable, Literal, ParamSpec, Sequence, TypeVar, overload
 
 from Bio import AlignIO, Phylo, SeqIO
 from Bio.Align import MultipleSeqAlignment
@@ -40,9 +40,11 @@ from ._utils import CheckAttrs, Timer, guess_seqtype, is_gzip_file, progress_dae
 
 __all__ = ["MFA2Tree", "MFA2TreeList"]
 _C = TypeVar("Callable", bound=Callable[..., Any])
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
-def _check_attributes(*attrs: str):
+def _check_attributes(*attrs: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator to ensure specific attributes are initialized before executing the function.
 
     Args:
@@ -60,7 +62,7 @@ def _check_attributes(*attrs: str):
     if invalid_attrs:
         raise AttributeError(f"Invalid attribute names: {invalid_attrs}")
 
-    def decorator(func: _C):
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @wraps(func)
         def wrapper(instance, *args, **kwargs):
             """Validate variable inequality and execute the wrapped function."""
@@ -138,7 +140,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         super().__init__(file, name, seqtype=seqtype)
         self._method: str = None
         self._tree: Tree = None
-        self._cmds: list[str] = [""] * 3
+        self._cmds: list[str] = []
         self._toverr: float = None
         self._saturation: float = None
 
@@ -272,6 +274,31 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         """
         return self._saturation
 
+    @overload
+    def build(
+        self,
+        method: Literal["ft"],
+        output: str | Path | None = None,
+        model: str | Path = "AUTO",
+        *,
+        noml: bool = False,
+        seed: int = -1,
+    ): ...
+
+    @overload
+    def build(
+        self,
+        method: Literal["raxml", "iqtree"],
+        output: str | Path | None = None,
+        model: str | Path = "AUTO",
+        *,
+        bs: int = 0,
+        scfl: int = 0,
+        seed: int = -1,
+        threads: int = 1,
+        threads_max: int = 1,
+    ): ...
+
     @_abc.load_data
     def build(
         self,
@@ -282,7 +309,10 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
         noml: bool = False,
         bs: int = 0,
         scfl: int = 0,
+        seed: int = -1,
         threads: int = 1,
+        threads_max: int = 1,
+        **kwargs,
     ) -> Tree:
         """Build a phylogenetic tree using the specified method.
 
@@ -310,6 +340,7 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
         tempdir = None
         try:
+            self._cmds.clear()
             if not output:
                 tempdir = tempfile.TemporaryDirectory()
                 output = tempdir.name
@@ -319,10 +350,11 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
             if model == "AUTO":
                 modelfinder = ModelFinder(
-                    self.file, output / "modelfinder", seqtype=self.seqtype, method=method.lower(), threads=threads
+                    self.file, output / "modelfinder", seqtype=self.seqtype, method=method.lower(), seed=seed, threads=threads
                 )
                 modelfinder.run()
                 model = modelfinder.result
+                self._cmds.append(f"ModelFinder cmd: {modelfinder.cmd}")
             elif Path(model).is_file():
                 # Partitioning analysis
                 if method == TreeMethods.FT.name:
@@ -330,35 +362,54 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
             if method == TreeMethods.FT.name:
                 runner = FastTree(
-                    self.file, output / f"{self.file.name}.nw", seqtype=self.seqtype, model=model, noml=noml, threads=threads
+                    self.file,
+                    output / f"{self.file.name}.nw",
+                    seqtype=self.seqtype,
+                    model=model,
+                    noml=noml,
+                    **kwargs,
                 )
             elif method == TreeMethods.RAXML.name:
-                runner = Raxml(self.file, output / self.file.name, seqtype=self.seqtype, model=model, threads=threads)
+                runner = Raxml(
+                    self.file,
+                    output / self.file.name,
+                    seqtype=self.seqtype,
+                    model=model,
+                    seed=seed,
+                    threads=threads,
+                    threads_max=threads_max,
+                    **kwargs,
+                )
             elif method == TreeMethods.IQTREE.name:
-                runner = Iqtree(self.file, output / self.file.name, seqtype=self.seqtype, model=model, threads=threads)
+                runner = Iqtree(
+                    self.file,
+                    output / self.file.name,
+                    seqtype=self.seqtype,
+                    model=model,
+                    seed=seed,
+                    threads=threads,
+                    threads_max=threads_max,
+                    **kwargs,
+                )
             else:
                 raise NotImplementedError(f"Method not implemented yet: {TreeMethods[method].name}.")
             runner.run()
             tree_file = runner.result
             self._method = method
             model = runner.model
-            self._cmds[0] = f"Tree building cmd: {runner.cmd}"
+            self._cmds.append(f"Tree building cmd: {runner.cmd}")
 
             if bs > 0:
-                runner = UFBoot(self.file, tree_file, output / "ufboot", model=model, bs=bs, threads=threads)
+                runner = UFBoot(self.file, tree_file, output / "ufboot", model=model, bs=bs, seed=seed, threads=threads)
                 runner.run()
                 tree_file = runner.result
-                self._cmds[1] = f"UFBoot cmd: {runner.cmd}"
-            else:
-                self._cmds[1] = ""
+                self._cmds.append(f"UFBoot cmd: {runner.cmd}")
 
             if scfl > 0:
-                runner = Concordance(self.file, tree_file, output / "concord", model=model, scfl=scfl, threads=threads)
+                runner = Concordance(self.file, tree_file, output / "concord", model=model, scfl=scfl, seed=seed, threads=threads)
                 runner.run()
                 tree_file = runner.result
-                self._cmds[2] = f"Concordance factor cmd: {runner.cmd}"
-            else:
-                self._cmds[2] = ""
+                self._cmds.append(f"Branch concordance cmd: {runner.cmd}")
 
             self._tree = Phylo.read(tree_file, "newick")
             logger.debug("Tree building on %s is done.", self.name)
@@ -398,6 +449,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
     """
 
     _bound_class = MFA2Tree
+    __slots__ = ("_cmds",)
 
     @overload
     def __init__(self, data: Sequence[str | Path | MFA2Tree], *, seqtype: Literal["dna", "pep", "AUTO"] = "AUTO") -> None: ...
@@ -426,6 +478,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             TypeError: If a data item cannot be converted to a MFA2Tree.
             KeyError: If the item already exists.
         """
+        self._cmds: list[str] = []
         super().__init__(data, names, seqtype=seqtype)
 
     @overload
@@ -456,6 +509,11 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             list[Tree]: A list of Biopython Tree objects.
         """
         return [mfa.tree for mfa in self]
+
+    @property
+    def cmds(self) -> list[str]:
+        """Return the commands that were used in the build method."""
+        return [cmd for mfa2tree in self for cmd in mfa2tree.cmds] + self._cmds
 
     @property
     def method(self) -> str:
@@ -577,7 +635,7 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
 
     @Timer.timer
     @_check_single_file
-    def get_consensus_tree(self, *, threads: int = 1) -> Tree:
+    def get_consensus_tree(self, *, seed: int = -1, threads: int = 1) -> Tree:
         """Compute a consensus tree using ASTRAL.
 
         Returns:
@@ -588,10 +646,12 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             RuntimeError: If ASTRAL fails.
         """
         with tempfile.NamedTemporaryFile() as f_in, tempfile.NamedTemporaryFile() as f_out:
+            self._cmds.clear()
             Phylo.write([mfa2tree.tree for mfa2tree in self], f_in.name, "newick")
             f_in.seek(0)
-            runner = Astral(f_in.name, f_out.name, threads=threads)
+            runner = Astral(f_in.name, f_out.name, seed=seed, threads=threads)
             runner.run()
+            self._cmds.append(runner.cmd)
             return Phylo.read(runner.result, "newick")
 
     @Timer.timer

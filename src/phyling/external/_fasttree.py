@@ -38,10 +38,10 @@ class FastTree(TreeToolWrapper):
         *,
         seqtype: Literal["dna", "pep"],
         model: str = "AUTO",
+        seed: int = -1,
         noml: bool = False,
-        threads: int = 1,
     ):
-        super().__init__(file, output, seqtype=seqtype, model=model, threads=threads, noml=noml)
+        super().__init__(file, output, seqtype=seqtype, model=model, seed=seed, noml=noml)
 
     def _construct_cmd(
         self,
@@ -50,8 +50,8 @@ class FastTree(TreeToolWrapper):
         *,
         seqtype: Literal["DNA", "AA"],
         model: str = "AUTO",
-        noml: bool = False,
-        threads: int = 1,
+        noml: bool,
+        seed: int,
     ):
         self._cmd = [
             FASTTREE_BIN,
@@ -78,3 +78,6 @@ class FastTree(TreeToolWrapper):
 
         if noml:
             self._cmd.insert(-1, "-noml")
+
+        if seed >= 0:
+            self._cmd[-1:-1] = ["-seed", str(seed)]

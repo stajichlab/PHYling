@@ -40,7 +40,9 @@ class Raxml(TreeToolWrapper):
         *,
         seqtype: Literal["dna", "pep", "AUTO"],
         model: str = "AUTO",
+        seed: int = -1,
         threads: int = 1,
+        threads_max: int = 1,
     ):
         """Instantiate RAxML-NG runner.
 
@@ -55,7 +57,7 @@ class Raxml(TreeToolWrapper):
             If capture_cmd is False (default), returns a Tree object.
             If capture_cmd is True, returns a tuple of the Tree object and the command string.
         """
-        super().__init__(file, output, seqtype=seqtype, model=model, threads=threads)
+        super().__init__(file, output, seqtype=seqtype, model=model, seed=seed, threads=threads, threads_max=threads_max)
 
     def _post_run(self):
         model_file = self._output.with_suffix(".bestModel")
@@ -78,8 +80,10 @@ class Raxml(TreeToolWrapper):
         output: Path,
         *,
         seqtype: Literal["DNA", "AA"] | None,
-        model: str = "AUTO",
-        threads: int = 1,
+        model: str,
+        seed: int,
+        threads: int,
+        threads_max: int,
     ):
         self._cmd = [
             RAXML_BIN,
@@ -90,9 +94,11 @@ class Raxml(TreeToolWrapper):
             "--model",
             str(model),
             "--threads",
-            f"auto{{{threads}}}",
+            str(threads) if threads >= 1 else f"auto{{{threads_max}}}",
         ]
         if seqtype:
             self._cmd.extend(["--data-type", seqtype])
+        if seed >= 0:
+            self._cmd.extend(["--seed", str(seed)])
 
         self._output = Path(f"{output}.raxml.bestTree")

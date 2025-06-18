@@ -87,6 +87,12 @@ def menu(parser: argparse.ArgumentParser) -> None:
     )
     opt_args.add_argument("-f", "--figure", action="store_true", help="Generate a matplotlib tree figure")
     opt_args.add_argument(
+        "--seed",
+        type=int,
+        default=-1,
+        help="Seed number for stochastic elements during inferences. (default: %(default)s to generate randomly)",
+    )
+    opt_args.add_argument(
         "-t",
         "--threads",
         type=int,
@@ -111,6 +117,7 @@ def tree(
     concat: bool = False,
     partition: bool = False,
     figure: bool = False,
+    seed: int = -1,
     threads: int = 1,
     **kwargs,
 ) -> None:
@@ -123,6 +130,12 @@ def tree(
     if concat:
         concat_file, partition_file = mfa2treelist.concat(output=output, threads=threads)
         concat_tree = MFA2Tree(concat_file, seqtype=seqtype)
+        if len(mfa2treelist) > 100 and len(concat_tree) > 10000:
+            threads = min(threads, len(mfa2treelist))
+            threads_max = threads
+        else:
+            threads_max = threads
+            threads = -1  # Auto detect optimal threads
         if partition:
             modelfinder_runner = ModelFinder(
                 concat_tree.file,
@@ -130,21 +143,29 @@ def tree(
                 partition_file,
                 seqtype=concat_tree.seqtype,
                 method=method,
+                seed=seed,
                 threads=threads,
+                threads_max=threads_max,
             )
             modelfinder_runner.run()
             new_partition_file = modelfinder_runner.result
             partition_file.unlink()
             partition_file.symlink_to(new_partition_file.parent.relative_to(partition_file.parent) / new_partition_file.name)
-            tree = concat_tree.build(method, output / method, partition_file, bs=bs, scfl=scfl, threads=threads)
+            tree = concat_tree.build(
+                method, output / method, partition_file, bs=bs, scfl=scfl, seed=seed, threads=threads, threads_max=threads_max
+            )
         else:
-            tree = concat_tree.build(method, output / method, "AUTO", bs=bs, scfl=scfl, threads=threads)
+            tree = concat_tree.build(
+                method, output / method, "AUTO", bs=bs, scfl=scfl, seed=seed, threads=threads, threads_max=threads_max
+            )
+            cmds = concat_tree.cmds
 
     else:
         if bs > 0 or scfl > 0:
             logger.warning("Bootstrap and concordance factor calculation are disabled when using consensus mode.")
         mfa2treelist.build(method, "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "GTR", bs=0, scfl=0, threads=threads)
-        tree = mfa2treelist.get_consensus_tree()
+        tree = mfa2treelist.get_consensus_tree(seed=seed)
+        cmds = mfa2treelist.cmds
 
     """Output the tree in newick format and figure."""
     Phylo.draw_ascii(tree)
@@ -155,14 +176,13 @@ def tree(
     with open(output / "log.txt", "w") as f:
         strategy = "concatenate" if concat else "consensus"
         f.write(f"# Final tree is built using {TreeMethods[method.upper()].method} with {strategy} strategy.")
-        if concat and partition:
-            f.write(" Partition mode is enabled.\n")
-            for cmd in concat_tree.cmds:
-                if cmd:
-                    f.write(f"# {cmd}\n")
+        if concat:
+            if partition:
+                f.write(" Partition mode is enabled.")
         else:
-            f.write("\n")
-        f.write("\n")
+            f.write("\n\n")
+        for cmd in cmds:
+            f.write(f"# {cmd}\n")
     with open(output_tree, "w") as f:
         Phylo.write(tree, f, "newick")
 

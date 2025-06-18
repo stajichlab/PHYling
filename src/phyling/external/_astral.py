@@ -24,8 +24,11 @@ class Astral(BinaryWrapper):
     _prog: str = "ASTRAL"
     _cmd_log = "stderr"
 
-    def __init__(self, file: str | Path, output: str | Path, *, threads: int = 1):
-        super().__init__(file, output, threads=threads)
+    def __init__(self, file: str | Path, output: str | Path, *, seed: int = -1, threads: int = 1):
+        super().__init__(file, output, seed=seed, threads=threads)
 
-    def _construct_cmd(self, file: Path, output: Path, *, threads: int):
+    def _construct_cmd(self, file: Path, output: Path, *, seed: int, threads: int):
         self._cmd = [ASTRAL_BIN, "--output", str(output), "--thread", str(threads), str(file)]
+
+        if seed >= 0:
+            self._cmd[-1:-1] = ["--seed", str(seed)]
