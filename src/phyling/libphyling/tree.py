@@ -12,7 +12,7 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing.sharedctypes import Synchronized
 from multiprocessing.synchronize import Condition
 from pathlib import Path
-from typing import Any, Callable, Literal, ParamSpec, Sequence, TypeVar, overload
+from typing import Callable, Literal, Sequence, TypeVar, overload
 
 from Bio import AlignIO, Phylo, SeqIO
 from Bio.Align import MultipleSeqAlignment
@@ -39,12 +39,10 @@ from . import SeqTypes, TreeMethods, TreeOutputFiles, _abc
 from ._utils import CheckAttrs, Timer, guess_seqtype, is_gzip_file, progress_daemon
 
 __all__ = ["MFA2Tree", "MFA2TreeList"]
-_C = TypeVar("Callable", bound=Callable[..., Any])
-P = ParamSpec("P")
-R = TypeVar("R")
+_R = TypeVar("R")
 
 
-def _check_attributes(*attrs: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def _check_attributes(*attrs: str) -> Callable[[Callable[..., _R]], Callable[..., _R]]:
     """Decorator to ensure specific attributes are initialized before executing the function.
 
     Args:
@@ -62,7 +60,7 @@ def _check_attributes(*attrs: str) -> Callable[[Callable[P, R]], Callable[P, R]]
     if invalid_attrs:
         raise AttributeError(f"Invalid attribute names: {invalid_attrs}")
 
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+    def decorator(func: Callable[..., _R]) -> Callable[..., _R]:
         @wraps(func)
         def wrapper(instance, *args, **kwargs):
             """Validate variable inequality and execute the wrapped function."""
@@ -76,7 +74,7 @@ def _check_attributes(*attrs: str) -> Callable[[Callable[P, R]], Callable[P, R]]
     return decorator
 
 
-def _check_single_file(func: _C) -> _C:
+def _check_single_file(func: Callable[..., _R]) -> Callable[..., _R]:
     """Decorator to ensure that the method is only called on a list with multiple MFA files.
 
     This decorator checks if the `MFA2TreeList` instance contains more than one MFA file. If there is only one file, it raises a
