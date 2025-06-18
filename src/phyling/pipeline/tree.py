@@ -158,7 +158,7 @@ def tree(
             tree = concat_tree.build(
                 method, output / method, "AUTO", bs=bs, scfl=scfl, seed=seed, threads=threads, threads_max=threads_max
             )
-            cmds = concat_tree.cmds
+        cmds = concat_tree.cmds
 
     else:
         if bs > 0 or scfl > 0:
