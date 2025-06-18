@@ -170,7 +170,6 @@ def tree(
         cmds = mfa2treelist.cmds
 
     """Output the tree in newick format and figure."""
-    Phylo.draw_ascii(tree)
     output = Path(output)
     output.mkdir(exist_ok=True)
     output_tree = output / TreeOutputFiles.TREE_NW
