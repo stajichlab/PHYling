@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+from .. import AVAIL_CPUS
 from ..libphyling import TreeMethods
 from ..libphyling._utils import check_binary
 from ._abc import TreeToolWrapper
@@ -42,7 +43,7 @@ class Raxml(TreeToolWrapper):
         model: str = "AUTO",
         seed: int = -1,
         threads: int = 1,
-        threads_max: int = 1,
+        threads_max: int = AVAIL_CPUS,
     ):
         """Instantiate RAxML-NG runner.
 

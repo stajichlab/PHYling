@@ -348,7 +348,13 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
 
             if model == "AUTO":
                 modelfinder = ModelFinder(
-                    self.file, output / "modelfinder", seqtype=self.seqtype, method=method.lower(), seed=seed, threads=threads
+                    self.file,
+                    output / "modelfinder",
+                    seqtype=self.seqtype,
+                    method=method.lower(),
+                    seed=seed,
+                    threads=threads,
+                    threads_max=threads_max,
                 )
                 modelfinder.run()
                 model = modelfinder.result

@@ -130,12 +130,14 @@ def tree(
     if concat:
         concat_file, partition_file = mfa2treelist.concat(output=output, threads=threads)
         concat_tree = MFA2Tree(concat_file, seqtype=seqtype)
-        if len(mfa2treelist) > 100 and len(concat_tree) > 10000:
-            threads = min(threads, len(mfa2treelist))
-            threads_max = threads
+        concat_tree.load()
+        threads_max = threads
+        if len(concat_tree._data) > 100 and len(concat_tree) > 10000:
+            threads = min(min(threads, len(concat_tree._data)), 32)  # Use at most 32 cpus
         else:
-            threads_max = threads
             threads = -1  # Auto detect optimal threads
+        concat_tree.unload()
+
         if partition:
             modelfinder_runner = ModelFinder(
                 concat_tree.file,

@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 from typing import Literal, overload
 
+from .. import AVAIL_CPUS
 from ..libphyling import SeqTypes, TreeMethods
 from ..libphyling._utils import check_binary
 from ._abc import BinaryWrapper, TreeToolWrapper
@@ -42,7 +43,7 @@ class ModelFinder(BinaryWrapper):
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
         seed: int = -1,
         threads: int = 1,
-        threads_max: int = 1,
+        threads_max: int = AVAIL_CPUS,
     ): ...
 
     @overload
@@ -55,7 +56,7 @@ class ModelFinder(BinaryWrapper):
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
         seed: int = -1,
         threads: int = 1,
-        threads_max: int = 1,
+        threads_max: int = AVAIL_CPUS,
     ): ...
 
     def __init__(
@@ -67,8 +68,8 @@ class ModelFinder(BinaryWrapper):
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         method: Literal["ft", "raxml", "iqtree"] = "iqtree",
         seed: int = -1,
-        threads: int = 1,
-        threads_max: int = 1,
+        threads: int = -1,
+        threads_max: int = AVAIL_CPUS,
     ):
         super().__init__(
             file, output, partition_file, seqtype=seqtype, method=method, seed=seed, threads=threads, threads_max=threads_max
@@ -181,8 +182,8 @@ class Iqtree(TreeToolWrapper):
         seqtype: Literal["dna", "pep", "AUTO"] = "AUTO",
         model: str = "AUTO",
         seed: int = -1,
-        threads: int = 1,
-        threads_max: int = 1,
+        threads: int = -1,
+        threads_max: int = AVAIL_CPUS,
     ):
         super().__init__(file, output, seqtype=seqtype, model=model, seed=seed, threads=threads, threads_max=threads_max)
 
@@ -241,8 +242,8 @@ class UFBoot(TreeToolWrapper):
         model: str = "AUTO",
         bs: int = 1000,
         seed: int = -1,
-        threads: int = 1,
-        threads_max: int = 1,
+        threads: int = -1,
+        threads_max: int = AVAIL_CPUS,
     ):
         super().__init__(
             file, output, tree, seqtype="AUTO", model=model, bs=bs, seed=seed, threads=threads, threads_max=threads_max
@@ -307,8 +308,8 @@ class Concordance(TreeToolWrapper):
         model: str = "AUTO",
         scfl: int = 100,
         seed: int = -1,
-        threads: int = 1,
-        threads_max: int = 1,
+        threads: int = -1,
+        threads_max: int = AVAIL_CPUS,
     ):
         super().__init__(
             file, output, tree, seqtype="AUTO", model=model, scfl=scfl, seed=seed, threads=threads, threads_max=threads_max
