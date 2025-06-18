@@ -356,9 +356,12 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                     threads=threads,
                     threads_max=threads_max,
                 )
+                logger.info("Find the best-fit model...")
                 modelfinder.run()
                 model = modelfinder.result
                 self._cmds.append(f"ModelFinder cmd: {modelfinder.cmd}")
+                logger.info(f"Best-fit model: {model}")
+                logger.info("Done.")
             elif Path(model).is_file():
                 # Partitioning analysis
                 if method == TreeMethods.FT.name:
@@ -397,23 +400,30 @@ class MFA2Tree(_abc.SeqFileWrapperABC):
                 )
             else:
                 raise NotImplementedError(f"Method not implemented yet: {TreeMethods[method].name}.")
+
+            logger.info(f"Build tree by {runner._prog}...")
             runner.run()
             tree_file = runner.result
             self._method = method
             model = runner.model
             self._cmds.append(f"Tree building cmd: {runner.cmd}")
+            logger.info("Done.")
 
             if bs > 0:
                 runner = UFBoot(self.file, tree_file, output / "ufboot", model=model, bs=bs, seed=seed, threads=threads)
+                logger.info("Bootstrapping...")
                 runner.run()
                 tree_file = runner.result
                 self._cmds.append(f"UFBoot cmd: {runner.cmd}")
+                logger.info("Done.")
 
             if scfl > 0:
                 runner = Concordance(self.file, tree_file, output / "concord", model=model, scfl=scfl, seed=seed, threads=threads)
+                logger.info("Calculate site concordance factor...")
                 runner.run()
                 tree_file = runner.result
                 self._cmds.append(f"Branch concordance cmd: {runner.cmd}")
+                logger.info("Done.")
 
             self._tree = Phylo.read(tree_file, "newick")
             logger.debug("Tree building on %s is done.", self.name)
