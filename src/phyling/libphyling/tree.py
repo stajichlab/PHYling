@@ -21,7 +21,7 @@ from Bio.Seq import Seq
 from Bio.SeqIO import FastaIO
 from Bio.SeqRecord import SeqRecord
 
-from .. import logger
+from . import logger
 from ..external import (
     Astral,
     Concordance,
@@ -599,6 +599,8 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
 
             params_per_task = [(mfa2tree, method, None, model, noml, bs, scfl, threads, counter, condition) for mfa2tree in self]
             try:
+                if logger.parent.getEffectiveLevel() > 10:
+                    logger.setLevel("WARNING")
                 if len(self) == 1 or threads == 1:
                     logger.debug("Sequential mode with %s threads.", threads)
                     for params in params_per_task:
@@ -610,6 +612,8 @@ class MFA2TreeList(_abc.SeqDataListABC[MFA2Tree]):
             except Exception:
                 logger.error("%s", traceback.format_exc())
                 raise
+            finally:
+                logger.setLevel(logger.parent.getEffectiveLevel())
 
     @Timer.timer
     def compute_toverr(self, *, threads: int = 1) -> None:

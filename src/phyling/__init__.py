@@ -12,7 +12,7 @@ from importlib.metadata import metadata
 from pathlib import Path
 
 # Create logger for the package
-logger = logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s", level="INFO")
+logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s", level="INFO")
 logger = logging.getLogger(__name__)
 
 

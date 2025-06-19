@@ -23,11 +23,12 @@ from Bio import SeqIO
 
 from ..external._libclipkit import trim_gaps
 
-from .. import AVAIL_CPUS, CFG_DIRS, logger
+from .. import AVAIL_CPUS, CFG_DIRS
 from ..exception import EmptyWarning
 from ..libphyling import ALIGN_METHODS, FileExts, SeqTypes
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.align import HMMMarkerSet, OrthologList, SampleList
+from . import logger
 from ._outputprecheck import AlignPrecheck
 
 
@@ -139,11 +140,12 @@ def align(
     logger.info("Loading markerset from %s ...", markerset)
     hmmmarkerset = HMMMarkerSet(markerset, markerset.parent / "scores_cutoff")
     hmmmarkerset.sort(key=lambda x: x.name)
+    logger.debug("Load markerset done.")
 
     # Params for precheck
     params = {
         "markerset": tuple(hmmmarkerset.checksums.keys()),
-        "markerset_cutoff": "markerset cutoff" if hmmmarkerset.have_cutoffs else evalue,
+        "markerset_cutoff": "markerset cutoff" if hmmmarkerset.have_cutoffs() else evalue,
         "method": method,
     }
     # Precheck and load checkpoint if it exist
@@ -167,6 +169,7 @@ def align(
             "All orthologs were gone after filtering. Please confirm whether the inputs have sufficient "
             "number of sample or if the correct HMM markers were being used."
         )
+    logger.debug("Filter hits done.")
 
     searchhits.load()
     orthologs = OrthologList(searchhits.orthologs.values(), searchhits.orthologs.keys(), seqtype=samples.seqtype)
@@ -176,6 +179,7 @@ def align(
     logger.info("Align done.")
 
     if not non_trim:
+        logger.info("Trimming start...")
         if threads == 1:
             msa_list = [trim_gaps(msa) for msa in msa_list]
         else:

@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from abc import ABC, abstractmethod
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Literal, TypeVar
 
-from .. import logger
 from ..libphyling import SeqTypes
 from ..libphyling._utils import CheckAttrs
 
 _C = TypeVar("Callable", bound=Callable[..., Any])
+
+logger = logging.getLogger(__package__)
 
 
 def _check_attributes(*attrs: str):
@@ -59,15 +61,14 @@ class BinaryWrapper(ABC):
         self._cmd: list[str]
         self.done = False
 
-    def run(self, *, verbose: bool = False) -> None:
+    def run(self) -> None:
         """Execute the command."""
         if self._output:
             Path(self._output).parent.mkdir(parents=True, exist_ok=True)
-        logger.debug(self.cmd)
+        logger.info(self.cmd)
         try:
             result = subprocess.run(self._cmd, capture_output=True, check=True, text=True)
-            if verbose:
-                logger.debug("%s", getattr(result, self._cmd_log))
+            logger.debug("%s", getattr(result, self._cmd_log))
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"{self._prog} failed with cmd: {self.cmd}\n{e.stderr}")
         if self._output:
@@ -110,14 +111,6 @@ class TreeToolWrapper(BinaryWrapper):
     ) -> None:
         super().__init__(file, output, *args, seqtype=seqtype, model=model, **kwargs)
         self._model: str = model
-
-    def run(self, *, verbose=False) -> None:
-        """Execute the phylogeny inference command.
-
-        Returns:
-            Path: The path of the newick tree file.
-        """
-        super().run(verbose=verbose)
 
     @property
     @_check_attributes("done")

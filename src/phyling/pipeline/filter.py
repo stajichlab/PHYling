@@ -12,10 +12,11 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from .. import AVAIL_CPUS, logger
+from .. import AVAIL_CPUS
 from ..libphyling import FileExts, SeqTypes, TreeMethods
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.tree import MFA2TreeList, TreeOutputFiles
+from . import logger
 from ._outputprecheck import FilterPrecheck
 
 
@@ -103,7 +104,6 @@ def filter(
             detail_msg = f"should between 2 to {len(inputs) - 1}"
         raise ValueError(f"Argument top_n_toverr out of range. ({detail_msg})")
 
-    logger.info("Filter start...")
     logger.info("Found %s MSA fasta.", len(inputs))
 
     mfa2treelist = MFA2TreeList(data=inputs, seqtype=seqtype)
@@ -116,6 +116,7 @@ def filter(
     remained_mfa2treelist, completed_mfa2treelist = output_precheck.precheck()
 
     if remained_mfa2treelist:
+        logger.info("Filter start...")
         logger.info(
             "Use %s to generate trees and filter by the rank of their toverr.",
             TreeMethods.FT.method,
@@ -156,8 +157,11 @@ def filter(
     files = [mfa2tree.file for mfa2tree in completed_mfa2treelist[:top_n_toverr]]
     for file in files:
         (output / file.name).symlink_to(file.absolute())
+    logger.debug("Create symlinks done.")
 
     output_precheck.save_checkpoint(completed_mfa2treelist)
+
+    logger.info("Done.")
 
 
 def _input_check(inputs: str | Path | list) -> tuple[Path]:

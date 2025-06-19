@@ -21,11 +21,12 @@ from typing import Literal
 import matplotlib.pyplot as plt
 from Bio import Phylo
 
-from .. import AVAIL_CPUS, logger
+from .. import AVAIL_CPUS
 from ..external import ModelFinder
 from ..libphyling import FileExts, SeqTypes, TreeMethods, TreeOutputFiles
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.tree import MFA2Tree, MFA2TreeList
+from . import logger
 
 
 def menu(parser: argparse.ArgumentParser) -> None:
@@ -124,10 +125,13 @@ def tree(
     """A pipeline that build phylogenetic tree through either FastTree, RAxML-NG or IQ-TREE."""
 
     inputs = _input_check(inputs)
+    logger.info("Found %s MSA fasta.", len(inputs))
+
     mfa2treelist = MFA2TreeList(inputs, seqtype=seqtype)
     partition = _validate_partition(partition, method, concat)
 
     if concat:
+        logger.info("Inference with concatenation mode...")
         concat_file, partition_file = mfa2treelist.concat(output=output, threads=threads)
         concat_tree = MFA2Tree(concat_file, seqtype=seqtype)
         concat_tree.load()
@@ -163,11 +167,14 @@ def tree(
         cmds = concat_tree.cmds
 
     else:
+        logger.info("Inference with consensus mode...")
         if bs > 0 or scfl > 0:
             logger.warning("Bootstrap and concordance factor calculation are disabled when using consensus mode.")
         mfa2treelist.build(method, "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "GTR", bs=0, scfl=0, threads=threads)
+        logger.info("Tree building done.")
         tree = mfa2treelist.get_consensus_tree(seed=seed)
         cmds = mfa2treelist.cmds
+    logger.info("Done.")
 
     """Output the tree in newick format and figure."""
     output = Path(output)

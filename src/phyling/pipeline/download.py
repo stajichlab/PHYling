@@ -57,8 +57,6 @@ def download(markerset: str, **kwargs) -> None:
                 )
     except URLError as e:
         raise URLError("Connection lost or URL currently not available: %s", e)
-    # except FileExistsError as e:
-    #     logger.info(e)
 
 
 def _wrapper(item_list: list[str], col: int, col_width: int, msg: str | None = None) -> None:

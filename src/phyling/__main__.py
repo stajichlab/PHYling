@@ -163,8 +163,6 @@ def main(args: list[str] | None = None) -> int:
 
         if args.verbose:
             logger.setLevel("DEBUG")
-            for handler in logger.handlers:
-                handler.setLevel("DEBUG")
             logger.debug("Debug mode enabled.")
 
         logger.debug(vars(args))

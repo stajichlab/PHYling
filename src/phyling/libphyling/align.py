@@ -22,10 +22,9 @@ from pyhmmer import hmmalign, hmmsearch
 from pyhmmer.easel import Alphabet, DigitalSequence, DigitalSequenceBlock, SequenceFile
 from pyhmmer.plan7 import HMM, HMMFile
 
-from .. import logger
 from ..exception import EmptyWarning, SeqtypeError
 from ..external import Muscle
-from . import SeqTypes, _abc
+from . import SeqTypes, _abc, logger
 from ._utils import guess_seqtype, is_gzip_file, load_msa, progress_daemon
 
 __all__ = [
@@ -309,7 +308,7 @@ class SampleSeqs(_abc.SeqFileWrapperABC):
                 len(problematic_seqs_name),
                 original_size,
             )
-            logger.debug("Problematic seqs: %s", ", ".join(problematic_seqs_name))
+            logger.info("Problematic seqs: %s", ", ".join(problematic_seqs_name))
 
 
 class SampleList(_abc.SeqDataListABC[SampleSeqs]):
@@ -398,6 +397,8 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
             progress.start()
 
             try:
+                if logger.parent.getEffectiveLevel() > 10:
+                    logger.setLevel("WARNING")
                 if jobs <= 1:
                     logger.debug("Sequential mode with %s threads.", threads)
                     search_res = [_search_helper(sample, hmms, evalue, threads, counter, condition) for sample in self]
@@ -413,6 +414,9 @@ class SampleList(_abc.SeqDataListABC[SampleSeqs]):
             except Exception:
                 logger.error("%s", traceback.format_exc())
                 raise
+            finally:
+                logger.setLevel(logger.parent.getEffectiveLevel())
+
         search_res = [hit for res in search_res for hit in res]
         return search_res
 
@@ -920,6 +924,8 @@ class OrthologList(_abc.SeqDataListABC[OrthologSeqs]):
                 (sample, method, hmms[sample.name.encode()] if hmms else None, threads, counter, condition) for sample in samples
             ]
             try:
+                if logger.parent.getEffectiveLevel() > 10:
+                    logger.setLevel("WARNING")
                 if jobs <= 1:
                     logger.debug("Sequential mode with %s threads.", threads)
                     msa = [_align_helper(*params) for params in params_per_task]
@@ -930,6 +936,8 @@ class OrthologList(_abc.SeqDataListABC[OrthologSeqs]):
             except Exception:
                 logger.error("%s", traceback.format_exc())
                 raise
+            finally:
+                logger.setLevel(logger.parent.getEffectiveLevel())
         return msa
 
 
@@ -973,7 +981,7 @@ def run_hmmsearch(sample: SampleSeqs, hmms: HMMMarkerSet, *, evalue: float = 1e-
             continue
         r.extend(reported)
 
-    logger.debug("Hmmsearch on %s is done.", sample.name)
+    logger.info("Hmmsearch on %s is done.", sample.name)
     return r
 
 
@@ -999,7 +1007,7 @@ def run_hmmalign(ortholog: OrthologSeqs, hmm: HMM) -> MultipleSeqAlignment:
         f.seek(0)
         alignment = load_msa(Path(f.name))
         alignment.annotations = {"seqtype": SeqTypes.PEP}
-        logger.debug("Hmmalign on %s is done.", ortholog.name)
+        logger.info("Hmmalign on %s is done.", ortholog.name)
         return alignment
     finally:
         f.close()
@@ -1048,7 +1056,7 @@ def run_muscle(ortholog: OrthologSeqs, *, threads: int = 1) -> MultipleSeqAlignm
         f_aln.seek(0)
         alignment = load_msa(Path(f_aln.name))
     alignment.annotations = {"seqtype": SeqTypes.PEP}
-    logger.debug("Muscle on %s is done.", ortholog.name)
+    logger.info("Muscle on %s is done.", ortholog.name)
     return alignment
 
 
