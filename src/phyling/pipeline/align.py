@@ -21,11 +21,13 @@ from typing import Literal
 
 from Bio import SeqIO
 
+from ..external._libclipkit import trim_gaps
+
 from .. import AVAIL_CPUS, CFG_DIRS, logger
 from ..exception import EmptyWarning
 from ..libphyling import ALIGN_METHODS, FileExts, SeqTypes
 from ..libphyling._utils import Timer, check_threads
-from ..libphyling.align import HMMMarkerSet, OrthologList, SampleList, trim_gaps
+from ..libphyling.align import HMMMarkerSet, OrthologList, SampleList
 from ._outputprecheck import AlignPrecheck
 
 
