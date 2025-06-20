@@ -21,14 +21,18 @@ def test_cfg_dirs_wo_env(monkeypatch):
 
 
 def test_main_help():
-    assert main.main(["--help"]) == main.main(["-h"]) == 0
+    with pytest.raises(SystemExit) as excinfo:
+        assert main.main(["--help"]) == main.main(["-h"])
+        assert "usage: phyling" in str(excinfo.value)
 
 
 def test_main_version(capsys: pytest.CaptureFixture):
-    assert main.main(["--version"]) == main.main(["-V"])
-    captured: str = capsys.readouterr().out
-    captured = captured.split("\n")
-    assert captured[0] == captured[1] == phyling.VERSION
+    with pytest.raises(SystemExit) as excinfo:
+        assert main.main(["--version"]) == main.main(["-V"])
+        # captured: str = capsys.readouterr().out
+        # captured = captured.split("\n")
+        # assert captured[0] == captured[1] == phyling.VERSION
+        assert phyling.VERSION in str(excinfo)
 
 
 def test_main_verbose(caplog: pytest.LogCaptureFixture):

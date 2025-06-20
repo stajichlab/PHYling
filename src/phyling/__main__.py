@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import re
 import sys
 import textwrap
 import traceback
+from pathlib import Path
 
 from . import AUTHOR, VERSION, logger
 from . import __doc__ as _module_doc
@@ -154,34 +156,46 @@ def main(args: list[str] | None = None) -> int:
     """
     parser = menu()
 
+    args = args or sys.argv[1:]
+    if not args:
+        parser.print_help(sys.stderr)
+        raise SystemExit(0)
+    args = parser.parse_args(args)
+
+    if args.verbose:
+        logger.setLevel("DEBUG")
+        logger.debug("Debug mode enabled.")
+
+    file_handler = None
     try:
-        args = args or sys.argv[1:]
-        if not args:
-            parser.print_help(sys.stderr)
-            raise SystemExit(0)
-        args = parser.parse_args(args)
+        if getattr(args, "output", None):
+            file_handler = logging.FileHandler(f"{Path(args.output)}.log", mode="w", delay=True)
+            file_handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+            logger.addHandler(file_handler)
+            logger.debug(vars(args))
+        try:
+            args.func(**vars(args))
 
-        if args.verbose:
-            logger.setLevel("DEBUG")
-            logger.debug("Debug mode enabled.")
+        except KeyboardInterrupt:
+            logger.warning("Terminated by user.")
+            return 1
 
-        logger.debug(vars(args))
-        args.func(**vars(args))
-
-    except KeyboardInterrupt:
-        logger.warning("Terminated by user.")
-        return 1
-
-    except Exception as err:
-        logger.error(err)
-        logger.debug("%s", traceback.format_exc())
-        return 1
-
-    except SystemExit as err:
-        if err.code != 0:
+        except Exception as err:
             logger.error(err)
             logger.debug("%s", traceback.format_exc())
-            return err.code
+            return 1
+
+        except SystemExit as err:
+            if err.code != 0:
+                logger.error(err)
+                logger.debug("%s", traceback.format_exc())
+                return err.code
+    finally:
+        if file_handler:
+            logger.removeHandler(file_handler)
+            file_handler.close()
+            if Path(args.output).is_dir():
+                Path(file_handler.baseFilename).rename(args.output / "log.txt")
 
     return 0
 

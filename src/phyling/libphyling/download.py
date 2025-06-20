@@ -12,8 +12,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-from . import logger
-from . import BUSCO_URL, METADATA_FILE
+from . import BUSCO_URL, METADATA_FILE, logger
 
 
 class BuscoParser(ContextDecorator):

@@ -21,10 +21,9 @@ from typing import Literal
 
 from Bio import SeqIO
 
-from ..external._libclipkit import trim_gaps
-
 from .. import AVAIL_CPUS, CFG_DIRS
 from ..exception import EmptyWarning
+from ..external._libclipkit import trim_gaps
 from ..libphyling import ALIGN_METHODS, FileExts, SeqTypes
 from ..libphyling._utils import Timer, check_threads
 from ..libphyling.align import HMMMarkerSet, OrthologList, SampleList
@@ -137,7 +136,7 @@ def align(
     ]
     samples = SampleList(inputs, names, seqtype=seqtype)
 
-    logger.info("Loading markerset from %s ...", markerset)
+    logger.info("Loading markerset from %s...", markerset)
     hmmmarkerset = HMMMarkerSet(markerset, markerset.parent / "scores_cutoff")
     hmmmarkerset.sort(key=lambda x: x.name)
     logger.debug("Load markerset done.")
@@ -174,9 +173,9 @@ def align(
     searchhits.load()
     orthologs = OrthologList(searchhits.orthologs.values(), searchhits.orthologs.keys(), seqtype=samples.seqtype)
 
-    logger.info("Align start...")
+    logger.info("Alignment start...")
     msa_list = orthologs.align(method=method, hmms=hmmmarkerset if method == "hmmalign" else None, jobs=threads)
-    logger.info("Align done.")
+    logger.info("Alignment done.")
 
     if not non_trim:
         logger.info("Trimming start...")
@@ -196,7 +195,7 @@ def align(
         with open(output_precheck.output / f"{hmm}.{ext}", "w") as f:
             SeqIO.write(msa, f, format="fasta")
 
-    logger.info("Done.")
+    logger.info(f"{__name__.split('.')[-1].capitalize()} module done.")
 
 
 def _args_check(

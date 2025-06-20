@@ -116,7 +116,6 @@ def filter(
     remained_mfa2treelist, completed_mfa2treelist = output_precheck.precheck()
 
     if remained_mfa2treelist:
-        logger.info("Filter start...")
         logger.info(
             "Use %s to generate trees and filter by the rank of their toverr.",
             TreeMethods.FT.method,
@@ -124,13 +123,13 @@ def filter(
         remained_mfa2treelist.build("ft", "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "JC", noml=not (ml), threads=threads)
         remained_mfa2treelist.compute_toverr(threads=threads)
         completed_mfa2treelist.extend(remained_mfa2treelist)
-        logger.info("Filter done.")
     completed_mfa2treelist.sort()
     all_samples = set()
     for mfa2tree in completed_mfa2treelist:
         all_samples.update([tip.name for tip in mfa2tree.tree.get_terminals()])
 
     # Generate treeness tsv
+    logger.info("Output selected fasta to folder %s...", output)
     treeness_file = output / TreeOutputFiles.TREENESS
     with open(treeness_file, "w") as f:
         f.write(f"# The MSA fasta which the toverr within top {top_n_toverr} are selected:\n")
@@ -160,8 +159,9 @@ def filter(
     logger.debug("Create symlinks done.")
 
     output_precheck.save_checkpoint(completed_mfa2treelist)
+    logger.debug("Save checkpoint done.")
 
-    logger.info("Done.")
+    logger.info(f"{__name__.split('.')[-1].capitalize()} module done.")
 
 
 def _input_check(inputs: str | Path | list) -> tuple[Path]:
