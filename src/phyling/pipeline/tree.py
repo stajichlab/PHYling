@@ -14,6 +14,7 @@ as output. Additionally, users can choose to obtain a matplotlib-style figure us
 from __future__ import annotations
 
 import argparse
+import shutil
 import time
 from pathlib import Path
 from typing import Literal
@@ -130,6 +131,9 @@ def tree(
     mfa2treelist = MFA2TreeList(inputs, seqtype=seqtype)
     partition = _validate_partition(partition, method, concat)
 
+    output = Path(output)
+    output.mkdir(exist_ok=True)
+
     if concat:
         logger.info("Inference with concatenation mode...")
         concat_file, partition_file = mfa2treelist.concat(output=output, threads=threads)
@@ -164,42 +168,28 @@ def tree(
             tree = concat_tree.build(
                 method, output / method, "AUTO", bs=bs, scfl=scfl, seed=seed, threads=threads, threads_max=threads_max
             )
-        cmds = concat_tree.cmds
 
     else:
         logger.info("Inference with consensus mode...")
         if bs > 0 or scfl > 0:
-            logger.warning("Bootstrap and concordance factor calculation are disabled when using consensus mode.")
-        mfa2treelist.build(method, "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "GTR", bs=0, scfl=0, threads=threads)
+            logger.warning("Bootstrap and concordance factor calculation are disabled with consensus mode.")
+        mfa2treelist.build(method, "LG" if mfa2treelist.seqtype == SeqTypes.PEP else "GTR", bs=0, scfl=0, jobs=threads, threads=1)
         logger.info("Tree building done.")
-        tree = mfa2treelist.get_consensus_tree(seed=seed)
-        cmds = mfa2treelist.cmds
-    logger.info("Done.")
+        tree = mfa2treelist.get_consensus_tree(output / "astral", seed=seed)
 
     """Output the tree in newick format and figure."""
-    output = Path(output)
-    output.mkdir(exist_ok=True)
     output_tree = output / TreeOutputFiles.TREE_NW
     logger.info("Output tree to %s", output_tree)
-    with open(output / "log.txt", "w") as f:
-        strategy = "concatenate" if concat else "consensus"
-        f.write(f"# Final tree is built using {TreeMethods[method.upper()].method} with {strategy} strategy.")
-        if concat:
-            if partition:
-                f.write(" Partition mode is enabled.")
-        else:
-            f.write("\n\n")
-        for cmd in cmds:
-            f.write(f"# {cmd}\n")
-    with open(output_tree, "w") as f:
-        Phylo.write(tree, f, "newick")
+    shutil.copy(tree, output_tree)
 
     if figure:
         fig, ax = plt.subplots(figsize=(20, 12))
         output_fig = output / TreeOutputFiles.TREE_IMG
         logger.info("Output figure to %s", output_fig)
-        Phylo.draw(tree, do_show=False, axes=ax)
+        Phylo.draw(Phylo.read(tree, "newick"), do_show=False, axes=ax)
         fig.savefig(output_fig)
+
+    logger.info(f"{__name__.split('.')[-1].capitalize()} module done.")
 
 
 def _input_check(inputs: str | Path | list) -> tuple[Path]:

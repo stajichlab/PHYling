@@ -14,7 +14,7 @@ from ..libphyling._utils import CheckAttrs
 
 _C = TypeVar("Callable", bound=Callable[..., Any])
 
-logger = logging.getLogger(__package__)
+logger = logging.getLogger(f"{SeqTypes.__module__}.{__package__.split('.')[-1]}")
 
 
 def _check_attributes(*attrs: str):
