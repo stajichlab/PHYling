@@ -2,16 +2,160 @@
 
 from __future__ import annotations
 
+import pickle
+from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
-from .. import logger
-from ..libphyling import TreeOutputFiles, _abc, FileExts
-from ..libphyling._utils import remove_files
+from ..libphyling import FileExts, TreeOutputFiles
+from ..libphyling._utils import CheckAttrs, remove_dirs, remove_files
 from ..libphyling.align import SampleList, SampleSeqs, SearchHitsManager
 from ..libphyling.tree import MFA2Tree, MFA2TreeList
+from . import logger
 
 
-class AlignPrecheck(_abc.OutputPrecheckABC):
+class OutputPrecheckABC(ABC):
+    """Abstract base class providing features for input/output precheck and checkpoint loading/saving.
+
+    This single-instance class ensures that certain attributes exist, and provides methods for checking output directories,
+    loading and saving checkpoints, and cleaning up files and directories.
+
+    Attributes:
+        output (Path): The path to the output directory.
+        ckp (str): The file name of the checkpoint.
+        params (dict): A dictionary of parameters.
+    """
+
+    _instance = None
+    output: Path
+    ckp: str
+    params: dict[str, Any]
+
+    def __new__(cls, *args, **kwargs):
+        """Create a new instance, cleaning up the previous instance if it exists.
+
+        If an existing instance is already created, it will be cleaned up before creating a new one.
+
+        Returns:
+            OutputPrecheckABC: A new instance of the class.
+        """
+        if cls._instance is not None:
+            cls._instance.cleanup()
+        cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __del__(self):
+        """Resets the class-level singleton instance when the object is destroyed."""
+        self.cleanup()
+
+    def __init__(self, output: Path):
+        """Initializes the output directory and checks for required attributes.
+
+        Args:
+            output (Path): The path to the output directory.
+
+        Raises:
+            AttributeError: If required attributes are missing.
+        """
+        self.output = Path(output)
+        missing_attrs = CheckAttrs.not_exists(self, "output", "ckp")
+        if missing_attrs:
+            raise AttributeError
+
+    def cleanup(self):
+        """Cleanup resources and reset the instance."""
+        type(self)._instance = None
+
+    @CheckAttrs.Exists("output", "ckp")
+    @abstractmethod
+    def precheck(self, force_rerun: bool = False) -> tuple | None:
+        """Checks the output folder and determines the rerun status.
+
+        Args:
+            force_rerun (bool, optional): Whether to force a rerun. Defaults to False.
+
+        Returns:
+            tuple | None: Status of the rerun or None if no rerun is needed.
+
+        Raises:
+            NotADirectoryError: If the output path exists but is not a directory.
+            FileExistsError: If the output directory is not empty and no checkpoint file is found.
+        """
+        if not self.output.exists():
+            self.output.mkdir()
+
+        if not self.output.is_dir():
+            raise NotADirectoryError(f"{self.output} is already existed but not a folder. Aborted.")
+
+        if force_rerun:
+            remove_dirs(self.output)
+            self.output.mkdir()
+
+        if any(self.output.iterdir()) and not (self.output / self.ckp).exists():
+            raise FileExistsError(f"Checkpoint file not found but the output directory {self.output} is not empty. Aborted.")
+
+        ...
+
+    @CheckAttrs.Exists("output", "ckp")
+    def load_checkpoint(self) -> tuple[dict[str, Any], ...]:
+        """Loads the checkpoint and retrieves the required parameters/data for determining the rerun status.
+
+        This method should be called before running the output precheck.
+
+        Returns:
+            tuple: Parameters and data loaded from the checkpoint file.
+
+        Raises:
+            FileNotFoundError: If the checkpoint file is not found.
+            RuntimeError: If the checkpoint file is corrupted.
+        """
+        logger.info("Loading from checkpoint...")
+        try:
+            with open(self.output / self.ckp, "rb") as f:
+                params, *data = pickle.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError("Checkpoint file not found.")
+        except (EOFError, ValueError):
+            raise RuntimeError("Checkpoint file corrupted. Please remove the output folder and try again.")
+
+        return params, *data
+
+    @CheckAttrs.Exists("output", "ckp")
+    def save_checkpoint(self, *data) -> None:
+        """Saves the parameters and data as a checkpoint for rerun.
+
+        Args:
+            params (dict): Parameters to save in the checkpoint.
+            *data: Additional data to save in the checkpoint.
+        """
+        with open(self.output / self.ckp, "wb") as f:
+            pickle.dump((self.params, *data), f)
+
+    @abstractmethod
+    def _type_check(self) -> None:
+        """Performs a type check before saving or after loading the checkpoint.
+
+        This method should be defined in the subclass to implement specific type checking logic.
+        """
+        ...
+
+    @abstractmethod
+    def _determine_rerun(self, cur: tuple, prev: tuple) -> tuple:
+        """Defines actions to take when a checkpoint file is found in the output folder.
+
+        Args:
+            cur (tuple): Current checkpoint data.
+            prev (tuple): Previous checkpoint data.
+
+        Returns:
+            tuple: Status or actions for rerun based on checkpoint data.
+
+        This method must be defined in the subclass to implement specific rerun logic.
+        """
+        ...
+
+
+class AlignPrecheck(OutputPrecheckABC):
     """A single-instance class that provides features for input/output precheck, checkpoint loading/saving and final MSA output.
 
     Attributes:
@@ -158,7 +302,7 @@ class AlignPrecheck(_abc.OutputPrecheckABC):
         return remained_samples, searchhits
 
 
-class FilterPrecheck(_abc.OutputPrecheckABC):
+class FilterPrecheck(OutputPrecheckABC):
     """A class providing input/output precheck, checkpoint management, and filtered MSAs output.
 
     Attributes:

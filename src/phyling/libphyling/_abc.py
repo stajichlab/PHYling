@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
-import pickle
 import textwrap
 from abc import ABC, abstractmethod
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Generic, Iterator, Literal, Sequence, TypeVar, overload
+from typing import Callable, Generic, Iterator, Literal, Sequence, TypeVar, overload
 
-from .. import logger
 from ..exception import SeqtypeError
 from . import SeqTypes
-from ._utils import CheckAttrs, get_file_checksum, remove_dirs
+from ._utils import CheckAttrs, get_file_checksum
 
-__all__ = ["FileWrapperABC", "SeqFileWrapperABC", "DataListABC", "SeqDataListABC", "OutputPrecheckABC"]
+__all__ = [
+    "FileWrapperABC",
+    "SeqFileWrapperABC",
+    "DataListABC",
+    "SeqDataListABC",
+]
 
-_C = TypeVar("Callable", bound=Callable[..., Any])
+_R = TypeVar("Return")
+_C = TypeVar("Callable", bound=Callable[..., _R])
 _FW = TypeVar("FileWrapperABC", bound="FileWrapperABC")
 _SFW = TypeVar("SeqFileWrapperABC", bound="SeqFileWrapperABC")
 _DL = TypeVar("DataListABC", bound="DataListABC")
@@ -882,144 +886,3 @@ class SeqDataListABC(DataListABC[_SFW]):
         """
         super()._before_append_validate(item)
         self._seqtype = _add_seqtypes(self, item)
-
-
-class OutputPrecheckABC(ABC):
-    """Abstract base class providing features for input/output precheck and checkpoint loading/saving.
-
-    This single-instance class ensures that certain attributes exist, and provides methods for checking output directories,
-    loading and saving checkpoints, and cleaning up files and directories.
-
-    Attributes:
-        output (Path): The path to the output directory.
-        ckp (str): The file name of the checkpoint.
-        params (dict): A dictionary of parameters.
-    """
-
-    _instance = None
-    output: Path
-    ckp: str
-    params: dict[str, Any]
-
-    def __new__(cls, *args, **kwargs):
-        """Create a new instance, cleaning up the previous instance if it exists.
-
-        If an existing instance is already created, it will be cleaned up before creating a new one.
-
-        Returns:
-            OutputPrecheckABC: A new instance of the class.
-        """
-        if cls._instance is not None:
-            cls._instance.cleanup()
-        cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __del__(self):
-        """Resets the class-level singleton instance when the object is destroyed."""
-        self.cleanup()
-
-    def __init__(self, output: Path):
-        """Initializes the output directory and checks for required attributes.
-
-        Args:
-            output (Path): The path to the output directory.
-
-        Raises:
-            AttributeError: If required attributes are missing.
-        """
-        self.output = Path(output)
-        missing_attrs = CheckAttrs.not_exists(self, "output", "ckp")
-        if missing_attrs:
-            raise AttributeError
-
-    def cleanup(self):
-        """Cleanup resources and reset the instance."""
-        type(self)._instance = None
-
-    @CheckAttrs.Exists("output", "ckp")
-    @abstractmethod
-    def precheck(self, force_rerun: bool = False) -> tuple | None:
-        """Checks the output folder and determines the rerun status.
-
-        Args:
-            force_rerun (bool, optional): Whether to force a rerun. Defaults to False.
-
-        Returns:
-            tuple | None: Status of the rerun or None if no rerun is needed.
-
-        Raises:
-            NotADirectoryError: If the output path exists but is not a directory.
-            FileExistsError: If the output directory is not empty and no checkpoint file is found.
-        """
-        if not self.output.exists():
-            self.output.mkdir()
-
-        if not self.output.is_dir():
-            raise NotADirectoryError(f"{self.output} is already existed but not a folder. Aborted.")
-
-        if force_rerun:
-            remove_dirs(self.output)
-            self.output.mkdir()
-
-        if any(self.output.iterdir()) and not (self.output / self.ckp).exists():
-            raise FileExistsError(f"Checkpoint file not found but the output directory {self.output} is not empty. Aborted.")
-
-        ...
-
-    @CheckAttrs.Exists("output", "ckp")
-    def load_checkpoint(self) -> tuple[dict[str, Any], ...]:
-        """Loads the checkpoint and retrieves the required parameters/data for determining the rerun status.
-
-        This method should be called before running the output precheck.
-
-        Returns:
-            tuple: Parameters and data loaded from the checkpoint file.
-
-        Raises:
-            FileNotFoundError: If the checkpoint file is not found.
-            RuntimeError: If the checkpoint file is corrupted.
-        """
-        logger.info("Loading from checkpoint...")
-        try:
-            with open(self.output / self.ckp, "rb") as f:
-                params, *data = pickle.load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError("Checkpoint file not found.")
-        except (EOFError, ValueError):
-            raise RuntimeError("Checkpoint file corrupted. Please remove the output folder and try again.")
-
-        return params, *data
-
-    @CheckAttrs.Exists("output", "ckp")
-    def save_checkpoint(self, *data) -> None:
-        """Saves the parameters and data as a checkpoint for rerun.
-
-        Args:
-            params (dict): Parameters to save in the checkpoint.
-            *data: Additional data to save in the checkpoint.
-        """
-        with open(self.output / self.ckp, "wb") as f:
-            pickle.dump((self.params, *data), f)
-
-    @abstractmethod
-    def _type_check(self) -> None:
-        """Performs a type check before saving or after loading the checkpoint.
-
-        This method should be defined in the subclass to implement specific type checking logic.
-        """
-        ...
-
-    @abstractmethod
-    def _determine_rerun(self, cur: tuple, prev: tuple) -> tuple:
-        """Defines actions to take when a checkpoint file is found in the output folder.
-
-        Args:
-            cur (tuple): Current checkpoint data.
-            prev (tuple): Previous checkpoint data.
-
-        Returns:
-            tuple: Status or actions for rerun based on checkpoint data.
-
-        This method must be defined in the subclass to implement specific rerun logic.
-        """
-        ...
