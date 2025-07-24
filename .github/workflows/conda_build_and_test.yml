@@ -36,6 +36,8 @@ jobs:
 
       - name: Lint with Ruff
         uses: astral-sh/ruff-action@v3
+        with:
+          version: "latest"
 
       - name: Install package
         run: pip install .
