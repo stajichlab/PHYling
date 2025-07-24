@@ -337,6 +337,7 @@ Options:
   -c, --concat          Concatenated alignment results
   -p, --partition       Partitioned analysis by sequence. Only works when --concat enabled.
   -f, --figure          Generate a matplotlib tree figure
+  --seed SEED           Seed number for stochastic elements during inferences. (default: -1 to generate randomly)
   -t THREADS, --threads THREADS
                         Threads for tree construction (default: 6)
   -v, --verbose         Verbose mode for debug
@@ -355,22 +356,36 @@ You can also use only a part of the alignment results to build the tree.
 phyling tree -i filtered_align/100957at4751.aa.mfa filtered_align/174653at4751.aa.mfa filtered_align/255412at4751.aa.mfa
 ```
 
+By default, the tree module creates an output folder named using the current UTC timestamp. You can specify a output path using
+the `--output/-o` option.
+
+```
+phyling tree -I filtered_align -o tree
+```
+
 Use IQ-TREE instead of the default FastTree method for tree building and run with 16 threads.
 
 ```
-phyling tree -I filtered_align -m iqtree -t 16
+phyling tree -I filtered_align -o tree -m iqtree -t 16
 ```
 
 Manually assign sequence type.
 
 ```
-phyling tree -I filtered_align -m iqtree -t 16 --seqtype pep
+phyling tree -I filtered_align -o tree -m iqtree -t 16 --seqtype pep
 ```
 
 Use matplotlib to generate a tree figure.
 
 ```
-phyling tree -I filtered_align -f -t 16
+phyling tree -I filtered_align -o tree -f -t 16
+```
+
+Many tree-building algorithms include stochastic steps that rely on random number generation to determine initial states. To
+ensure reproducibility and minimize randomness, users can specify a fixed seed using the `--seed` option.
+
+```
+phyling tree -I filtered_align -o tree --seed 12345 -t 16
 ```
 
 #### Use concatenate strategy
@@ -379,7 +394,7 @@ The consensus strategy is used for tree construction by default but users can ch
 single tree on it.
 
 ```
-phyling tree -I align -c -t 16
+phyling tree -I filtered_align -o concat_tree -c -t 16
 ```
 
 When concatenation mode is enabled, PHYling concatenates all the inputs to a `concat_alignments.mfa` file and use that to generate
@@ -391,7 +406,7 @@ the partition mode expects different genes exhibit different evolutionary rates,
 The example below concatenates all the markers and run tree building with partitioning through IQ-TREE.
 
 ```
-phyling tree -I align -M iqtree -c -p -t 16
+phyling tree -I align -M iqtree -o partition_tree -c -p -t 16
 ```
 
 **Note: Partition mode is not supported in FastTree.**

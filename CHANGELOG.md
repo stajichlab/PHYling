@@ -9,12 +9,21 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Add the argument "seqtype" to SeqFileWrapperABC and its subclasses, which allow users to manually assign the seqtype of the
-  inputs if the autodetection failed.
+- The argument "seqtype" to SeqFileWrapperABC and its subclasses, which allow users to manually assign the seqtype of the inputs
+  if the autodetection failed.
+
+- The argument "seed" to tree module providing control to random generator during tree building.
+
+### Removed
+
+- Tree displaying at the end of the tree module.
 
 ### Changed
 
 - Swap the key-value in DataListABC checksums which allow to look up using input checksums instead of input names.
+
+- Use hierarchical loggers to better control the logging behavior. Now core modules (align, filter, tree) will output logs to a
+  file `[output_dir]/log.txt`.
 
 ### Fixed
 
