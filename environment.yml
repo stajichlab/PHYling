@@ -8,7 +8,7 @@ dependencies:
   - biopython>=1.81
   - clipkit>=2.1.1
   - fasttree>=2.1.1
-  - iqtree>=2.4.0
+  - iqtree>=2.4.0,<3.0
   - matplotlib>=3.5.3
   - muscle>=5.3
   - numpy>=2.2.1
