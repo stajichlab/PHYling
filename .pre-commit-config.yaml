@@ -22,7 +22,7 @@ repos:
     rev: v2.3.0
     hooks:
       - id: codespell
-        exclude: ^tests
+        exclude: '(^tests/|\.svg$)'
         args:
           - --ignore-words-list=nd,reacher,thist,ths,ure,referenc,wile,nin,pid
   - repo: https://github.com/astral-sh/ruff-pre-commit
