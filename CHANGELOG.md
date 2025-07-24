@@ -7,6 +7,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.3.0] - 2025-07-24
+
 ### Added
 
 - The argument "seqtype" to SeqFileWrapperABC and its subclasses, which allow users to manually assign the seqtype of the inputs
@@ -176,7 +178,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Implement back-translation to convert the peptide MSA results to DNA counterpart when receiving coding sequence fasta as inputs.
 
-[Unreleased]: https://github.com/stajichlab/PHYling/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/stajichlab/PHYling/compare/v2.3.0...HEAD
+
+[2.3.0]: https://github.com/stajichlab/PHYling/compare/v2.2.0...v2.3.0
 
 [2.2.0]: https://github.com/stajichlab/PHYling/compare/v2.1.1...v2.2.0
 
