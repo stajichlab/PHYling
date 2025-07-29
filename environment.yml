@@ -9,7 +9,7 @@ dependencies:
   - clipkit>=2.1.1
   - fasttree>=2.1.1
   - iqtree>=2.4.0,<3.0
-  - matplotlib>=3.5.3
+  - matplotlib-base>=3.5.3
   - muscle>=5.3
   - numpy>=2.0.2
   - phykit>=2.0.1
