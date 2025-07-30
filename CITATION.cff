@@ -2,50 +2,44 @@
 # Visit https://bit.ly/cffinit to generate yours today!
 
 cff-version: 1.2.0
-title: PHYling for Phylogenomic reconstruction from genomes
+title: 'Phyling: phylogenetic inference from annotated genomes'
 message: >-
   If you use this software, please cite it using the
   metadata from this file.
 type: software
 authors:
+  - given-names: Cheng-Hung
+    family-names: Tsai
+    email: chenghung.tsai@email.ucr.edu
+    affiliation: University of California-Riverside
+    orcid: 'https://orcid.org/0000-0003-3419-2146'
   - given-names: Jason
     family-names: Stajich
     name-particle: E
     email: jason.stajich@ucr.edu
     affiliation: University of California-Riverside
     orcid: 'https://orcid.org/0000-0002-7591-0020'
-  - given-names: Cheng-Hung
-    family-names: Tsai
-    email: chenghung.tsai@email.ucr.edu
-    affiliation: University of California-Riverside
-    orcid: 'https://orcid.org/0000-0003-3419-2146'
-repository-code: 'https://github.com/stajichlab/PHYling'
+repository-code: 'https://github.com/stajichlab/Phyling'
 url: 'https://lab.stajich.org/projects/'
-abstract: >-
-  The unified PHYling pipeline for phylogenomic data
-  collection from annotated genomes.
+abstract: >
+  Phyling is a fast, scalable, and user-friendly tool supporting phylogenomic reconstruction of species phylogenies directly from
+  protein-encoded genomic data. It identifies orthologous genes by searching a sample's protein sequences against a Hidden Markov
+  Models marker set, containing single-copy orthologs, retrieved from the BUSCO database. In the final step, users can choose
+  between consensus and concatenation strategies to construct the species tree from the aligned orthologs.
 
 
-  This is latest iteration of tool for using
-  phylogenetically conserved markers to pull out informative
-  gene or protein info from genomic and transcriptomic
-  datasets in order to construct gene trees and species
-  phylogenies.
-
-
-  The aligned markers can be extracted from protein
-  sequences for phylogenetic analyses and also projected
-  into coding sequence alignments for codon-based analyses
-  for better resolution of recently diverged species.  This
-  approach can also utilize BUSCO generated marker sets to
-  obtain markers from unannotated genomes.
-
-
-  The assumptions in this approach are that the markers are
-  generally single copy in genomes and taking best hit is
-  sufficient first approximation for identifying orthologs.
+  Phyling efficiently resolves large phylogenies by optimizing memory usage and data processing. Its checkpoint system enables
+  users to incrementally add or remove samples without repeating the entire search process. For analyses involving closely related
+  taxa, Phyling supports the use of nucleotide coding sequences, which may capture phylogenetic signals missed by protein
+  sequences. The benchmark results show that Phyling substantially runs faster than OrthoFinder, a Reciprocal Best Hit based
+  method, while achieving equal or better accuracy.
 keywords:
+  - phylogenetics
   - phylogenomics
+  - software
+  - orthology
+  - Hidden Markov Models
+  - Python
 license: MIT
-version: '2.0'
-date-released: '2023-04-27'
+version: 2.3.0
+date-released: '2025-07-24'
