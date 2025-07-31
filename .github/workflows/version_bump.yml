@@ -25,16 +25,14 @@ on:
 
 jobs:
   version_check:
-    name: Update Readme and Changelog
+    name: Update Changelog and citation
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          sparse-checkout: |
-            CHANGELOG.md
-          sparse-checkout-cone-mode: false
+          sparse-checkout: .
 
       - name: Bump changelog version
         uses: release-flow/keep-a-changelog-action@v3
@@ -52,11 +50,25 @@ jobs:
           command: query
           version: latest
 
-      - name: Save cache to Changelog.md
+      - name: Edit CITATION.cff
+        run: |
+          VERSION=${{ steps.query-release-info.outputs.version }}
+          DATE=$(date -u +%Y-%m-%d)
+
+          if [ -f CITATION.cff ]; then
+            sed -i "s/^version: .*/version: $VERSION/" CITATION.cff
+            sed -i "s/^date-released: .*/date-released: '$DATE'/" CITATION.cff
+          else
+            echo "CITATION.cff not found, skipping update."
+          fi
+
+      - name: Save cache to CHANGELOG.md and CITATION.cff
         uses: actions/cache/save@v4
         with:
-          path: CHANGELOG.md
-          key: version-bump-v${{ steps.query-release-info.outputs.version }}
+          path: |
+            CHANGELOG.md
+            CITATION.cff
+          key: version-bump-v${{ steps.query-release-info.outputs.version }}-${{ github.run_id }}
 
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v3
@@ -65,5 +77,6 @@ jobs:
           client-payload: >-
             {
               "bump_type": "${{ github.event.inputs.bump_type }}",
-              "version": "${{ steps.query-release-info.outputs.version }}"
+              "version": "${{ steps.query-release-info.outputs.version }}",
+              "run_id": ${{ github.run_id }}
             }

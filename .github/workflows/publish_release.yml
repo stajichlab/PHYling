@@ -22,12 +22,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: .
 
-      - name: Restore cache to Changelog.md
+      - name: Restore cache to CHANGELOG.md and CITATION.cff
         uses: actions/cache/restore@v4
         with:
-          path: CHANGELOG.md
-          key: version-bump-v${{ github.event.client_payload.version }}
+          path: |
+            CHANGELOG.md
+            CITATION.cff
+          key: version-bump-v${{ github.event.client_payload.version }}-${{ github.event.client_payload.run_id }}
 
       - name: Get release info
         id: query-release-info
