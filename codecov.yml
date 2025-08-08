@@ -2,13 +2,12 @@ coverage:
   status:
     project:
       default:
-        target: 70
-        threshold: 10
-        base: auto
+        target: 80
+        threshold: 5
         paths:
           - "src"
     patch:
       default:
-        target: 70
+        target: 80
         paths:
           - "src"

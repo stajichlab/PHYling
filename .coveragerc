@@ -1,8 +1,17 @@
-[run]
-omit =
-    src/phyling/__init__.py
-    src/phyling/exception.py
-
 [path]
 source =
-    src/phyling/
+    src/phyling
+
+[run]
+omit =
+    **/__init__.py
+    **/_[^_]*.py
+    tests/*.py
+    src/phyling/exception.py
+
+[report]
+omit =
+    **/__init__.py
+    **/_[^_]*.py
+    tests/*.py
+    src/phyling/exception.py
