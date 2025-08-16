@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The PHYling CLI menu and sub-process execution."""
+"""The Phyling CLI menu and sub-process execution."""
 
 from __future__ import annotations
 

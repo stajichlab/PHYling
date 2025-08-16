@@ -1,6 +1,6 @@
-"""PHYling - Phylogenomic reconstruction from genomes.
+"""Phyling - Phylogenomic reconstruction from genomes.
 
-PHYling comprises 4 modules - download, align, filter and tree. The download module can be used to download HMM markerset from
+Phyling comprises 4 modules - download, align, filter and tree. The download module can be used to download HMM markerset from
 BUSCO. The align module is the core element of this package which generate multiple sequence alignment among the orthologs
 found across samples. The filter module calculates treeness/RCV scores to filter out the uninformative alignment results. The
 tree module help to build a phylogenetic tree by different algorithms.

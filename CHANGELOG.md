@@ -178,18 +178,18 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Implement back-translation to convert the peptide MSA results to DNA counterpart when receiving coding sequence fasta as inputs.
 
-[Unreleased]: https://github.com/stajichlab/PHYling/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/stajichlab/Phyling/compare/v2.3.0...HEAD
 
-[2.3.0]: https://github.com/stajichlab/PHYling/compare/v2.2.0...v2.3.0
+[2.3.0]: https://github.com/stajichlab/Phyling/compare/v2.2.0...v2.3.0
 
-[2.2.0]: https://github.com/stajichlab/PHYling/compare/v2.1.1...v2.2.0
+[2.2.0]: https://github.com/stajichlab/Phyling/compare/v2.1.1...v2.2.0
 
-[2.1.1]: https://github.com/stajichlab/PHYling/compare/v2.1.0...v2.1.1
+[2.1.1]: https://github.com/stajichlab/Phyling/compare/v2.1.0...v2.1.1
 
-[2.1.0]: https://github.com/stajichlab/PHYling/compare/v2.0.0...v2.1.0
+[2.1.0]: https://github.com/stajichlab/Phyling/compare/v2.0.0...v2.1.0
 
-[2.0.0]: https://github.com/stajichlab/PHYling/compare/v2.0.0-beta...v2.0.0
+[2.0.0]: https://github.com/stajichlab/Phyling/compare/v2.0.0-beta...v2.0.0
 
-[2.0.0-beta]: https://github.com/stajichlab/PHYling/compare/v2.0.0-alpha...v2.0.0-beta
+[2.0.0-beta]: https://github.com/stajichlab/Phyling/compare/v2.0.0-alpha...v2.0.0-beta
 
-[2.0.0-alpha]: https://github.com/stajichlab/PHYling/releases/tag/v2.0.0-alpha
+[2.0.0-alpha]: https://github.com/stajichlab/Phyling/releases/tag/v2.0.0-alpha

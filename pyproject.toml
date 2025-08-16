@@ -32,8 +32,8 @@ dynamic = ["dependencies", "version"]
 phyling = "phyling.__main__:main"
 
 [project.urls]
-"Homepage" = "https://github.com/stajichlab/PHYling"
-"Bug Tracker" = "https://github.com/stajichlab/PHYling/issues"
+"Homepage" = "https://github.com/stajichlab/Phyling"
+"Bug Tracker" = "https://github.com/stajichlab/Phyling/issues"
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
