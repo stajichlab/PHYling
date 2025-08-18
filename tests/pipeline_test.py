@@ -10,7 +10,7 @@ from shutil import copytree
 import pytest
 from Bio import AlignIO
 
-from phyling.libphyling import ALIGN_METHODS, TreeMethods, TreeOutputFiles, FileExts
+from phyling.libphyling import ALIGN_METHODS, FileExts, TreeMethods, TreeOutputFiles
 from phyling.pipeline import align, download, filter, tree
 
 
@@ -242,6 +242,21 @@ class TestAlign:
             ]
         )
         assert samples == expected_samples
+
+
+@pytest.mark.parametrize(
+    "thread_param, expected",
+    [
+        ((1, 1), (1, 1)),
+        ((4, 1), (1, 1)),
+        ((4, 7), (1, 7)),
+        ((4, 8), (2, 4)),
+        ((4, 16), (4, 4)),
+        ((8, 96), (8, 4)),
+    ],
+)
+def test_search_threads_check(thread_param, expected):
+    assert align._search_threads_check(*thread_param) == expected
 
 
 @pytest.mark.dependency(depends=["align"])

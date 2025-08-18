@@ -152,9 +152,8 @@ def align(
     remaining_samples, searchhits = output_precheck.precheck()
     if remaining_samples:
         logger.info("Search start...")
-        threads_per_jobs = threads if (threads < 8 or len(remaining_samples) == 1) else 4
-        jobs = threads // threads_per_jobs
-        hits = remaining_samples.search(hmmmarkerset, evalue=evalue, jobs=jobs, threads=threads_per_jobs)
+        jobs, threads_per_job = _search_threads_check(len(remaining_samples), threads)
+        hits = remaining_samples.search(hmmmarkerset, evalue=evalue, jobs=jobs, threads=threads_per_job)
         searchhits.update(hits)
         logger.info("Search done.")
 
@@ -234,3 +233,11 @@ def _args_check(
         raise ValueError(f"Invalid method: {method}")
 
     return inputs, hmmmarkerset, evalue, method
+
+
+def _search_threads_check(n_samples: int, threads: int):
+    threads_per_job = threads if (threads < 8 or n_samples == 1) else 4
+    jobs = threads // threads_per_job
+    if jobs > n_samples:
+        jobs = n_samples
+    return jobs, threads_per_job
