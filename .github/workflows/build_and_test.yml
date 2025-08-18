@@ -107,6 +107,12 @@ jobs:
           package_name=$(grep '^name = ' pyproject.toml | sed 's/name = "\(.*\)"/\1/' | tr -d '[:space:]')
           pytest -vv --cov=$package_name --cov-config=.coveragerc --cov-report=xml --runslow
 
+      - name: Upload coverage.xml artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5.4.3
         with:
