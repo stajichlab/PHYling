@@ -110,7 +110,7 @@ jobs:
       - name: Upload coverage.xml artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: coverage-report-${{ matrix.python }}
           path: coverage.xml
 
       - name: Upload coverage reports to Codecov

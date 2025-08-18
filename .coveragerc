@@ -7,11 +7,11 @@ omit =
     **/__init__.py
     **/_[^_]*.py
     tests/*.py
-    src/phyling/exception.py
+    exception.py
 
 [report]
 omit =
     **/__init__.py
     **/_[^_]*.py
     tests/*.py
-    src/phyling/exception.py
+    exception.py
